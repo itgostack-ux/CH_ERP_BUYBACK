@@ -4,5 +4,8 @@ from frappe.model.document import Document
 
 class BuybackPriceMaster(Document):
     def before_insert(self):
-        # generate auto SKU id
-        self.sku_id = frappe.db.get_next_sequence_val("buyback_price_master_seq")
+        last = frappe.db.sql("""
+            SELECT MAX(sku_id) FROM `tabBuyback Price Master`
+        """)[0][0] or 0
+
+        self.sku_id = last + 1
