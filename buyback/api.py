@@ -1,5 +1,11 @@
 import frappe
+import csv
+import io
 
+
+# ---------------------------
+# Upload CSV
+# ---------------------------
 @frappe.whitelist()
 def upload_buyback_csv(file_url):
 
@@ -9,34 +15,69 @@ def upload_buyback_csv(file_url):
     if not content:
         frappe.throw("Empty file")
 
-    if isinstance(content, str):
-        text = content
-    else:
-        text = content.decode("utf-8")
+    # safe decode
+    text = content.decode("utf-8") if isinstance(content, bytes) else content
 
-    lines = text.split("\n")
+    reader = csv.reader(io.StringIO(text))
     header = True
+    inserted = 0
 
-    for line in lines:
+    for row in reader:
 
         if header:
             header = False
             continue
 
-        if not line.strip():
+        if len(row) < 4:
             continue
 
-        parts = line.split(",")
+        item_code = row[0].strip()
+        item_name = row[1].strip()
+        price = row[2] or 0
+        vendor = row[3] or 0
 
-        if len(parts) < 4:
+        # optional: skip duplicates
+        if frappe.db.exists("Buyback Price Master", {"item_code": item_code}):
             continue
 
         doc = frappe.new_doc("Buyback Price Master")
-        doc.item_code = parts[0].strip()
-        doc.item_name = parts[1].strip()
-        doc.current_market__price = parts[2] or 0
-        doc.vendor_price = parts[3] or 0
-
+        doc.item_code = item_code
+        doc.item_name = item_name
+        doc.current_market__price = price
+        doc.vendor_price = vendor
         doc.insert(ignore_permissions=True)
 
-    return {"message": "Upload completed"}
+        inserted += 1
+
+    return {"message": f"Upload completed. Inserted {inserted} rows"}
+
+
+# ---------------------------
+# Download Template
+# ---------------------------
+@frappe.whitelist()
+def download_buyback_template():
+
+    items = frappe.get_all(
+        "Item",
+        filters={"item_group": "Mobiles", "disabled": 0},
+        fields=["item_code", "item_name"],
+        ignore_permissions=True
+    )
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+
+    writer.writerow([
+        "item_code",
+        "item_name",
+        "current_market_price",
+        "vendor_price"
+    ])
+
+    for i in items:
+        writer.writerow([i.item_code, i.item_name, 0, 0])
+
+    frappe.response.filename = "buyback_template.csv"
+    frappe.response.filecontent = output.getvalue()
+    frappe.response.type = "download"
