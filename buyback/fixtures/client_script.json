@@ -1,0 +1,13 @@
+[
+ {
+  "docstatus": 0,
+  "doctype": "Client Script",
+  "dt": "Buyback Price Master",
+  "enabled": 1,
+  "modified": "2026-02-06 12:09:32.829437",
+  "module": "BuyBack",
+  "name": "Buyback Price Master Download Upload Button UI",
+  "script": "frappe.listview_settings['Buyback Price Master'] = {\n    onload(listview) {\n\n        if (listview.buttons_added) return;\n        listview.buttons_added = true;\n\n        // Download button\n        listview.page.add_inner_button('Download Template', () => {\n            window.open('/api/method/download_buyback_template');\n        });\n\n        // Upload button\n        listview.page.add_inner_button('Upload CSV', () => {\n\n            new frappe.ui.FileUploader({\n                allow_multiple: false,\n                on_success(file) {\n\n                    frappe.call({\n                        method: \"buyback.api.upload_buyback_csv\",  \n                        args: { file_url: file.file_url },\n                        callback: () => {\n                            frappe.msgprint(\"Upload complete\");\n                            listview.refresh();\n                        }\n                    });\n\n                }\n            });\n\n        });\n\n    }\n};\n",
+  "view": "List"
+ }
+]

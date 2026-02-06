@@ -250,3 +250,8 @@ app_license = "mit"
 doctype_list_js = {
     "Buyback Price Master": "buyback/doctype/buyback_price_master/buyback_price_master.js"
 }
+
+fixtures = [
+    "Client Script",
+    "Server Script"
+]
