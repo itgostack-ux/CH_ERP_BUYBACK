@@ -15,7 +15,6 @@ def upload_buyback_csv(file_url):
     if not content:
         frappe.throw("Empty file")
 
-    # safe decode
     text = content.decode("utf-8") if isinstance(content, bytes) else content
 
     reader = csv.reader(io.StringIO(text))
@@ -36,7 +35,7 @@ def upload_buyback_csv(file_url):
         price = row[2] or 0
         vendor = row[3] or 0
 
-        # optional: skip duplicates
+        # skip duplicates
         if frappe.db.exists("Buyback Price Master", {"item_code": item_code}):
             continue
 
