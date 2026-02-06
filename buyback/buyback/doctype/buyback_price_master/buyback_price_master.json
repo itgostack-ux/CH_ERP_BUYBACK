@@ -1,0 +1,72 @@
+{
+ "actions": [],
+ "allow_import": 1,
+ "allow_rename": 1,
+ "creation": "2026-02-05 14:27:58.725197",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "sku_id",
+  "item_code",
+  "item_name",
+  "current_market__price",
+  "vendor_price"
+ ],
+ "fields": [
+  {
+   "fieldname": "sku_id",
+   "fieldtype": "Int",
+   "label": "Sku ID",
+   "read_only": 1
+  },
+  {
+   "fieldname": "item_code",
+   "fieldtype": "Link",
+   "label": "Item Code ",
+   "options": "Item"
+  },
+  {
+   "fetch_from": "item_code.item_name",
+   "fieldname": "item_name",
+   "fieldtype": "Data",
+   "label": "Item Name"
+  },
+  {
+   "fieldname": "current_market__price",
+   "fieldtype": "Currency",
+   "label": "Current Market  Price "
+  },
+  {
+   "fieldname": "vendor_price",
+   "fieldtype": "Currency",
+   "label": "Vendor Price"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-02-05 15:38:50.180714",
+ "modified_by": "Administrator",
+ "module": "BuyBack",
+ "name": "Buyback Price Master",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
