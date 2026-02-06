@@ -252,6 +252,9 @@ doctype_list_js = {
 }
 
 fixtures = [
-    "Client Script",
-    "Server Script"
+    {"dt": "Role"},
+    {"dt": "Custom DocPerm"},
+    {"dt": "Server Script"},
+    {"dt": "Client Script"},
+    {"dt": "Workspace"}
 ]
