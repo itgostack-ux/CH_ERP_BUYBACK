@@ -5,19 +5,37 @@
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
-  "name1"
+  "question_id",
+  "question_text",
+  "question_description",
+  "question_type"
  ],
  "fields": [
   {
-   "fieldname": "name1",
+   "fieldname": "question_id",
    "fieldtype": "Data",
-   "label": "Name"
+   "label": "Question ID "
+  },
+  {
+   "fieldname": "question_text",
+   "fieldtype": "Data",
+   "label": "Question Text"
+  },
+  {
+   "fieldname": "question_description",
+   "fieldtype": "Data",
+   "label": "Question Description"
+  },
+  {
+   "fieldname": "question_type",
+   "fieldtype": "Data",
+   "label": "Question Type"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-02-04 18:23:38.779871",
+ "modified": "2026-02-06 18:59:04.732310",
  "modified_by": "Administrator",
  "module": "BuyBack",
  "name": "Question Master",

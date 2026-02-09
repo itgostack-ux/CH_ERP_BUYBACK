@@ -1,9 +1,12 @@
-# Copyright (c) 2026, Abiraj and contributors
-# For license information, please see license.txt
-
-# import frappe
+import frappe
 from frappe.model.document import Document
 
 
 class QuestionMaster(Document):
-	pass
+    def before_insert(self):
+
+        last = frappe.db.sql("""
+            SELECT MAX(question_id) FROM `tabQuestion Master`
+        """)[0][0] or 0
+
+        self.question_id = last + 1
