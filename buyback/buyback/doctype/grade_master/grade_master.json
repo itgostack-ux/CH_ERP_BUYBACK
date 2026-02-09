@@ -1,48 +1,37 @@
 {
  "actions": [],
  "allow_rename": 1,
- "autoname": "field:test_id",
- "creation": "2026-02-04 18:53:08.562351",
+ "autoname": "field:grade_id",
+ "creation": "2026-02-09 13:19:33.793107",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
-  "column_break_gkmx",
-  "test_id",
-  "test_name",
-  "is_active"
+  "grade_id",
+  "grade_name"
  ],
  "fields": [
   {
-   "fieldname": "test_id",
+   "fieldname": "grade_id",
    "fieldtype": "Int",
-   "label": "Test ID",
+   "label": "Grade ID",
    "read_only": 1,
    "unique": 1
   },
   {
-   "fieldname": "test_name",
+   "fieldname": "grade_name",
    "fieldtype": "Data",
-   "label": "Test Name"
-  },
-  {
-   "default": "1",
-   "fieldname": "is_active",
-   "fieldtype": "Check",
-   "label": "Is Active"
-  },
-  {
-   "default": "Checked",
-   "fieldname": "column_break_gkmx",
-   "fieldtype": "Column Break"
+   "in_list_view": 1,
+   "label": "Grade Name",
+   "reqd": 1
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-02-09 12:39:06.796484",
+ "modified": "2026-02-09 13:21:37.727511",
  "modified_by": "Administrator",
  "module": "BuyBack",
- "name": "Test Master",
+ "name": "Grade Master",
  "naming_rule": "By fieldname",
  "owner": "Administrator",
  "permissions": [

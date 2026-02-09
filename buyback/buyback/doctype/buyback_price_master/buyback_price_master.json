@@ -6,11 +6,28 @@
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
+  "buyback_price_configuration_column",
   "sku_id",
   "item_code",
   "item_name",
-  "current_market__price",
-  "vendor_price"
+  "current_market_price",
+  "vendor_price",
+  "a_grade_iw_0_3",
+  "b_grade_iw_0_3",
+  "c_grade_iw_0_3",
+  "a_grade_iw_0_6",
+  "b_grade_iw_0_6",
+  "c_grade_iw_0_6",
+  "d_grade_iw_0_6",
+  "a_grade_iw_6_11",
+  "b_grade_iw_6_11",
+  "c_grade_iw_6_11",
+  "d_grade_iw_6_11",
+  "a_grade_oow_11",
+  "b_grade_oow_11",
+  "c_grade_oow_11",
+  "d_grade_oow_11",
+  "is_active"
  ],
  "fields": [
   {
@@ -32,20 +49,106 @@
    "label": "Item Name"
   },
   {
-   "fieldname": "current_market__price",
-   "fieldtype": "Currency",
-   "label": "Current Market  Price "
-  },
-  {
    "fieldname": "vendor_price",
    "fieldtype": "Currency",
    "label": "Vendor Price"
+  },
+  {
+   "fieldname": "a_grade_iw_0_3",
+   "fieldtype": "Currency",
+   "label": "A_Grade_IW_0_3"
+  },
+  {
+   "fieldname": "b_grade_iw_0_3",
+   "fieldtype": "Currency",
+   "label": "B_Grade_IW_0_3"
+  },
+  {
+   "fieldname": "c_grade_iw_0_3",
+   "fieldtype": "Currency",
+   "label": "C_Grade_IW_0_3"
+  },
+  {
+   "fieldname": "buyback_price_configuration_column",
+   "fieldtype": "Column Break",
+   "label": "Buyback Price Configuration"
+  },
+  {
+   "fieldname": "a_grade_iw_0_6",
+   "fieldtype": "Currency",
+   "label": "A_Grade_IW_0_6"
+  },
+  {
+   "fieldname": "b_grade_iw_0_6",
+   "fieldtype": "Currency",
+   "label": "B_Grade_IW_0_6"
+  },
+  {
+   "fieldname": "c_grade_iw_0_6",
+   "fieldtype": "Currency",
+   "label": "C_Grade_IW_0_6"
+  },
+  {
+   "fieldname": "d_grade_iw_0_6",
+   "fieldtype": "Currency",
+   "label": "D_Grade_IW_0_6"
+  },
+  {
+   "fieldname": "a_grade_iw_6_11",
+   "fieldtype": "Currency",
+   "label": "A_Grade_IW_6_11"
+  },
+  {
+   "fieldname": "b_grade_iw_6_11",
+   "fieldtype": "Currency",
+   "label": "B_Grade_IW_6_11"
+  },
+  {
+   "fieldname": "c_grade_iw_6_11",
+   "fieldtype": "Currency",
+   "label": "C_Grade_IW_6_11"
+  },
+  {
+   "fieldname": "d_grade_iw_6_11",
+   "fieldtype": "Currency",
+   "label": "D_Grade_IW_6_11"
+  },
+  {
+   "fieldname": "a_grade_oow_11",
+   "fieldtype": "Currency",
+   "label": "A_Grade_OOW_11"
+  },
+  {
+   "fieldname": "b_grade_oow_11",
+   "fieldtype": "Currency",
+   "label": "B_Grade_OOW_11"
+  },
+  {
+   "fieldname": "c_grade_oow_11",
+   "fieldtype": "Currency",
+   "label": "C_Grade_OOW_11"
+  },
+  {
+   "fieldname": "d_grade_oow_11",
+   "fieldtype": "Currency",
+   "label": "D_Grade_OOW_11"
+  },
+  {
+   "default": "0",
+   "fieldname": "is_active",
+   "fieldtype": "Check",
+   "label": "Is Active"
+  },
+  {
+   "fieldname": "current_market_price",
+   "fieldtype": "Currency",
+   "label": "Current Market  Price "
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-02-05 15:38:50.180714",
+ "modified": "2026-02-09 12:07:50.984687",
  "modified_by": "Administrator",
  "module": "BuyBack",
  "name": "Buyback Price Master",

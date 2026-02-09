@@ -1,49 +1,45 @@
 {
  "actions": [],
  "allow_rename": 1,
- "autoname": "field:test_id",
- "creation": "2026-02-04 18:53:08.562351",
+ "creation": "2026-02-09 13:28:01.447346",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
-  "column_break_gkmx",
-  "test_id",
-  "test_name",
-  "is_active"
+  "option_id",
+  "question_name",
+  "option_text",
+  "grades"
  ],
  "fields": [
   {
-   "fieldname": "test_id",
+   "fieldname": "option_id",
    "fieldtype": "Int",
-   "label": "Test ID",
-   "read_only": 1,
-   "unique": 1
+   "label": "Option ID",
+   "read_only": 1
   },
   {
-   "fieldname": "test_name",
+   "fieldname": "question_name",
    "fieldtype": "Data",
-   "label": "Test Name"
+   "label": "Question Name"
   },
   {
-   "default": "1",
-   "fieldname": "is_active",
-   "fieldtype": "Check",
-   "label": "Is Active"
+   "fieldname": "option_text",
+   "fieldtype": "Data",
+   "label": "Option Text"
   },
   {
-   "default": "Checked",
-   "fieldname": "column_break_gkmx",
-   "fieldtype": "Column Break"
+   "fieldname": "grades",
+   "fieldtype": "Int",
+   "label": "Grades"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-02-09 12:39:06.796484",
+ "modified": "2026-02-09 14:10:44.100054",
  "modified_by": "Administrator",
  "module": "BuyBack",
- "name": "Test Master",
- "naming_rule": "By fieldname",
+ "name": "Option Master",
  "owner": "Administrator",
  "permissions": [
   {
