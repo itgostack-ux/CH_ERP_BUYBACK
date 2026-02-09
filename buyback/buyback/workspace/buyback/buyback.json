@@ -1,7 +1,7 @@
 {
  "charts": [],
- "content": "[{\"id\":\"5gB648mewX\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\">BuyBack</span>\",\"col\":12}},{\"id\":\"Q6nyvGH4Q3\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Test Master\",\"col\":3}},{\"id\":\"i5tFCGnsXE\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Buyback Price Master\",\"col\":3}},{\"id\":\"125rOoW8y9\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Question Master\",\"col\":3}},{\"id\":\"YJJnmgl57M\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Grade Master\",\"col\":3}},{\"id\":\"jcGO0lVoeL\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Option Master\",\"col\":3}}]",
- "creation": "2026-02-06 16:31:19.389598",
+ "content": "[{\"id\":\"5gB648mewX\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\">BuyBack</span>\",\"col\":12}},{\"id\":\"Q6nyvGH4Q3\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Test Master\",\"col\":3}},{\"id\":\"i5tFCGnsXE\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Buyback Price Master\",\"col\":3}},{\"id\":\"125rOoW8y9\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Question Master\",\"col\":3}},{\"id\":\"YJJnmgl57M\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Grade Master\",\"col\":3}},{\"id\":\"2TdBbXI_V_\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Option Master\",\"col\":3}},{\"id\":\"7SO9m6-otU\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Option Percenge Link\",\"col\":3}}]",
+ "creation": "2026-02-09 17:52:30.805111",
  "custom_blocks": [],
  "docstatus": 0,
  "doctype": "Workspace",
@@ -13,7 +13,7 @@
  "is_hidden": 0,
  "label": "BuyBack",
  "links": [],
- "modified": "2026-02-09 14:11:10.393405",
+ "modified": "2026-02-09 18:39:41.659625",
  "modified_by": "Administrator",
  "module": "BuyBack",
  "name": "BuyBack",
@@ -28,8 +28,8 @@
   {
    "color": "Grey",
    "doc_view": "List",
-   "label": "Option Master",
-   "link_to": "Option Master",
+   "label": "Option Percenge Link",
+   "link_to": "Option Percenge Link",
    "stats_filter": "[]",
    "type": "DocType"
   },
@@ -38,6 +38,14 @@
    "doc_view": "List",
    "label": "Grade Master",
    "link_to": "Grade Master",
+   "stats_filter": "[]",
+   "type": "DocType"
+  },
+  {
+   "color": "Grey",
+   "doc_view": "List",
+   "label": "Option Master",
+   "link_to": "Option Master",
    "stats_filter": "[]",
    "type": "DocType"
   },

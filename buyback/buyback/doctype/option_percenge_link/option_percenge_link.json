@@ -1,73 +1,74 @@
 {
  "actions": [],
  "allow_rename": 1,
- "autoname": "field:option_id",
- "creation": "2026-02-09 18:03:47.209906",
+ "autoname": "field:option_percentage_id",
+ "creation": "2026-02-09 18:29:33.657927",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
-  "option_id",
+  "option_percentage_id",
   "question_id",
   "question_name",
-  "option_text",
   "grade_id",
   "grade_name",
-  "is_active"
+  "price_percentage"
  ],
  "fields": [
   {
-   "fieldname": "option_id",
+   "fieldname": "option_percentage_id",
    "fieldtype": "Int",
-   "label": "Option Id",
+   "label": "Option Percentage ID",
    "read_only": 1,
    "unique": 1
   },
   {
-   "fieldname": "option_text",
-   "fieldtype": "Data",
-   "in_list_view": 1,
-   "label": "Option Text",
-   "reqd": 1
-  },
-  {
    "fieldname": "question_id",
    "fieldtype": "Link",
+   "in_list_view": 1,
    "label": "Question ID",
-   "options": "Question Master"
+   "options": "Question Master",
+   "reqd": 1
   },
   {
    "fetch_from": "question_id.question_text",
    "fieldname": "question_name",
    "fieldtype": "Data",
-   "label": "Question name",
-   "read_only": 1
+   "in_list_view": 1,
+   "label": "Question Name",
+   "read_only": 1,
+   "reqd": 1
   },
   {
    "fieldname": "grade_id",
    "fieldtype": "Link",
-   "label": "Grade ID",
-   "options": "Grade Master"
-  },
-  {
-   "default": "0",
-   "fieldname": "is_active",
-   "fieldtype": "Check",
-   "label": "Is Active"
+   "in_list_view": 1,
+   "label": "Grade Id",
+   "options": "Grade Master",
+   "reqd": 1
   },
   {
    "fetch_from": "grade_id.grade_name",
    "fieldname": "grade_name",
    "fieldtype": "Data",
-   "label": "Grade Name"
+   "in_list_view": 1,
+   "label": "Grade Name",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "price_percentage",
+   "fieldtype": "Currency",
+   "label": "Price Percentage",
+   "reqd": 1
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-02-09 18:27:26.165005",
+ "modified": "2026-02-09 18:49:20.828254",
  "modified_by": "Administrator",
  "module": "BuyBack",
- "name": "Option Master",
+ "name": "Option Percenge Link",
  "naming_rule": "By fieldname",
  "owner": "Administrator",
  "permissions": [
