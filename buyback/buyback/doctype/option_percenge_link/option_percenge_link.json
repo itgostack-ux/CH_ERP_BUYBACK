@@ -9,9 +9,10 @@
   "option_percentage_id",
   "question_id",
   "question_name",
-  "grade_id",
-  "grade_name",
-  "price_percentage"
+  "option_id",
+  "option_name",
+  "price_percentage",
+  "is_active"
  ],
  "fields": [
   {
@@ -39,33 +40,37 @@
    "reqd": 1
   },
   {
-   "fieldname": "grade_id",
-   "fieldtype": "Link",
-   "in_list_view": 1,
-   "label": "Grade Id",
-   "options": "Grade Master",
-   "reqd": 1
-  },
-  {
-   "fetch_from": "grade_id.grade_name",
-   "fieldname": "grade_name",
-   "fieldtype": "Data",
-   "in_list_view": 1,
-   "label": "Grade Name",
-   "read_only": 1,
-   "reqd": 1
-  },
-  {
    "fieldname": "price_percentage",
    "fieldtype": "Currency",
    "label": "Price Percentage",
    "reqd": 1
+  },
+  {
+   "fieldname": "option_id",
+   "fieldtype": "Link",
+   "label": "Option ID",
+   "options": "Option Master",
+   "reqd": 1
+  },
+  {
+   "fetch_from": "option_id.option_text",
+   "fieldname": "option_name",
+   "fieldtype": "Data",
+   "label": "Option Name",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "default": "1",
+   "fieldname": "is_active",
+   "fieldtype": "Check",
+   "label": "Is Active "
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-02-09 18:49:20.828254",
+ "modified": "2026-02-10 13:01:09.560394",
  "modified_by": "Administrator",
  "module": "BuyBack",
  "name": "Option Percenge Link",

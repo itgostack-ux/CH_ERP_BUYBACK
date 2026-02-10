@@ -2,6 +2,7 @@
  "actions": [],
  "allow_import": 1,
  "allow_rename": 1,
+ "autoname": "field:sku_id",
  "creation": "2026-02-05 14:27:58.725197",
  "doctype": "DocType",
  "engine": "InnoDB",
@@ -34,7 +35,8 @@
    "fieldname": "sku_id",
    "fieldtype": "Int",
    "label": "Sku ID",
-   "read_only": 1
+   "read_only": 1,
+   "unique": 1
   },
   {
    "fieldname": "item_code",
@@ -148,10 +150,11 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-02-09 12:07:50.984687",
+ "modified": "2026-02-10 13:03:35.277439",
  "modified_by": "Administrator",
  "module": "BuyBack",
  "name": "Buyback Price Master",
+ "naming_rule": "By fieldname",
  "owner": "Administrator",
  "permissions": [
   {
