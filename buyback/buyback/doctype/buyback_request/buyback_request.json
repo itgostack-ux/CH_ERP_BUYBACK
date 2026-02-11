@@ -8,6 +8,7 @@
  "engine": "InnoDB",
  "field_order": [
   "buyback_section",
+  "section_break_utum",
   "mode",
   "buybackid",
   "customer_name",
@@ -20,11 +21,15 @@
   "district",
   "pincode",
   "column_break_ivxq",
+  "deal_status",
+  "buyback_request_staff",
   "customer_image",
   "aadhaar_pdf",
+  "customer_image_preview",
   "tab_2_tab",
   "item_name",
   "item_full_name",
+  "imei",
   "column_break_hvjy",
   "usage_key",
   "grade",
@@ -126,6 +131,7 @@
   {
    "fieldname": "customer_image",
    "fieldtype": "Attach Image",
+   "in_preview": 1,
    "label": "Customer Image"
   },
   {
@@ -177,16 +183,14 @@
    "fieldname": "payment_mode",
    "fieldtype": "Link",
    "label": "Payment Mode ID",
-   "options": "Payment Method Master",
-   "reqd": 1
+   "options": "Payment Method Master"
   },
   {
    "fetch_from": "payment_mode.payment_method",
    "fieldname": "payment_mode_name",
    "fieldtype": "Data",
    "label": "Payment Mode Name",
-   "read_only": 1,
-   "reqd": 1
+   "read_only": 1
   },
   {
    "fieldname": "bank_name",
@@ -197,8 +201,7 @@
    "fieldname": "final_buyback_amount",
    "fieldtype": "Data",
    "label": "Final Buyback Amount",
-   "read_only": 1,
-   "reqd": 1
+   "read_only": 1
   },
   {
    "fieldname": "ifsc_code",
@@ -228,7 +231,7 @@
   {
    "fieldname": "buybackid",
    "fieldtype": "Int",
-   "label": "BuybackID",
+   "label": "Buyback ID",
    "read_only": 1,
    "unique": 1
   },
@@ -257,16 +260,48 @@
    "fieldname": "status",
    "fieldtype": "Select",
    "label": "Status",
-   "options": "Created\nPending Customer Approval\nPending Finance Approval\nPayment Done\nCompleted\nRejected"
+   "options": "Open Request\nPending Customer Approval\nPending Finance Approval\nPayment Done\nCompleted\nRejected",
+   "read_only": 1
   },
   {
    "default": "1",
    "fieldname": "is_active",
    "fieldtype": "Check",
    "label": "Is Active"
+  },
+  {
+   "fieldname": "buyback_request_staff",
+   "fieldtype": "Link",
+   "label": "Buyback Request Staff",
+   "options": "User",
+   "reqd": 1
+  },
+  {
+   "fieldname": "imei",
+   "fieldtype": "Data",
+   "label": "IMEI",
+   "reqd": 1
+  },
+  {
+   "fieldname": "customer_image_preview",
+   "fieldtype": "Image",
+   "in_preview": 1,
+   "label": "Customer Image Preview",
+   "options": "customer_image"
+  },
+  {
+   "fieldname": "deal_status",
+   "fieldtype": "Select",
+   "label": "Deal Status",
+   "options": "Deal\nNo Deal"
+  },
+  {
+   "fieldname": "section_break_utum",
+   "fieldtype": "Section Break"
   }
  ],
  "grid_page_length": 50,
+ "image_field": "customer_image",
  "index_web_pages_for_search": 1,
  "links": [
   {
@@ -274,7 +309,8 @@
    "link_fieldname": "item_name"
   }
  ],
- "modified": "2026-02-11 12:59:12.275235",
+ "make_attachments_public": 1,
+ "modified": "2026-02-11 17:36:02.736773",
  "modified_by": "Administrator",
  "module": "BuyBack",
  "name": "Buyback Request",

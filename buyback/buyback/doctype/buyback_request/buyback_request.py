@@ -5,11 +5,16 @@ from frappe.model.document import Document
 class BuybackRequest(Document):
 
     def before_insert(self):
+
+        # auto buyback id
         last = frappe.db.sql("""
             SELECT MAX(buybackid) FROM `tabBuyback Request`
         """)[0][0] or 0
 
         self.buybackid = last + 1
+
+        # store login user
+        self.created_by_user = frappe.session.user
 
     def validate(self):
         self.validate_payment()
@@ -22,7 +27,7 @@ class BuybackRequest(Document):
         mode = self.payment_mode_name.lower()
 
         # CASH
-        if "cash" in mode:
+        if "Cash" in mode:
             if not self.cash_notes:
                 frappe.throw("Cash notes required")
 
@@ -32,7 +37,8 @@ class BuybackRequest(Document):
                 "Account Holder Name": self.account_holder_name,
                 "Branch": self.branch,
                 "Bank Name": self.bank_name,
-                "IFSC Code": self.ifsc_code
+                "IFSC Code": self.ifsc_code,
+                "Transaction Proof": self.transaction_proof
             }
 
             for label, value in required.items():

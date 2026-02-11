@@ -26,10 +26,21 @@
   "doctype": "Client Script",
   "dt": "Buyback Request",
   "enabled": 1,
-  "modified": "2026-02-11 12:39:14.150903",
+  "modified": "2026-02-11 14:56:33.379021",
   "module": "BuyBack",
   "name": "Dynamic Script in Buyback Price",
-  "script": "frappe.ui.form.on('Buyback Request', {\n    item_name: calc_price,\n    usage_key: calc_price,\n    grade: calc_price,\n    refresh: calc_price\n});\n\nfunction calc_price(frm) {\n\n    if (!frm.doc.item_name || !frm.doc.usage_key || !frm.doc.grade) {\n        frm.set_value('buyback_price', 0);\n        frm.set_value('final_buyback_amount', 0);\n        return;\n    }\n\n    frappe.db.get_doc('Buyback Price Master', frm.doc.item_name)\n        .then(doc => {\n\n            let key = `${frm.doc.grade}_grade_${frm.doc.usage_key}`;\n\n            console.log(\"KEY:\", key);\n            console.log(\"PRICE:\", doc[key]);\n\n            let price = doc[key] || 0;\n\n            frm.set_value('buyback_price', price);\n            frm.set_value('final_buyback_amount', price);\n        });\n}\n",
+  "script": "frappe.ui.form.on('Buyback Request', {\n    refresh(frm) {\n        if (frm.is_new()) calc_price(frm);\n    },\n\n    item_name: calc_price,\n    usage_key: calc_price,\n    grade: calc_price\n});\n\nfunction calc_price(frm) {\n\n    // stop if fields missing\n    if (!frm.doc.item_name || !frm.doc.usage_key || !frm.doc.grade) {\n        frm.set_value('buyback_price', 0);\n        frm.set_value('final_buyback_amount', 0);\n        return;\n    }\n\n    let key = `${frm.doc.grade}_grade_${frm.doc.usage_key}`;\n    console.log(\"PRICE KEY →\", key);\n\n    frappe.db.get_doc('Buyback Price Master', frm.doc.item_name)\n        .then(doc => {\n\n            let price = doc[key] || 0;\n\n            console.log(\"FETCHED PRICE →\", price);\n\n            frm.set_value('buyback_price', price);\n            frm.set_value('final_buyback_amount', price);\n        })\n        .catch(err => {\n            console.error(\"Price fetch error:\", err);\n            frm.set_value('buyback_price', 0);\n            frm.set_value('final_buyback_amount', 0);\n        });\n}\n",
+  "view": "Form"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Client Script",
+  "dt": "Buyback Price Master",
+  "enabled": 1,
+  "modified": "2026-02-11 14:46:55.710475",
+  "module": "BuyBack",
+  "name": "Buyback Request Staff",
+  "script": "frappe.ui.form.on('Buyback Request', {\n    refresh: function(frm) {\n\n        if (frm.is_new()) {\n            frm.set_value('buyback_request_staff', frappe.session.user);\n        }\n    }\n});\n",
   "view": "Form"
  },
  {
@@ -37,10 +48,21 @@
   "doctype": "Client Script",
   "dt": "Buyback Request",
   "enabled": 1,
-  "modified": "2026-02-11 12:31:29.954090",
+  "modified": "2026-02-11 15:58:33.247795",
   "module": "BuyBack",
-  "name": "Buyback Request Payment Mode  Related Fields",
-  "script": "frappe.ui.form.on('Buyback Request', {\n    payment_mode: function(frm) {\n        payment_ui(frm);\n    },\n    refresh: function(frm) {\n        payment_ui(frm);\n    }\n});\n\nfunction payment_ui(frm) {\n\n    // hide everything first\n    frm.toggle_display([\n        'cash_notes',\n        'account_holder_name',\n        'branch',\n        'bank_name',\n        'ifsc_code',\n        'upi_id',\n        'transaction_proof'\n    ], false);\n\n    // always show amount\n    frm.toggle_display('final_buyback_amount', true);\n\n    if (!frm.doc.payment_mode) return;\n\n    frappe.db.get_doc('Payment Method Master', frm.doc.payment_mode)\n        .then(doc => {\n\n            frm.set_value('payment_mode_name', doc.payment_method);\n\n            // CASH\n            if (doc.payment_method === \"Cash\") {\n                frm.toggle_display('cash_notes', true);\n            }\n\n            // BANK\n            else if (doc.payment_method === \"Bank Transfer\") {\n                frm.toggle_display([\n                    'account_holder_name',\n                    'branch',\n                    'bank_name',\n                    'ifsc_code'\n                ], true);\n            }\n\n            // UPI\n            else if (doc.payment_method === \"UPI\") {\n                frm.toggle_display([\n                    'upi_id',\n                    'transaction_proof'\n                ], true);\n            }\n\n        });\n}\n",
+  "name": "Buyback Request Customer Image Preview",
+  "script": "frappe.ui.form.on('Buyback Request', {\n\n    refresh(frm) {\n        show_preview(frm);\n    },\n\n    customer_image(frm) {\n        show_preview(frm);\n    }\n});\n\nfunction show_preview(frm) {\n\n    if (!frm.doc.customer_image) {\n        frm.set_value('customer_image_preview', '');\n        return;\n    }\n\n    let url = window.location.origin + frm.doc.customer_image;\n\n    frm.set_value('customer_image_preview', url);\n}\n",
+  "view": "Form"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Client Script",
+  "dt": "Buyback Request",
+  "enabled": 1,
+  "modified": "2026-02-11 16:18:45.239191",
+  "module": "BuyBack",
+  "name": "Buyback Request Payment method Fields",
+  "script": "frappe.ui.form.on('Buyback Request', {\n    payment_mode: function(frm) {\n        payment_ui(frm);\n    },\n    refresh: function(frm) {\n        payment_ui(frm);\n    }\n});\n\nfunction payment_ui(frm) {\n\n    // hide everything first\n    frm.toggle_display([\n        'cash_notes',\n        'account_holder_name',\n        'branch',\n        'bank_name',\n        'ifsc_code',\n        'upi_id',\n        'transaction_proof'\n    ], false);\n\n    // always show amount\n    frm.toggle_display('final_buyback_amount', true);\n\n    if (!frm.doc.payment_mode) return;\n\n    frappe.db.get_doc('Payment Method Master', frm.doc.payment_mode)\n        .then(doc => {\n\n            frm.set_value('payment_mode_name', doc.payment_method);\n\n            // CASH\n            if (doc.payment_method === \"Cash\") {\n                frm.toggle_display('cash_notes', true);\n            }\n\n            // BANK\n            else if (doc.payment_method === \"Bank Transfer\") {\n                frm.toggle_display([\n                    'account_holder_name',\n                    'branch',\n                    'bank_name',\n                    'ifsc_code',\n                     'transaction_proof'\n                ], true);\n            }\n\n            // UPI\n            else if (doc.payment_method === \"UPI\") {\n                frm.toggle_display([\n                    'upi_id',\n                    'transaction_proof'\n                ], true);\n            }\n\n        });\n}\n",
   "view": "Form"
  }
 ]
