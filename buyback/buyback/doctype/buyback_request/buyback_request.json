@@ -1,0 +1,192 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-02-10 13:13:23.087439",
+ "default_view": "List",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "buyback_section",
+  "mode",
+  "customer_name",
+  "mobile_no",
+  "email",
+  "address",
+  "city",
+  "district",
+  "pincode",
+  "column_break_ivxq",
+  "customer_image",
+  "aadhaar_pdf",
+  "tab_2_tab",
+  "item_name",
+  "item_full_name",
+  "column_break_hvjy",
+  "usage_key",
+  "grade",
+  "buyback_price",
+  "payment_details_tab",
+  "upload_phone_image_tab",
+  "upload_phone_images"
+ ],
+ "fields": [
+  {
+   "default": "BuyBack",
+   "fieldname": "mode",
+   "fieldtype": "Select",
+   "label": "Mode",
+   "options": "BuyBack\nDiagnosis"
+  },
+  {
+   "fieldname": "buyback_section",
+   "fieldtype": "Tab Break",
+   "label": "Customer Details"
+  },
+  {
+   "fieldname": "mobile_no",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Mobile No",
+   "reqd": 1
+  },
+  {
+   "fieldname": "customer_name",
+   "fieldtype": "Data",
+   "label": "Customer Name",
+   "reqd": 1
+  },
+  {
+   "fieldname": "tab_2_tab",
+   "fieldtype": "Tab Break",
+   "label": "Product Details"
+  },
+  {
+   "fieldname": "email",
+   "fieldtype": "Data",
+   "label": "Email"
+  },
+  {
+   "fieldname": "item_name",
+   "fieldtype": "Link",
+   "label": "Item ID",
+   "options": "Buyback Price Master",
+   "reqd": 1
+  },
+  {
+   "fieldname": "address",
+   "fieldtype": "Small Text",
+   "label": "Address"
+  },
+  {
+   "fieldname": "city",
+   "fieldtype": "Data",
+   "label": "City",
+   "reqd": 1
+  },
+  {
+   "fieldname": "district",
+   "fieldtype": "Data",
+   "label": "District"
+  },
+  {
+   "fieldname": "pincode",
+   "fieldtype": "Data",
+   "label": "Pincode",
+   "reqd": 1
+  },
+  {
+   "fetch_from": "item_name.item_name",
+   "fieldname": "item_full_name",
+   "fieldtype": "Data",
+   "label": "Item Name",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_ivxq",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "customer_image",
+   "fieldtype": "Attach Image",
+   "label": "Customer Image"
+  },
+  {
+   "fieldname": "column_break_hvjy",
+   "fieldtype": "Column Break",
+   "options": "iw_0_3\niw_0_6\niw_6_11\noow_11"
+  },
+  {
+   "fieldname": "aadhaar_pdf",
+   "fieldtype": "Attach",
+   "label": "Aadhaar Document"
+  },
+  {
+   "fieldname": "usage_key",
+   "fieldtype": "Select",
+   "label": "Usage Months",
+   "options": "iw_0_3\niw_0_6\niw_6_11\noow_11",
+   "reqd": 1
+  },
+  {
+   "fieldname": "grade",
+   "fieldtype": "Select",
+   "label": "Grade",
+   "options": "a\nb\nc\nd",
+   "reqd": 1
+  },
+  {
+   "fieldname": "buyback_price",
+   "fieldtype": "Currency",
+   "label": "Buyback Price",
+   "reqd": 1
+  },
+  {
+   "fieldname": "payment_details_tab",
+   "fieldtype": "Tab Break",
+   "label": "Payment Details"
+  },
+  {
+   "fieldname": "upload_phone_image_tab",
+   "fieldtype": "Tab Break",
+   "label": "Upload Phone Image"
+  },
+  {
+   "fieldname": "upload_phone_images",
+   "fieldtype": "Attach",
+   "label": "Upload Phone Images"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [
+  {
+   "link_doctype": "Buyback Price Master",
+   "link_fieldname": "item_name"
+  }
+ ],
+ "modified": "2026-02-10 18:29:51.366046",
+ "modified_by": "Administrator",
+ "module": "BuyBack",
+ "name": "Buyback Request",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
