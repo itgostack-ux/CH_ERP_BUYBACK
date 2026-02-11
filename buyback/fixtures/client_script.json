@@ -9,5 +9,27 @@
   "name": "Buyback Price Master Download Upload Button UI",
   "script": "frappe.listview_settings['Buyback Price Master'] = {\n    onload(listview) {\n\n        if (listview.buttons_added) return;\n        listview.buttons_added = true;\n\n        // Download button\n        listview.page.add_inner_button('Download Template', () => {\n            window.open('/api/method/buyback.api.download_buyback_template');\n        });\n\n        // Upload button\n        listview.page.add_inner_button('Upload CSV', () => {\n\n            new frappe.ui.FileUploader({\n                allow_multiple: false,\n                on_success(file) {\n\n                    frappe.call({\n                        method: \"buyback.api.upload_buyback_csv\",\n                        args: { file_url: file.file_url },\n                        callback: () => {\n                            frappe.msgprint(\"Upload complete\");\n                            listview.refresh();\n                        }\n                    });\n\n                }\n            });\n\n        });\n\n    }\n};\n",
   "view": "List"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Client Script",
+  "dt": "Buyback Request",
+  "enabled": 1,
+  "modified": "2026-02-10 15:35:45.490273",
+  "module": "BuyBack",
+  "name": "Buyback Request Type",
+  "script": "frappe.ui.form.on('Buyback Request', {\n    refresh(frm) {\n        apply_mode(frm);\n    },\n    mode(frm) {\n        apply_mode(frm);\n    }\n});\n\nfunction apply_mode(frm) {\n\n    let is_buyback = frm.doc.mode === \"BuyBack\";\n\n    frm.toggle_display(\"buyback_section\", is_buyback);\n    frm.toggle_display(\"diagnosis_section\", !is_buyback);\n\n    frm.dashboard.clear_headline();\n    frm.dashboard.set_headline(\n        is_buyback ? \"BuyBack Mode Active\" : \"Diagnosis Mode Active\"\n    );\n}\n",
+  "view": "Form"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Client Script",
+  "dt": "Buyback Request",
+  "enabled": 1,
+  "modified": "2026-02-10 18:25:36.342071",
+  "module": "BuyBack",
+  "name": "Dynamic Script in Buyback Price",
+  "script": "frappe.ui.form.on('Buyback Request', {\n    item_name: calc_price,\n    usage_key: calc_price,\n    grade: calc_price,\n    refresh: calc_price\n});\n\nfunction calc_price(frm) {\n\n    if (!frm.doc.item_name || !frm.doc.usage_key || !frm.doc.grade) {\n        frm.set_value('buyback_price', 0);\n        return;\n    }\n\n    frappe.db.get_doc('Buyback Price Master', frm.doc.item_name)\n        .then(doc => {\n\n            let key = `${frm.doc.grade}_grade_${frm.doc.usage_key}`;\n\n            console.log(\"KEY:\", key);\n            console.log(\"PRICE:\", doc[key]);\n\n            frm.set_value('buyback_price', doc[key] || 0);\n        });\n}\n",
+  "view": "Form"
  }
 ]
