@@ -30,6 +30,7 @@
   "item_name",
   "item_full_name",
   "imei",
+  "no_deal_reason",
   "column_break_hvjy",
   "usage_key",
   "grade",
@@ -298,6 +299,11 @@
   {
    "fieldname": "section_break_utum",
    "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "no_deal_reason",
+   "fieldtype": "Small Text",
+   "label": "No Deal Reason"
   }
  ],
  "grid_page_length": 50,
@@ -310,7 +316,7 @@
   }
  ],
  "make_attachments_public": 1,
- "modified": "2026-02-11 17:36:02.736773",
+ "modified": "2026-02-11 17:51:57.621401",
  "modified_by": "Administrator",
  "module": "BuyBack",
  "name": "Buyback Request",
