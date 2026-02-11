@@ -7,6 +7,7 @@
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
+  "section_break_tgka",
   "buyback_price_configuration_column",
   "sku_id",
   "item_code",
@@ -145,12 +146,17 @@
    "fieldname": "current_market_price",
    "fieldtype": "Currency",
    "label": "Current Market  Price "
+  },
+  {
+   "columns": 1,
+   "fieldname": "section_break_tgka",
+   "fieldtype": "Section Break"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-02-10 16:36:40.257521",
+ "modified": "2026-02-11 10:48:25.598995",
  "modified_by": "Administrator",
  "module": "BuyBack",
  "name": "Buyback Price Master",

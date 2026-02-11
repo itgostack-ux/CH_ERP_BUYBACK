@@ -1,45 +1,38 @@
 {
  "actions": [],
+ "allow_import": 1,
  "allow_rename": 1,
- "autoname": "field:payment_id",
- "creation": "2026-02-10 18:30:57.020438",
+ "autoname": "field:state_id",
+ "creation": "2026-02-11 11:57:22.606173",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
-  "payment_id",
-  "payment_method",
-  "is_active"
+  "state_id",
+  "state_name"
  ],
  "fields": [
   {
-   "fieldname": "payment_id",
+   "fieldname": "state_id",
    "fieldtype": "Int",
-   "label": "Payment ID",
+   "label": "State ID",
    "read_only": 1,
    "unique": 1
   },
   {
-   "fieldname": "payment_method",
+   "fieldname": "state_name",
    "fieldtype": "Data",
    "in_list_view": 1,
-   "label": "Payment Method ",
-   "reqd": 1,
-   "unique": 1
-  },
-  {
-   "default": "1",
-   "fieldname": "is_active",
-   "fieldtype": "Check",
-   "label": "Is Active"
+   "label": "State Name",
+   "reqd": 1
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-02-11 11:15:12.619066",
+ "modified": "2026-02-11 12:16:48.025017",
  "modified_by": "Administrator",
  "module": "BuyBack",
- "name": "Payment Method Master",
+ "name": "State Master",
  "naming_rule": "By fieldname",
  "owner": "Administrator",
  "permissions": [
@@ -58,8 +51,8 @@
  ],
  "row_format": "Dynamic",
  "rows_threshold_for_grid_search": 20,
+ "search_fields": "state_name",
  "sort_field": "modified",
  "sort_order": "DESC",
- "states": [],
- "title_field": "payment_method"
+ "states": []
 }

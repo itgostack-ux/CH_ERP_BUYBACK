@@ -1,6 +1,7 @@
 {
  "actions": [],
  "allow_rename": 1,
+ "autoname": "field:buybackid",
  "creation": "2026-02-10 13:13:23.087439",
  "default_view": "List",
  "doctype": "DocType",
@@ -8,10 +9,13 @@
  "field_order": [
   "buyback_section",
   "mode",
+  "buybackid",
   "customer_name",
   "mobile_no",
   "email",
   "address",
+  "state_id",
+  "state_name",
   "city",
   "district",
   "pincode",
@@ -26,15 +30,28 @@
   "grade",
   "buyback_price",
   "payment_details_tab",
+  "payment_mode",
+  "payment_mode_name",
+  "final_buyback_amount",
+  "cash_notes",
+  "transaction_proof",
+  "column_break_osre",
+  "account_holder_name",
+  "branch",
+  "bank_name",
+  "ifsc_code",
+  "upi_id",
   "upload_phone_image_tab",
-  "upload_phone_images"
+  "upload_phone_images",
+  "status",
+  "is_active"
  ],
  "fields": [
   {
-   "default": "BuyBack",
+   "default": "Diagnosis",
    "fieldname": "mode",
    "fieldtype": "Select",
-   "label": "Mode",
+   "label": "Select Mode",
    "options": "BuyBack\nDiagnosis"
   },
   {
@@ -155,6 +172,98 @@
    "fieldname": "upload_phone_images",
    "fieldtype": "Attach",
    "label": "Upload Phone Images"
+  },
+  {
+   "fieldname": "payment_mode",
+   "fieldtype": "Link",
+   "label": "Payment Mode ID",
+   "options": "Payment Method Master",
+   "reqd": 1
+  },
+  {
+   "fetch_from": "payment_mode.payment_method",
+   "fieldname": "payment_mode_name",
+   "fieldtype": "Data",
+   "label": "Payment Mode Name",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "bank_name",
+   "fieldtype": "Data",
+   "label": "Bank Name"
+  },
+  {
+   "fieldname": "final_buyback_amount",
+   "fieldtype": "Data",
+   "label": "Final Buyback Amount",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "ifsc_code",
+   "fieldtype": "Data",
+   "label": "IFSC Code "
+  },
+  {
+   "fieldname": "account_holder_name",
+   "fieldtype": "Data",
+   "label": "Account Holder Name"
+  },
+  {
+   "fieldname": "branch",
+   "fieldtype": "Data",
+   "label": "Branch"
+  },
+  {
+   "fieldname": "transaction_proof",
+   "fieldtype": "Attach",
+   "label": "Transaction Proof"
+  },
+  {
+   "fieldname": "upi_id",
+   "fieldtype": "Data",
+   "label": "UPI ID"
+  },
+  {
+   "fieldname": "buybackid",
+   "fieldtype": "Int",
+   "label": "BuybackID",
+   "read_only": 1,
+   "unique": 1
+  },
+  {
+   "fieldname": "cash_notes",
+   "fieldtype": "Data",
+   "label": "Cash Notes"
+  },
+  {
+   "fieldname": "column_break_osre",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "state_id",
+   "fieldtype": "Link",
+   "label": "State ID",
+   "options": "State Master"
+  },
+  {
+   "fetch_from": "state_id.state_name",
+   "fieldname": "state_name",
+   "fieldtype": "Data",
+   "label": "State Name"
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "options": "Created\nPending Customer Approval\nPending Finance Approval\nPayment Done\nCompleted\nRejected"
+  },
+  {
+   "default": "1",
+   "fieldname": "is_active",
+   "fieldtype": "Check",
+   "label": "Is Active"
   }
  ],
  "grid_page_length": 50,
@@ -165,10 +274,11 @@
    "link_fieldname": "item_name"
   }
  ],
- "modified": "2026-02-10 18:29:51.366046",
+ "modified": "2026-02-11 12:59:12.275235",
  "modified_by": "Administrator",
  "module": "BuyBack",
  "name": "Buyback Request",
+ "naming_rule": "By fieldname",
  "owner": "Administrator",
  "permissions": [
   {
