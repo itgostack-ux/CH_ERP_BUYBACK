@@ -163,6 +163,7 @@
    "fieldname": "buyback_price",
    "fieldtype": "Currency",
    "label": "Buyback Price",
+   "read_only": 1,
    "reqd": 1
   },
   {
@@ -316,7 +317,7 @@
   }
  ],
  "make_attachments_public": 1,
- "modified": "2026-02-11 17:51:57.621401",
+ "modified": "2026-02-11 18:58:42.705349",
  "modified_by": "Administrator",
  "module": "BuyBack",
  "name": "Buyback Request",
@@ -334,6 +335,16 @@
    "role": "System Manager",
    "share": 1,
    "write": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Buyback Request Permission",
+   "share": 1
   }
  ],
  "row_format": "Dynamic",

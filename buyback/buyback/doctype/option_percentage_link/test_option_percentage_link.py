@@ -5,5 +5,5 @@
 from frappe.tests.utils import FrappeTestCase
 
 
-class TestOptionPercengeLink(FrappeTestCase):
+class TestOptionPercentageLink(FrappeTestCase):
 	pass

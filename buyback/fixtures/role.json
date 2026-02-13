@@ -674,5 +674,31 @@
   "restrict_to_domain": null,
   "role_name": "Interviewer",
   "two_factor_auth": 0
+ },
+ {
+  "desk_access": 1,
+  "disabled": 0,
+  "docstatus": 0,
+  "doctype": "Role",
+  "home_page": null,
+  "is_custom": 0,
+  "modified": "2026-02-11 18:58:20.694564",
+  "name": "Buyback Request Permission",
+  "restrict_to_domain": null,
+  "role_name": "Buyback Request Permission",
+  "two_factor_auth": 0
+ },
+ {
+  "desk_access": 1,
+  "disabled": 0,
+  "docstatus": 0,
+  "doctype": "Role",
+  "home_page": null,
+  "is_custom": 0,
+  "modified": "2026-02-13 10:35:21.391097",
+  "name": "Buyback  Store Manager",
+  "restrict_to_domain": null,
+  "role_name": "Buyback  Store Manager",
+  "two_factor_auth": 0
  }
 ]

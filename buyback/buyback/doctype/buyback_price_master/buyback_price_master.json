@@ -42,19 +42,25 @@
   {
    "fieldname": "item_code",
    "fieldtype": "Link",
+   "in_list_view": 1,
    "label": "Item Code ",
-   "options": "Item"
+   "options": "Item",
+   "reqd": 1
   },
   {
    "fetch_from": "item_code.item_name",
    "fieldname": "item_name",
    "fieldtype": "Data",
-   "label": "Item Name"
+   "in_list_view": 1,
+   "label": "Item Name",
+   "reqd": 1
   },
   {
    "fieldname": "vendor_price",
    "fieldtype": "Currency",
-   "label": "Vendor Price"
+   "in_list_view": 1,
+   "label": "Vendor Price",
+   "reqd": 1
   },
   {
    "fieldname": "a_grade_iw_0_3",
@@ -145,7 +151,9 @@
   {
    "fieldname": "current_market_price",
    "fieldtype": "Currency",
-   "label": "Current Market  Price "
+   "in_list_view": 1,
+   "label": "Current Market  Price ",
+   "reqd": 1
   },
   {
    "columns": 1,
@@ -156,7 +164,7 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-02-11 10:48:25.598995",
+ "modified": "2026-02-11 18:51:43.763718",
  "modified_by": "Administrator",
  "module": "BuyBack",
  "name": "Buyback Price Master",

@@ -2,7 +2,7 @@ import frappe
 from frappe.model.document import Document
 
 
-class OptionPercengeLink(Document):
+class OptionPercentageLink(Document):
 
     def before_insert(self):
 
