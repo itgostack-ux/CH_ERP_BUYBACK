@@ -64,5 +64,27 @@
   "name": "Buyback Request Payment method Fields",
   "script": "frappe.ui.form.on('Buyback Request', {\n    payment_mode: function(frm) {\n        payment_ui(frm);\n    },\n    refresh: function(frm) {\n        payment_ui(frm);\n    }\n});\n\nfunction payment_ui(frm) {\n\n    // hide everything first\n    frm.toggle_display([\n        'cash_notes',\n        'account_holder_name',\n        'branch',\n        'bank_name',\n        'ifsc_code',\n        'upi_id',\n        'transaction_proof'\n    ], false);\n\n    // always show amount\n    frm.toggle_display('final_buyback_amount', true);\n\n    if (!frm.doc.payment_mode) return;\n\n    frappe.db.get_doc('Payment Method Master', frm.doc.payment_mode)\n        .then(doc => {\n\n            frm.set_value('payment_mode_name', doc.payment_method);\n\n            // CASH\n            if (doc.payment_method === \"Cash\") {\n                frm.toggle_display('cash_notes', true);\n            }\n\n            // BANK\n            else if (doc.payment_method === \"Bank Transfer\") {\n                frm.toggle_display([\n                    'account_holder_name',\n                    'branch',\n                    'bank_name',\n                    'ifsc_code',\n                     'transaction_proof'\n                ], true);\n            }\n\n            // UPI\n            else if (doc.payment_method === \"UPI\") {\n                frm.toggle_display([\n                    'upi_id',\n                    'transaction_proof'\n                ], true);\n            }\n\n        });\n}\n",
   "view": "Form"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Client Script",
+  "dt": "Buyback Request",
+  "enabled": 1,
+  "modified": "2026-02-13 14:22:56.278723",
+  "module": "BuyBack",
+  "name": "Buyback Request  Nodeal related Fields Show Hide",
+  "script": "frappe.ui.form.on('Buyback Request', {\n    refresh: function(frm) {\n        toggle_no_deal(frm);\n    },\n\n    deal_status: function(frm) {\n        toggle_no_deal(frm);\n    }\n});\n\nfunction toggle_no_deal(frm) {\n    if (frm.doc.deal_status === \"No Deal\") {\n        frm.set_df_property('no_deal_reason', 'hidden', 0);\n        frm.set_df_property('no_deal_reason', 'reqd', 1);\n    } else {\n        frm.set_df_property('no_deal_reason', 'hidden', 1);\n        frm.set_df_property('no_deal_reason', 'reqd', 0);\n        frm.set_value('no_deal_reason', '');\n    }\n}\n",
+  "view": "Form"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Client Script",
+  "dt": "Buyback Request",
+  "enabled": 1,
+  "modified": "2026-02-13 14:35:59.377222",
+  "module": "BuyBack",
+  "name": "Buyback Request Numeric Field Reference",
+  "script": "frappe.ui.form.on('Buyback Request', {\n    refresh(frm) {\n        bind_numeric(frm);\n    }\n});\n\nfunction bind_numeric(frm) {\n\n    ['mobile_no', 'pincode'].forEach(fieldname => {\n\n        let input = frm.fields_dict[fieldname].$input;\n\n        if (!input) return;\n\n        input.off('keypress.numeric'); // prevent duplicate binding\n\n        input.on('keypress.numeric', function(e) {\n\n            // allow control keys\n            if (e.ctrlKey || e.metaKey || e.key === \"Backspace\") return;\n\n            // block non-numeric\n            if (!/[0-9]/.test(e.key)) {\n                e.preventDefault();\n            }\n        });\n    });\n}\n",
+  "view": "Form"
  }
 ]

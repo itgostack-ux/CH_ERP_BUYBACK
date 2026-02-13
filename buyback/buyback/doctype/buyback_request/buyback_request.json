@@ -70,6 +70,7 @@
    "fieldtype": "Data",
    "in_list_view": 1,
    "label": "Mobile No",
+   "length": 10,
    "reqd": 1
   },
   {
@@ -115,6 +116,7 @@
    "fieldname": "pincode",
    "fieldtype": "Data",
    "label": "Pincode",
+   "length": 6,
    "reqd": 1
   },
   {
@@ -317,7 +319,7 @@
   }
  ],
  "make_attachments_public": 1,
- "modified": "2026-02-11 18:58:42.705349",
+ "modified": "2026-02-13 14:56:38.985571",
  "modified_by": "Administrator",
  "module": "BuyBack",
  "name": "Buyback Request",

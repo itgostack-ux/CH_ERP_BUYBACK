@@ -2,7 +2,7 @@
  "actions": [],
  "allow_rename": 1,
  "autoname": "field:option_percentage_id",
- "creation": "2026-02-09 18:29:33.657927",
+ "creation": "2026-02-13 18:32:12.772953",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
@@ -11,17 +11,10 @@
   "question_name",
   "option_id",
   "option_name",
-  "price_percentage",
+  "percentage",
   "is_active"
  ],
  "fields": [
-  {
-   "fieldname": "option_percentage_id",
-   "fieldtype": "Int",
-   "label": "Option Percentage ID",
-   "read_only": 1,
-   "unique": 1
-  },
   {
    "fieldname": "question_id",
    "fieldtype": "Link",
@@ -34,20 +27,13 @@
    "fetch_from": "question_id.question_text",
    "fieldname": "question_name",
    "fieldtype": "Data",
-   "in_list_view": 1,
    "label": "Question Name",
-   "read_only": 1,
-   "reqd": 1
-  },
-  {
-   "fieldname": "price_percentage",
-   "fieldtype": "Currency",
-   "label": "Price Percentage",
-   "reqd": 1
+   "read_only": 1
   },
   {
    "fieldname": "option_id",
    "fieldtype": "Link",
+   "in_list_view": 1,
    "label": "Option ID",
    "options": "Option Master",
    "reqd": 1
@@ -56,21 +42,31 @@
    "fetch_from": "option_id.option_text",
    "fieldname": "option_name",
    "fieldtype": "Data",
-   "label": "Option Name",
+   "label": "Option Name"
+  },
+  {
+   "fieldname": "percentage",
+   "fieldtype": "Percent",
+   "label": "Percentage"
+  },
+  {
+   "fieldname": "option_percentage_id",
+   "fieldtype": "Int",
+   "label": "Option Percentage ID",
    "read_only": 1,
-   "reqd": 1
+   "unique": 1
   },
   {
    "default": "1",
    "fieldname": "is_active",
    "fieldtype": "Check",
-   "label": "Is Active "
+   "label": "Is Active"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-02-10 13:01:09.560394",
+ "modified": "2026-02-13 18:46:43.761645",
  "modified_by": "Administrator",
  "module": "BuyBack",
  "name": "Option Percentage Link",
