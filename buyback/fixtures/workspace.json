@@ -12911,7 +12911,7 @@
  },
  {
   "charts": [],
-  "content": "[{\"id\":\"5gB648mewX\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\">BuyBack</span>\",\"col\":12}},{\"id\":\"Q6nyvGH4Q3\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Test Master\",\"col\":3}},{\"id\":\"i5tFCGnsXE\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Buyback Price Master\",\"col\":3}},{\"id\":\"125rOoW8y9\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Question Master\",\"col\":3}},{\"id\":\"YJJnmgl57M\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Grade Master\",\"col\":3}},{\"id\":\"2TdBbXI_V_\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Option Master\",\"col\":3}},{\"id\":\"7SO9m6-otU\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Option Percentage Link\",\"col\":3}},{\"id\":\"7NpNsdwqd4\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Payment Method Master\",\"col\":3}},{\"id\":\"9mjh68WPB7\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Buyback Request\",\"col\":3}},{\"id\":\"e2CMRYAou-\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"State Master\",\"col\":3}},{\"id\":\"lEOvprCiUJ\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>Reports</b></span>\",\"col\":12}},{\"id\":\"yyNsXCBCO9\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"View Buybacks\",\"col\":3}}]",
+  "content": "[{\"id\":\"5gB648mewX\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\">BuyBack</span>\",\"col\":12}},{\"id\":\"ZGXBhxTeqS\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"Total BuyBacks\",\"col\":4}},{\"id\":\"c272lQRcYG\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"Deal \",\"col\":4}},{\"id\":\"mhrxZgcDLe\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"No Deal\",\"col\":4}},{\"id\":\"DmPPMkMGva\",\"type\":\"spacer\",\"data\":{\"col\":12}},{\"id\":\"9mjh68WPB7\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Buyback Request\",\"col\":3}},{\"id\":\"i5tFCGnsXE\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Buyback Price Master\",\"col\":3}},{\"id\":\"125rOoW8y9\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Question Master\",\"col\":3}},{\"id\":\"YJJnmgl57M\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Grade Master\",\"col\":3}},{\"id\":\"2TdBbXI_V_\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Option Master\",\"col\":3}},{\"id\":\"7NpNsdwqd4\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Payment Method Master\",\"col\":3}},{\"id\":\"Q6nyvGH4Q3\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Test Master\",\"col\":3}},{\"id\":\"e2CMRYAou-\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"State Master\",\"col\":3}},{\"id\":\"2OVpBn0Kqp\",\"type\":\"spacer\",\"data\":{\"col\":12}},{\"id\":\"lEOvprCiUJ\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>Reports</b></span>\",\"col\":12}},{\"id\":\"yyNsXCBCO9\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"View Buybacks\",\"col\":3}}]",
   "custom_blocks": [],
   "docstatus": 0,
   "doctype": "Workspace",
@@ -12922,10 +12922,32 @@
   "is_hidden": 0,
   "label": "BuyBack",
   "links": [],
-  "modified": "2026-02-13 18:30:40.580212",
+  "modified": "2026-02-16 16:12:27.736408",
   "module": "BuyBack",
   "name": "BuyBack",
-  "number_cards": [],
+  "number_cards": [
+   {
+    "label": "Deal ",
+    "number_card_name": "Deal Status",
+    "parent": "BuyBack",
+    "parentfield": "number_cards",
+    "parenttype": "Workspace"
+   },
+   {
+    "label": "Total BuyBacks",
+    "number_card_name": "Total Buybacks-1",
+    "parent": "BuyBack",
+    "parentfield": "number_cards",
+    "parenttype": "Workspace"
+   },
+   {
+    "label": "No Deal",
+    "number_card_name": "No deal",
+    "parent": "BuyBack",
+    "parentfield": "number_cards",
+    "parenttype": "Workspace"
+   }
+  ],
   "parent_page": "",
   "public": 1,
   "quick_lists": [],

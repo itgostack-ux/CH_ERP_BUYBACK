@@ -4,10 +4,10 @@
   "doctype": "Client Script",
   "dt": "Buyback Price Master",
   "enabled": 1,
-  "modified": "2026-02-09 10:58:28.742691",
+  "modified": "2026-02-16 10:36:30.265090",
   "module": "BuyBack",
   "name": "Buyback Price Master Download Upload Button UI",
-  "script": "frappe.listview_settings['Buyback Price Master'] = {\n    onload(listview) {\n\n        if (listview.buttons_added) return;\n        listview.buttons_added = true;\n\n        // Download button\n        listview.page.add_inner_button('Download Template', () => {\n            window.open('/api/method/buyback.api.download_buyback_template');\n        });\n\n        // Upload button\n        listview.page.add_inner_button('Upload CSV', () => {\n\n            new frappe.ui.FileUploader({\n                allow_multiple: false,\n                on_success(file) {\n\n                    frappe.call({\n                        method: \"buyback.api.upload_buyback_csv\",\n                        args: { file_url: file.file_url },\n                        callback: () => {\n                            frappe.msgprint(\"Upload complete\");\n                            listview.refresh();\n                        }\n                    });\n\n                }\n            });\n\n        });\n\n    }\n};\n",
+  "script": "frappe.listview_settings['Buyback Price Master'] = {\n    onload(listview) {\n\n        if (listview.buttons_added) return;\n        listview.buttons_added = true;\n\n        // Download button\n        listview.page.add_inner_button('Buyback Price Import', () => {\n            window.open('/api/method/buyback.api.download_buyback_template');\n        });\n\n        // Upload button\n        listview.page.add_inner_button('Upload Price', () => {\n\n            new frappe.ui.FileUploader({\n                allow_multiple: false,\n                on_success(file) {\n\n                    frappe.call({\n                        method: \"buyback.api.upload_buyback_csv\",\n                        args: { file_url: file.file_url },\n                        callback: () => {\n                            frappe.msgprint(\"Upload complete\");\n                            listview.refresh();\n                        }\n                    });\n\n                }\n            });\n\n        });\n\n    }\n};\n",
   "view": "List"
  },
  {
@@ -26,10 +26,10 @@
   "doctype": "Client Script",
   "dt": "Buyback Request",
   "enabled": 1,
-  "modified": "2026-02-11 14:56:33.379021",
+  "modified": "2026-02-16 17:38:10.103783",
   "module": "BuyBack",
   "name": "Dynamic Script in Buyback Price",
-  "script": "frappe.ui.form.on('Buyback Request', {\n    refresh(frm) {\n        if (frm.is_new()) calc_price(frm);\n    },\n\n    item_name: calc_price,\n    usage_key: calc_price,\n    grade: calc_price\n});\n\nfunction calc_price(frm) {\n\n    // stop if fields missing\n    if (!frm.doc.item_name || !frm.doc.usage_key || !frm.doc.grade) {\n        frm.set_value('buyback_price', 0);\n        frm.set_value('final_buyback_amount', 0);\n        return;\n    }\n\n    let key = `${frm.doc.grade}_grade_${frm.doc.usage_key}`;\n    console.log(\"PRICE KEY →\", key);\n\n    frappe.db.get_doc('Buyback Price Master', frm.doc.item_name)\n        .then(doc => {\n\n            let price = doc[key] || 0;\n\n            console.log(\"FETCHED PRICE →\", price);\n\n            frm.set_value('buyback_price', price);\n            frm.set_value('final_buyback_amount', price);\n        })\n        .catch(err => {\n            console.error(\"Price fetch error:\", err);\n            frm.set_value('buyback_price', 0);\n            frm.set_value('final_buyback_amount', 0);\n        });\n}\n",
+  "script": "frappe.ui.form.on('Buyback Request', {\n    refresh(frm) {\n        if (frm.is_new()) calc_price(frm);\n    },\n\n    item_name: calc_price,\n    usage_key: calc_price,\n    grade: calc_price\n});\n\nfunction calc_price(frm) {\n\n    // stop if fields missing\n    if (!frm.doc.item_name || !frm.doc.usage_key || !frm.doc.grade) {\n        frm.set_value('buyback_price', 0);\n        frm.set_value('final_buyback_amount', 0);\n         frm.set_value('cash_notes', 0);\n         frm.set_value('account_no', 0);\n        return;\n    }\n\n    let key = `${frm.doc.grade}_grade_${frm.doc.usage_key}`;\n    console.log(\"PRICE KEY →\", key);\n\n    frappe.db.get_doc('Buyback Price Master', frm.doc.item_name)\n        .then(doc => {\n\n            let price = doc[key] || 0;\n\n            console.log(\"FETCHED PRICE →\", price);\n\n            frm.set_value('buyback_price', price);\n            frm.set_value('final_buyback_amount', price);\n        })\n        .catch(err => {\n            console.error(\"Price fetch error:\", err);\n            frm.set_value('buyback_price', 0);\n            frm.set_value('final_buyback_amount', 0);\n        });\n}\n",
   "view": "Form"
  },
  {
@@ -59,10 +59,10 @@
   "doctype": "Client Script",
   "dt": "Buyback Request",
   "enabled": 1,
-  "modified": "2026-02-11 16:18:45.239191",
+  "modified": "2026-02-16 17:39:48.900860",
   "module": "BuyBack",
   "name": "Buyback Request Payment method Fields",
-  "script": "frappe.ui.form.on('Buyback Request', {\n    payment_mode: function(frm) {\n        payment_ui(frm);\n    },\n    refresh: function(frm) {\n        payment_ui(frm);\n    }\n});\n\nfunction payment_ui(frm) {\n\n    // hide everything first\n    frm.toggle_display([\n        'cash_notes',\n        'account_holder_name',\n        'branch',\n        'bank_name',\n        'ifsc_code',\n        'upi_id',\n        'transaction_proof'\n    ], false);\n\n    // always show amount\n    frm.toggle_display('final_buyback_amount', true);\n\n    if (!frm.doc.payment_mode) return;\n\n    frappe.db.get_doc('Payment Method Master', frm.doc.payment_mode)\n        .then(doc => {\n\n            frm.set_value('payment_mode_name', doc.payment_method);\n\n            // CASH\n            if (doc.payment_method === \"Cash\") {\n                frm.toggle_display('cash_notes', true);\n            }\n\n            // BANK\n            else if (doc.payment_method === \"Bank Transfer\") {\n                frm.toggle_display([\n                    'account_holder_name',\n                    'branch',\n                    'bank_name',\n                    'ifsc_code',\n                     'transaction_proof'\n                ], true);\n            }\n\n            // UPI\n            else if (doc.payment_method === \"UPI\") {\n                frm.toggle_display([\n                    'upi_id',\n                    'transaction_proof'\n                ], true);\n            }\n\n        });\n}\n",
+  "script": "frappe.ui.form.on('Buyback Request', {\n    payment_mode: function(frm) {\n        payment_ui(frm);\n    },\n    refresh: function(frm) {\n        payment_ui(frm);\n    }\n});\n\nfunction payment_ui(frm) {\n\n    // hide everything first\n    frm.toggle_display([\n        'cash_notes',\n        'account_holder_name',\n        'branch',\n        'bank_name',\n        'ifsc_code',\n        'upi_id',\n         'account_no',\n        'transaction_proof'\n    ], false);\n\n    // always show amount\n    frm.toggle_display('final_buyback_amount', true);\n\n    if (!frm.doc.payment_mode) return;\n\n    frappe.db.get_doc('Payment Method Master', frm.doc.payment_mode)\n        .then(doc => {\n\n            frm.set_value('payment_mode_name', doc.payment_method);\n\n            // CASH\n            if (doc.payment_method === \"Cash\") {\n                frm.toggle_display('cash_notes', true);\n            }\n\n            // BANK\n            else if (doc.payment_method === \"Bank Transfer\") {\n                frm.toggle_display([\n                    'account_holder_name',\n                    'branch',\n                    'bank_name',\n                    'ifsc_code',\n                     'account_no',\n                     'transaction_proof'\n                ], true);\n            }\n\n            // UPI\n            else if (doc.payment_method === \"UPI\") {\n                frm.toggle_display([\n                    'upi_id',\n                    'transaction_proof'\n                ], true);\n            }\n\n        });\n}",
   "view": "Form"
  },
  {
@@ -81,10 +81,21 @@
   "doctype": "Client Script",
   "dt": "Buyback Request",
   "enabled": 1,
-  "modified": "2026-02-13 14:35:59.377222",
+  "modified": "2026-02-16 10:55:11.274569",
   "module": "BuyBack",
   "name": "Buyback Request Numeric Field Reference",
-  "script": "frappe.ui.form.on('Buyback Request', {\n    refresh(frm) {\n        bind_numeric(frm);\n    }\n});\n\nfunction bind_numeric(frm) {\n\n    ['mobile_no', 'pincode'].forEach(fieldname => {\n\n        let input = frm.fields_dict[fieldname].$input;\n\n        if (!input) return;\n\n        input.off('keypress.numeric'); // prevent duplicate binding\n\n        input.on('keypress.numeric', function(e) {\n\n            // allow control keys\n            if (e.ctrlKey || e.metaKey || e.key === \"Backspace\") return;\n\n            // block non-numeric\n            if (!/[0-9]/.test(e.key)) {\n                e.preventDefault();\n            }\n        });\n    });\n}\n",
+  "script": "frappe.ui.form.on('Buyback Request', {\n    refresh(frm) {\n        bind_numeric(frm);\n    }\n});\n\nfunction bind_numeric(frm) {\n\n    ['mobile_no', 'pincode','imei','cash_notes'].forEach(fieldname => {\n\n        let input = frm.fields_dict[fieldname].$input;\n\n        if (!input) return;\n\n        input.off('keypress.numeric'); // prevent duplicate binding\n\n        input.on('keypress.numeric', function(e) {\n\n            // allow control keys\n            if (e.ctrlKey || e.metaKey || e.key === \"Backspace\") return;\n\n            // block non-numeric\n            if (!/[0-9]/.test(e.key)) {\n                e.preventDefault();\n            }\n        });\n    });\n}\n",
+  "view": "Form"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Client Script",
+  "dt": "Buyback Price Master",
+  "enabled": 1,
+  "modified": "2026-02-16 11:36:02.400700",
+  "module": "BuyBack",
+  "name": "Buyback Price Master Numeric Columns",
+  "script": "frappe.ui.form.on('Buyback Price Master', {\n    refresh(frm) {\n        bind_numeric(frm);\n    }\n});\n\nfunction bind_numeric(frm) {\n\n    const numeric_fields = [\n        \"sku_id\",\n        \"current_market_price\",\n        \"vendor_price\",\n        \"a_grade_iw_0_3\",\n        \"b_grade_iw_0_3\",\n        \"c_grade_iw_0_3\",\n        \"a_grade_iw_0_6\",\n        \"b_grade_iw_0_6\",\n        \"c_grade_iw_0_6\",\n        \"d_grade_iw_0_6\",\n        \"a_grade_iw_6_11\",\n        \"b_grade_iw_6_11\",\n        \"c_grade_iw_6_11\",\n        \"d_grade_iw_6_11\",\n        \"a_grade_oow_11\",\n        \"b_grade_oow_11\",\n        \"c_grade_oow_11\",\n        \"d_grade_oow_11\"\n    ];\n\n    numeric_fields.forEach(fieldname => {\n\n        let input = frm.fields_dict[fieldname]?.$input;\n        if (!input) return;\n\n        input.off('keypress.numeric');\n\n        input.on('keypress.numeric', function(e) {\n\n            // allow control keys\n            if (e.ctrlKey || e.metaKey || e.key === \"Backspace\" || e.key === \"Tab\") return;\n\n            // block non-numeric\n            if (!/[0-9]/.test(e.key)) {\n                e.preventDefault();\n            }\n        });\n    });\n\n}\n",
   "view": "Form"
  }
 ]
