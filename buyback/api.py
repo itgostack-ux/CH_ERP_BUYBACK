@@ -111,3 +111,29 @@ def download_buyback_template():
     frappe.response.filename = "buyback_template.csv"
     frappe.response.filecontent = output.getvalue()
     frappe.response.type = "download"
+@frappe.whitelist(allow_guest=True)
+def get_buyback(id):
+
+    doc = frappe.db.get_value(
+        "Buyback Request",
+        {"buybackid": id},
+        "*",
+        as_dict=True
+    )
+
+    return doc
+
+
+@frappe.whitelist()
+def confirm_deal(name):
+
+    doc = frappe.get_doc("Buyback Request", name)
+
+    # Only allow approval from Open Request
+    if doc.status != "Open Request":
+        frappe.throw(f"Cannot approve. Current status: {doc.status}")
+
+    doc.status = "Customer Approved"
+    doc.save(ignore_permissions=True)
+
+    return "OK"

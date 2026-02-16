@@ -1,0 +1,126 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "field:session_id",
+ "creation": "2026-02-16 12:22:17.650445",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "session_id",
+  "imei_number",
+  "mobile_no",
+  "purpose",
+  "item_code",
+  "item_name",
+  "diagnosis_date",
+  "buyback_amount",
+  "evaluation_price",
+  "current_buyback_price",
+  "is_active",
+  "diagnosis_results",
+  "question_result"
+ ],
+ "fields": [
+  {
+   "fieldname": "session_id",
+   "fieldtype": "Int",
+   "label": "Session ID",
+   "unique": 1
+  },
+  {
+   "fieldname": "imei_number",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "IMEI Number",
+   "reqd": 1
+  },
+  {
+   "fieldname": "mobile_no",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Mobile No",
+   "reqd": 1
+  },
+  {
+   "fieldname": "purpose",
+   "fieldtype": "Data",
+   "label": "Purpose"
+  },
+  {
+   "fieldname": "item_code",
+   "fieldtype": "Data",
+   "label": "Item Code"
+  },
+  {
+   "fieldname": "item_name",
+   "fieldtype": "Data",
+   "label": "Item Name"
+  },
+  {
+   "fieldname": "diagnosis_date",
+   "fieldtype": "Date",
+   "label": "Diagnosis Date"
+  },
+  {
+   "fieldname": "buyback_amount",
+   "fieldtype": "Currency",
+   "label": "Buyback Amount"
+  },
+  {
+   "fieldname": "evaluation_price",
+   "fieldtype": "Currency",
+   "label": "Evaluation Price"
+  },
+  {
+   "fieldname": "current_buyback_price",
+   "fieldtype": "Currency",
+   "label": "Current Buyback Price"
+  },
+  {
+   "default": "1",
+   "fieldname": "is_active",
+   "fieldtype": "Check",
+   "label": "Is Active"
+  },
+  {
+   "fieldname": "diagnosis_results",
+   "fieldtype": "Table",
+   "label": "Diagnosis Results",
+   "options": "Diagnosis Results"
+  },
+  {
+   "fieldname": "question_result",
+   "fieldtype": "Table",
+   "label": "Question Result",
+   "options": "Question Results"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-02-16 14:28:59.150484",
+ "modified_by": "Administrator",
+ "module": "BuyBack",
+ "name": "Diagnosis Master",
+ "naming_rule": "By fieldname",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

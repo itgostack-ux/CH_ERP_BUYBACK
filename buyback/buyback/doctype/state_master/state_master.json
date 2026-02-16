@@ -8,7 +8,8 @@
  "engine": "InnoDB",
  "field_order": [
   "state_id",
-  "state_name"
+  "state_name",
+  "isactive"
  ],
  "fields": [
   {
@@ -24,12 +25,18 @@
    "in_list_view": 1,
    "label": "State Name",
    "reqd": 1
+  },
+  {
+   "default": "1",
+   "fieldname": "isactive",
+   "fieldtype": "Check",
+   "label": "IsActive"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-02-11 12:16:48.025017",
+ "modified": "2026-02-16 10:40:09.731178",
  "modified_by": "Administrator",
  "module": "BuyBack",
  "name": "State Master",

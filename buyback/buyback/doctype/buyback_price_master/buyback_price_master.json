@@ -164,7 +164,7 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-02-11 18:51:43.763718",
+ "modified": "2026-02-16 11:57:30.696710",
  "modified_by": "Administrator",
  "module": "BuyBack",
  "name": "Buyback Price Master",
@@ -186,7 +186,7 @@
  ],
  "row_format": "Dynamic",
  "rows_threshold_for_grid_search": 20,
- "search_fields": "item_name",
+ "search_fields": "item_code,item_name",
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": []

@@ -28,6 +28,7 @@
   "customer_image_preview",
   "tab_2_tab",
   "item_name",
+  "item_code",
   "item_full_name",
   "imei",
   "no_deal_reason",
@@ -42,6 +43,7 @@
   "cash_notes",
   "transaction_proof",
   "column_break_osre",
+  "account_no",
   "account_holder_name",
   "branch",
   "bank_name",
@@ -242,7 +244,8 @@
   {
    "fieldname": "cash_notes",
    "fieldtype": "Data",
-   "label": "Cash Notes"
+   "label": "Cash Notes",
+   "read_only": 1
   },
   {
    "fieldname": "column_break_osre",
@@ -264,7 +267,7 @@
    "fieldname": "status",
    "fieldtype": "Select",
    "label": "Status",
-   "options": "Open Request\nPending Customer Approval\nPending Finance Approval\nPayment Done\nCompleted\nRejected",
+   "options": "Open Request\nCustomer Approved\nFinance Approved\nPayment Done\nCompleted\nRejected",
    "read_only": 1
   },
   {
@@ -307,6 +310,19 @@
    "fieldname": "no_deal_reason",
    "fieldtype": "Small Text",
    "label": "No Deal Reason"
+  },
+  {
+   "fetch_from": "item_name.item_code",
+   "fieldname": "item_code",
+   "fieldtype": "Data",
+   "label": "Item Code",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "account_no",
+   "fieldtype": "Data",
+   "label": "Account No"
   }
  ],
  "grid_page_length": 50,
@@ -319,7 +335,7 @@
   }
  ],
  "make_attachments_public": 1,
- "modified": "2026-02-13 14:56:38.985571",
+ "modified": "2026-02-16 17:54:38.142317",
  "modified_by": "Administrator",
  "module": "BuyBack",
  "name": "Buyback Request",

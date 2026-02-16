@@ -1,0 +1,63 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-02-16 12:47:10.643966",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "question_id",
+  "selected_option_id",
+  "grade_id",
+  "answer_date",
+  "is_active",
+  "sesstion_id"
+ ],
+ "fields": [
+  {
+   "fieldname": "question_id",
+   "fieldtype": "Int",
+   "label": "Question ID"
+  },
+  {
+   "fieldname": "selected_option_id",
+   "fieldtype": "Int",
+   "label": "Selected Option ID"
+  },
+  {
+   "fieldname": "grade_id",
+   "fieldtype": "Int",
+   "label": "Grade ID"
+  },
+  {
+   "fieldname": "answer_date",
+   "fieldtype": "Datetime",
+   "label": "Answer Date"
+  },
+  {
+   "default": "1",
+   "fieldname": "is_active",
+   "fieldtype": "Check",
+   "label": "Is Active"
+  },
+  {
+   "fieldname": "sesstion_id",
+   "fieldtype": "Int",
+   "label": "Sesstion ID"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-02-16 13:27:14.426577",
+ "modified_by": "Administrator",
+ "module": "BuyBack",
+ "name": "Question Results",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
