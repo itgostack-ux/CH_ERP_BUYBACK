@@ -197,3 +197,9 @@ class BuybackRequest(Document):
 
         else:
             frappe.throw(f"Invalid payment mode: {self.payment_mode_name}")
+
+def after_insert(self):
+
+    # send email only if deal
+    if self.deal_status == "Deal":
+        send_approval_email(self)

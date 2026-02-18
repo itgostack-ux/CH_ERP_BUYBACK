@@ -124,16 +124,18 @@ def get_buyback(id):
     return doc
 
 
-@frappe.whitelist()
+@frappe.whitelist(allow_guest=True)
 def confirm_deal(name):
 
     doc = frappe.get_doc("Buyback Request", name)
 
-    # Only allow approval from Open Request
+    # prevent double approval
     if doc.status != "Open Request":
-        frappe.throw(f"Cannot approve. Current status: {doc.status}")
+        return {"status": "already_processed"}
 
     doc.status = "Customer Approved"
     doc.save(ignore_permissions=True)
 
-    return "OK"
+    frappe.db.commit()
+
+    return {"status": "success"}
