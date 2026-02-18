@@ -1,5 +1,6 @@
 {
  "actions": [],
+ "allow_import": 1,
  "allow_rename": 1,
  "autoname": "field:option_id",
  "creation": "2026-02-09 18:03:47.209906",
@@ -68,7 +69,7 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-02-11 18:47:06.080160",
+ "modified": "2026-02-18 17:18:57.492362",
  "modified_by": "Administrator",
  "module": "BuyBack",
  "name": "Option Master",
