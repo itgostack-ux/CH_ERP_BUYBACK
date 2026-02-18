@@ -168,12 +168,12 @@ class BuybackRequest(Document):
 
         mode = (self.payment_mode_name or "").lower().strip()
 
-        if mode == "cash":
+        if mode == "Cash":
 
             if not self.cash_notes:
                 frappe.throw("Cash notes required for Cash payment")
 
-        elif "bank" in mode:
+        elif "Bank Transfer" in mode:
 
             required = {
                 "Account Holder Name": self.account_holder_name,
@@ -187,7 +187,7 @@ class BuybackRequest(Document):
                 if not value:
                     frappe.throw(f"{label} is required for Bank Transfer")
 
-        elif mode == "upi":
+        elif mode == "UPI":
 
             if not self.upi_id:
                 frappe.throw("UPI ID required")
