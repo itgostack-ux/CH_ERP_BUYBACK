@@ -7,18 +7,26 @@
  "engine": "InnoDB",
  "field_order": [
   "session_id",
-  "imei_number",
+  "customer_id",
+  "customer_name",
   "mobile_no",
+  "imei_number",
   "purpose",
+  "sku_id",
   "item_code",
   "item_name",
   "diagnosis_date",
-  "buyback_amount",
-  "evaluation_price",
   "current_buyback_price",
+  "evaluation_price",
+  "created_user",
+  "created_date",
+  "created_time",
   "is_active",
   "diagnosis_results",
-  "question_result"
+  "question_result",
+  "updated_user",
+  "updated_date",
+  "updated_time"
  ],
  "fields": [
   {
@@ -31,15 +39,13 @@
    "fieldname": "imei_number",
    "fieldtype": "Data",
    "in_list_view": 1,
-   "label": "IMEI Number",
-   "reqd": 1
+   "label": "IMEI Number"
   },
   {
    "fieldname": "mobile_no",
    "fieldtype": "Data",
    "in_list_view": 1,
-   "label": "Mobile No",
-   "reqd": 1
+   "label": "Mobile No"
   },
   {
    "fieldname": "purpose",
@@ -60,11 +66,6 @@
    "fieldname": "diagnosis_date",
    "fieldtype": "Date",
    "label": "Diagnosis Date"
-  },
-  {
-   "fieldname": "buyback_amount",
-   "fieldtype": "Currency",
-   "label": "Buyback Amount"
   },
   {
    "fieldname": "evaluation_price",
@@ -93,12 +94,57 @@
    "fieldtype": "Table",
    "label": "Question Result",
    "options": "Question Results"
+  },
+  {
+   "fieldname": "customer_id",
+   "fieldtype": "Int",
+   "label": "Customer ID"
+  },
+  {
+   "fieldname": "customer_name",
+   "fieldtype": "Data",
+   "label": "Customer Name"
+  },
+  {
+   "fieldname": "sku_id",
+   "fieldtype": "Int",
+   "label": "Sku ID"
+  },
+  {
+   "fieldname": "created_user",
+   "fieldtype": "Data",
+   "label": "Created User"
+  },
+  {
+   "fieldname": "created_date",
+   "fieldtype": "Date",
+   "label": "Created Date"
+  },
+  {
+   "fieldname": "created_time",
+   "fieldtype": "Datetime",
+   "label": "Created Time"
+  },
+  {
+   "fieldname": "updated_user",
+   "fieldtype": "Data",
+   "label": "Updated User"
+  },
+  {
+   "fieldname": "updated_date",
+   "fieldtype": "Date",
+   "label": "Updated Date"
+  },
+  {
+   "fieldname": "updated_time",
+   "fieldtype": "Datetime",
+   "label": "Updated Time"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-02-16 14:28:59.150484",
+ "modified": "2026-02-19 19:45:56.184983",
  "modified_by": "Administrator",
  "module": "BuyBack",
  "name": "Diagnosis Master",

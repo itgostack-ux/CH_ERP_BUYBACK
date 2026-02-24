@@ -8,8 +8,13 @@
   "sesstion_id",
   "test_id",
   "test_name",
-  "created_on",
+  "test_result",
   "created_user",
+  "created_on",
+  "created_time",
+  "updated_user",
+  "updated_date",
+  "updated_time",
   "is_active"
  ],
  "fields": [
@@ -21,12 +26,12 @@
   {
    "fieldname": "test_name",
    "fieldtype": "Data",
-   "label": "Test Result"
+   "label": "Test Name"
   },
   {
    "fieldname": "created_on",
    "fieldtype": "Date",
-   "label": "Created On"
+   "label": "Created Date"
   },
   {
    "fieldname": "created_user",
@@ -43,13 +48,38 @@
    "fieldname": "sesstion_id",
    "fieldtype": "Int",
    "label": "Sesstion ID"
+  },
+  {
+   "fieldname": "updated_user",
+   "fieldtype": "Data",
+   "label": "Updated User"
+  },
+  {
+   "fieldname": "updated_date",
+   "fieldtype": "Date",
+   "label": "Updated Date"
+  },
+  {
+   "fieldname": "updated_time",
+   "fieldtype": "Datetime",
+   "label": "Updated Time"
+  },
+  {
+   "fieldname": "test_result",
+   "fieldtype": "Data",
+   "label": "Test Result"
+  },
+  {
+   "fieldname": "created_time",
+   "fieldtype": "Datetime",
+   "label": "Created Time"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-02-16 13:23:45.468872",
+ "modified": "2026-02-20 18:55:29.479896",
  "modified_by": "Administrator",
  "module": "BuyBack",
  "name": "Diagnosis Results",
