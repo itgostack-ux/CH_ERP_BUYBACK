@@ -2,14 +2,14 @@
  "actions": [],
  "allow_import": 1,
  "allow_rename": 1,
- "autoname": "field:sku_id",
+ "autoname": "field:buyback_price_id",
  "creation": "2026-02-05 14:27:58.725197",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
   "section_break_tgka",
   "buyback_price_configuration_column",
-  "sku_id",
+  "buyback_price_id",
   "item_code",
   "item_name",
   "current_market_price",
@@ -32,13 +32,6 @@
   "is_active"
  ],
  "fields": [
-  {
-   "fieldname": "sku_id",
-   "fieldtype": "Int",
-   "label": "Sku ID",
-   "read_only": 1,
-   "unique": 1
-  },
   {
    "fieldname": "item_code",
    "fieldtype": "Link",
@@ -159,12 +152,19 @@
    "columns": 1,
    "fieldname": "section_break_tgka",
    "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "buyback_price_id",
+   "fieldtype": "Int",
+   "label": "Buyback Price ID",
+   "read_only": 1,
+   "unique": 1
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-02-16 11:57:30.696710",
+ "modified": "2026-02-25 16:26:13.643020",
  "modified_by": "Administrator",
  "module": "BuyBack",
  "name": "Buyback Price Master",

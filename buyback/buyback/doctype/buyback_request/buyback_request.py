@@ -2,13 +2,14 @@ import frappe
 import re
 from frappe.model.document import Document
 from frappe.utils import get_url
-
+from frappe.utils import validate_email_address
+import re
 
 # ===============================
 # EMAIL FUNCTION (outside class)
 # ===============================
-def send_approval_email(doc):
 
+def send_approval_email(doc):
     base_url = get_url()
     approval_link = f"{base_url}/approval?id={doc.buybackid}"
 
@@ -31,13 +32,12 @@ def send_approval_email(doc):
     <p>Request ID: {doc.buybackid}</p>
     """
 
-    frappe.enqueue(
-        frappe.sendmail,
+    frappe.sendmail(
         recipients=[doc.email],
         subject="Buyback Approval Required",
-        message=message
+        message=message,
+        now=False 
     )
-
 
 # ===============================
 # BUYBACK REQUEST CLASS
@@ -81,38 +81,38 @@ class BuybackRequest(Document):
     # -------------------------
     # AFTER INSERT → EMAIL
     # -------------------------
-    def after_insert(self):
+def after_insert(self):
         send_approval_email(self)
 
+def validate_customer(self):
 
-    # -------------------------
-    # CUSTOMER VALIDATION
-    # -------------------------
-    def validate_customer(self):
+    required = {
+        "Customer Name": self.customer_name,
+        "Mobile No": self.mobile_no,
+        "Address": self.address,
+        "PIN Code": self.pincode,
+        "Email": self.email,
+    }
 
-        required = {
-            "Customer Name": self.customer_name,
-            "Mobile No": self.mobile_no,
-            "Address": self.address,
-            "PIN Code": self.pincode,
-            "Email": self.email
-        }
+    for label, value in required.items():
+        if not value:
+            frappe.throw(f"{label} is required")
 
-        for label, value in required.items():
-            if not value:
-                frappe.throw(f"{label} is required")
+    # mobile
+    mobile = (self.mobile_no or "").strip()
+    if not re.fullmatch(r"\d{10}", mobile):
+        frappe.throw("Mobile number must be exactly 10 digits")
+    self.mobile_no = mobile
 
-        mobile = (self.mobile_no or "").strip()
-        if not re.fullmatch(r"\d{10}", mobile):
-            frappe.throw("Mobile number must be exactly 10 digits")
+    # pincode
+    pin = (self.pincode or "").strip()
+    if not re.fullmatch(r"\d{6}", pin):
+        frappe.throw("PIN code must be exactly 6 digits")
+    self.pincode = pin
 
-        pin = (self.pincode or "").strip()
-        if not re.fullmatch(r"\d{6}", pin):
-            frappe.throw("PIN code must be exactly 6 digits")
-
-        email = (self.email or "").strip().lower()
-        if not re.fullmatch(r"[a-zA-Z0-9._%+-]+@gmail\.com", email):
-            frappe.throw("Enter a valid Gmail address")
+    # email (IMPORTANT — same indent level)
+    self.email = (self.email or "").strip().lower()
+    validate_email_address(self.email, throw=True)
 
 
     # -------------------------
@@ -168,12 +168,12 @@ class BuybackRequest(Document):
 
         mode = (self.payment_mode_name or "").lower().strip()
 
-        if mode == "Cash":
+        if mode == "cash":
 
             if not self.cash_notes:
                 frappe.throw("Cash notes required for Cash payment")
 
-        elif "Bank Transfer" in mode:
+        elif "bank transfer" in mode:
 
             required = {
                 "Account Holder Name": self.account_holder_name,
@@ -187,7 +187,7 @@ class BuybackRequest(Document):
                 if not value:
                     frappe.throw(f"{label} is required for Bank Transfer")
 
-        elif mode == "UPI":
+        elif mode == "upi":
 
             if not self.upi_id:
                 frappe.throw("UPI ID required")

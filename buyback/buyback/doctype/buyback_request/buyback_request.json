@@ -27,7 +27,7 @@
   "aadhaar_pdf",
   "customer_image_preview",
   "tab_2_tab",
-  "item_name",
+  "item_id",
   "item_code",
   "item_full_name",
   "imei",
@@ -92,13 +92,6 @@
    "label": "Email"
   },
   {
-   "fieldname": "item_name",
-   "fieldtype": "Link",
-   "label": "Item ID",
-   "options": "Buyback Price Master",
-   "reqd": 1
-  },
-  {
    "fieldname": "address",
    "fieldtype": "Small Text",
    "label": "Address"
@@ -122,7 +115,7 @@
    "reqd": 1
   },
   {
-   "fetch_from": "item_name.item_name",
+   "fetch_from": "item_id.item_name",
    "fieldname": "item_full_name",
    "fieldtype": "Data",
    "label": "Item Name",
@@ -205,7 +198,7 @@
   },
   {
    "fieldname": "final_buyback_amount",
-   "fieldtype": "Data",
+   "fieldtype": "Currency",
    "label": "Final Buyback Amount",
    "read_only": 1
   },
@@ -312,7 +305,7 @@
    "label": "No Deal Reason"
   },
   {
-   "fetch_from": "item_name.item_code",
+   "fetch_from": "item_id.item_code",
    "fieldname": "item_code",
    "fieldtype": "Data",
    "label": "Item Code",
@@ -323,6 +316,13 @@
    "fieldname": "account_no",
    "fieldtype": "Data",
    "label": "Account No"
+  },
+  {
+   "fieldname": "item_id",
+   "fieldtype": "Link",
+   "label": "Item ID",
+   "options": "Buyback Price Master",
+   "reqd": 1
   }
  ],
  "grid_page_length": 50,
@@ -335,7 +335,7 @@
   }
  ],
  "make_attachments_public": 1,
- "modified": "2026-02-16 17:54:38.142317",
+ "modified": "2026-02-25 16:39:23.871243",
  "modified_by": "Administrator",
  "module": "BuyBack",
  "name": "Buyback Request",
