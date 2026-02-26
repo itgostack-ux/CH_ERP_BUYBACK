@@ -4,8 +4,6 @@ import csv
 import io
 
 
-
-
 # ---------------------------
 # Upload CSV
 # ---------------------------
@@ -20,36 +18,88 @@ def upload_buyback_csv(file_url):
         frappe.throw("Empty file")
 
     text = content.decode("utf-8") if isinstance(content, bytes) else content
-
     reader = csv.DictReader(io.StringIO(text))
-    inserted = 0
 
-    # get valid doctype fields
     meta = frappe.get_meta("Buyback Price Master")
-    valid_fields = [f.fieldname for f in meta.fields]
+    field_map = {f.fieldname: f.fieldtype for f in meta.fields}
 
-    for row in reader:
+    inserted = 0
+    skipped = []
+    duplicates = []
+    errors = []
 
-        item_code = (row.get("item_code") or "").strip()
+    for idx, row in enumerate(reader, start=2):
+        try:
+            # 🔹 trim all string values
+            row = {
+                k: (v.strip() if isinstance(v, str) else v)
+                for k, v in row.items()
+            }
 
-        if not item_code:
-            continue
+            item_code = (row.get("item_code") or "").strip()
 
-        if frappe.db.exists("Buyback Price Master", {"item_code": item_code}):
-            continue
+            if not item_code:
+                skipped.append(f"Row {idx}: Missing item_code")
+                continue
 
-        doc = frappe.new_doc("Buyback Price Master")
+            if frappe.db.exists("Buyback Price Master", {"item_code": item_code}):
+                duplicates.append(f"Row {idx}: Duplicate item_code {item_code}")
+                continue
 
-        for key, value in row.items():
-            if key in valid_fields:
-                setattr(doc, key, value or 0)
+            doc = frappe.new_doc("Buyback Price Master")
 
-        doc.insert(ignore_permissions=True)
-        inserted += 1
+            for key, value in row.items():
+                if key not in field_map:
+                    continue
+
+                fieldtype = field_map[key]
+
+                # empty handling
+                if value in ("", None):
+                    if fieldtype in ("Int", "Float", "Currency", "Percent"):
+                        setattr(doc, key, 0)
+                    else:
+                        setattr(doc, key, None)
+                    continue
+
+                # numeric casting
+                if fieldtype == "Int":
+                    setattr(doc, key, int(value))
+
+                elif fieldtype in ("Float", "Currency", "Percent"):
+                    setattr(doc, key, float(value))
+
+                else:
+                    setattr(doc, key, str(value))
+
+            doc.insert(ignore_permissions=True)
+            inserted += 1
+
+        except Exception as e:
+            errors.append(f"Row {idx}: {str(e)}")
 
     frappe.db.commit()
 
-    return {"message": f"Upload completed. Inserted {inserted} rows"}
+    return {
+        "message": (
+            f"Upload completed. "
+            f"Inserted: {inserted}, "
+            f"Skipped: {len(skipped)}, "
+            f"Duplicates: {len(duplicates)}, "
+            f"Errors: {len(errors)}"
+        ),
+        "inserted": inserted,
+        "skipped_rows": skipped[:20],
+        "duplicate_rows": duplicates[:20],
+        "error_rows": errors[:20],
+    }
+
+
+
+
+
+
+
 
 
 @frappe.whitelist()

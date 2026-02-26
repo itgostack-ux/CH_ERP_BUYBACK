@@ -1,15 +1,18 @@
 import frappe
 import re
 from frappe.model.document import Document
-from frappe.utils import get_url
-from frappe.utils import validate_email_address
-import re
+from frappe.utils import get_url, validate_email_address
 
-# ===============================
+
+# =========================================================
 # EMAIL FUNCTION (outside class)
-# ===============================
-
+# =========================================================
 def send_approval_email(doc):
+    """Send approval email to customer"""
+
+    if not doc.email:
+        return
+
     base_url = get_url()
     approval_link = f"{base_url}/approval?id={doc.buybackid}"
 
@@ -36,34 +39,40 @@ def send_approval_email(doc):
         recipients=[doc.email],
         subject="Buyback Approval Required",
         message=message,
-        now=False 
+        now=False,
     )
 
-# ===============================
-# BUYBACK REQUEST CLASS
-# ===============================
+
+# =========================================================
+# BUYBACK REQUEST
+# =========================================================
 class BuybackRequest(Document):
 
-    # -------------------------
+    # -----------------------------------------------------
     # BEFORE INSERT
-    # -------------------------
+    # -----------------------------------------------------
     def before_insert(self):
+        """Generate incremental buybackid (temporary approach)"""
 
-        last = frappe.db.sql("""
-            SELECT MAX(buybackid)
-            FROM `tabBuyback Request`
-            FOR UPDATE
-        """)[0][0] or 0
+        last = frappe.db.sql(
+            """SELECT MAX(buybackid) FROM `tabBuyback Request`"""
+        )[0][0] or 0
 
         self.buybackid = last + 1
         self.created_by_user = frappe.session.user
 
+    # -----------------------------------------------------
+    # AFTER INSERT
+    # -----------------------------------------------------
+    def after_insert(self):
+        """Send email only for Deal"""
+        if self.deal_status == "Deal":
+            send_approval_email(self)
 
-    # -------------------------
+    # -----------------------------------------------------
     # MAIN VALIDATION
-    # -------------------------
+    # -----------------------------------------------------
     def validate(self):
-
         if not self.deal_status:
             frappe.throw("Select Deal or No Deal")
 
@@ -77,53 +86,49 @@ class BuybackRequest(Document):
         self.validate_deal()
         self.validate_payment()
 
-
-    # -------------------------
-    # AFTER INSERT → EMAIL
-    # -------------------------
-def after_insert(self):
-        send_approval_email(self)
-
-def validate_customer(self):
-
-    required = {
-        "Customer Name": self.customer_name,
-        "Mobile No": self.mobile_no,
-        "Address": self.address,
-        "PIN Code": self.pincode,
-        "Email": self.email,
-    }
-
-    for label, value in required.items():
-        if not value:
-            frappe.throw(f"{label} is required")
-
-    # mobile
-    mobile = (self.mobile_no or "").strip()
-    if not re.fullmatch(r"\d{10}", mobile):
-        frappe.throw("Mobile number must be exactly 10 digits")
-    self.mobile_no = mobile
-
-    # pincode
-    pin = (self.pincode or "").strip()
-    if not re.fullmatch(r"\d{6}", pin):
-        frappe.throw("PIN code must be exactly 6 digits")
-    self.pincode = pin
-
-    # email (IMPORTANT — same indent level)
-    self.email = (self.email or "").strip().lower()
-    validate_email_address(self.email, throw=True)
-
-
-    # -------------------------
-    # PRODUCT VALIDATION
-    # -------------------------
-    def validate_product(self):
+    # -----------------------------------------------------
+    # CUSTOMER VALIDATION
+    # -----------------------------------------------------
+    def validate_customer(self):
 
         required = {
-            "Item Name": self.item_name,
+            "Customer Name": self.customer_name,
+            "Mobile No": self.mobile_no,
+            "Address": self.address,
+            "PIN Code": self.pincode,
+            "Email": self.email,
+        }
+
+        for label, value in required.items():
+            if not value:
+                frappe.throw(f"{label} is required")
+
+        # ✅ mobile validation
+        mobile = (self.mobile_no or "").strip()
+        if not re.fullmatch(r"\d{10}", mobile):
+            frappe.throw("Mobile number must be exactly 10 digits")
+        self.mobile_no = mobile
+
+        # ✅ pincode validation
+        pin = (self.pincode or "").strip()
+        if not re.fullmatch(r"\d{6}", pin):
+            frappe.throw("PIN code must be exactly 6 digits")
+        self.pincode = pin
+
+        # ✅ email validation (any domain)
+        self.email = (self.email or "").strip().lower()
+        validate_email_address(self.email, throw=True)
+
+    # -----------------------------------------------------
+    # PRODUCT VALIDATION
+    # -----------------------------------------------------
+    def validate_product(self):
+        """Validate selected item and pricing"""
+
+        required = {
+            "Item": self.item_id,  # ✅ correct field
             "Usage Months": self.usage_key,
-            "Grade": self.grade
+            "Grade": self.grade,
         }
 
         for label, value in required.items():
@@ -133,19 +138,16 @@ def validate_customer(self):
         if self.buyback_price is None or self.buyback_price <= 0:
             frappe.throw("Invalid Buyback Price")
 
-
-    # -------------------------
+    # -----------------------------------------------------
     # NO DEAL VALIDATION
-    # -------------------------
+    # -----------------------------------------------------
     def validate_no_deal(self):
-
         if not self.no_deal_reason:
             frappe.throw("No Deal reason required")
 
-
-    # -------------------------
+    # -----------------------------------------------------
     # DEAL VALIDATION
-    # -------------------------
+    # -----------------------------------------------------
     def validate_deal(self):
 
         if not self.customer_image:
@@ -157,10 +159,9 @@ def validate_customer(self):
         if not self.upload_phone_images:
             frappe.throw("Upload Phone Images required")
 
-
-    # -------------------------
+    # -----------------------------------------------------
     # PAYMENT VALIDATION
-    # -------------------------
+    # -----------------------------------------------------
     def validate_payment(self):
 
         if not self.payment_mode_name:
@@ -168,27 +169,27 @@ def validate_customer(self):
 
         mode = (self.payment_mode_name or "").lower().strip()
 
+        # ---------------- CASH ----------------
         if mode == "cash":
-
             if not self.cash_notes:
                 frappe.throw("Cash notes required for Cash payment")
 
+        # ---------------- BANK ----------------
         elif "bank transfer" in mode:
-
             required = {
                 "Account Holder Name": self.account_holder_name,
                 "Branch": self.branch,
                 "Bank Name": self.bank_name,
                 "IFSC Code": self.ifsc_code,
-                "Transaction Proof": self.transaction_proof
+                "Transaction Proof": self.transaction_proof,
             }
 
             for label, value in required.items():
                 if not value:
                     frappe.throw(f"{label} is required for Bank Transfer")
 
+        # ---------------- UPI ----------------
         elif mode == "upi":
-
             if not self.upi_id:
                 frappe.throw("UPI ID required")
 
@@ -197,9 +198,3 @@ def validate_customer(self):
 
         else:
             frappe.throw(f"Invalid payment mode: {self.payment_mode_name}")
-
-def after_insert(self):
-
-    # send email only if deal
-    if self.deal_status == "Deal":
-        send_approval_email(self)

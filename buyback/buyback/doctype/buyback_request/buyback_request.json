@@ -236,7 +236,7 @@
   },
   {
    "fieldname": "cash_notes",
-   "fieldtype": "Data",
+   "fieldtype": "Currency",
    "label": "Cash Notes",
    "read_only": 1
   },
@@ -335,7 +335,7 @@
   }
  ],
  "make_attachments_public": 1,
- "modified": "2026-02-25 16:39:23.871243",
+ "modified": "2026-02-25 17:56:06.795104",
  "modified_by": "Administrator",
  "module": "BuyBack",
  "name": "Buyback Request",

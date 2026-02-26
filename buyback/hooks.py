@@ -252,9 +252,28 @@ doctype_list_js = {
 }
 
 fixtures = [
-    {"doctype": "Role"},
-    {"doctype": "Custom DocPerm"},
-    {"doctype": "Server Script"},
-    {"doctype": "Client Script"},
-    {"doctype": "Workspace"}
+    {
+        "doctype": "Custom DocPerm",
+        "filters": [
+            ["parent", "like", "Buyback%"]
+        ]
+    },
+    {
+        "doctype": "Server Script",
+        "filters": [
+            ["name", "like", "Buyback%"]
+        ]
+    },
+    {
+        "doctype": "Client Script",
+        "filters": [
+            ["dt", "like", "Buyback%"]
+        ]
+    },
+    {
+        "doctype": "Workspace",
+        "filters": [
+            ["module", "=", "BuyBack"]
+        ]
+    }
 ]
