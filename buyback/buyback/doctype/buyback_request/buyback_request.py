@@ -103,19 +103,18 @@ class BuybackRequest(Document):
             if not value:
                 frappe.throw(f"{label} is required")
 
-        # ✅ mobile validation
+        
         mobile = (self.mobile_no or "").strip()
         if not re.fullmatch(r"\d{10}", mobile):
             frappe.throw("Mobile number must be exactly 10 digits")
         self.mobile_no = mobile
 
-        # ✅ pincode validation
+       
         pin = (self.pincode or "").strip()
         if not re.fullmatch(r"\d{6}", pin):
             frappe.throw("PIN code must be exactly 6 digits")
         self.pincode = pin
 
-        # ✅ email validation (any domain)
         self.email = (self.email or "").strip().lower()
         validate_email_address(self.email, throw=True)
 
@@ -126,7 +125,7 @@ class BuybackRequest(Document):
         """Validate selected item and pricing"""
 
         required = {
-            "Item": self.item_id,  # ✅ correct field
+            "Item": self.item_id,  
             "Usage Months": self.usage_key,
             "Grade": self.grade,
         }
