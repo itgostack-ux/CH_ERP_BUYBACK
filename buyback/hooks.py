@@ -250,30 +250,9 @@ app_license = "mit"
 doctype_list_js = {
     "Buyback Price Master": "buyback/doctype/buyback_price_master/buyback_price_master.js"
 }
-
 fixtures = [
-    {
-        "doctype": "Custom DocPerm",
-        "filters": [
-            ["parent", "like", "Buyback%"]
-        ]
-    },
-    {
-        "doctype": "Server Script",
-        "filters": [
-            ["name", "like", "Buyback%"]
-        ]
-    },
-    {
-        "doctype": "Client Script",
-        "filters": [
-            ["dt", "like", "Buyback%"]
-        ]
-    },
-    {
-        "doctype": "Workspace",
-        "filters": [
-            ["module", "=", "BuyBack"]
-        ]
-    }
+    {"doctype": "Custom DocPerm"},
+    {"doctype": "Server Script"},
+    {"doctype": "Client Script"},
+    {"doctype": "Workspace"}
 ]
