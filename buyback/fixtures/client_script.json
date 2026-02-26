@@ -81,10 +81,10 @@
   "doctype": "Client Script",
   "dt": "Buyback Request",
   "enabled": 1,
-  "modified": "2026-02-16 10:55:11.274569",
+  "modified": "2026-02-26 11:38:54.046882",
   "module": "BuyBack",
   "name": "Buyback Request Numeric Field Reference",
-  "script": "frappe.ui.form.on('Buyback Request', {\n    refresh(frm) {\n        bind_numeric(frm);\n    }\n});\n\nfunction bind_numeric(frm) {\n\n    ['mobile_no', 'pincode','imei','cash_notes'].forEach(fieldname => {\n\n        let input = frm.fields_dict[fieldname].$input;\n\n        if (!input) return;\n\n        input.off('keypress.numeric'); // prevent duplicate binding\n\n        input.on('keypress.numeric', function(e) {\n\n            // allow control keys\n            if (e.ctrlKey || e.metaKey || e.key === \"Backspace\") return;\n\n            // block non-numeric\n            if (!/[0-9]/.test(e.key)) {\n                e.preventDefault();\n            }\n        });\n    });\n}\n",
+  "script": "frappe.ui.form.on('Buyback Request', {\n    refresh(frm) {\n        bind_integer_fields(frm);\n    }\n});\n\nfunction bind_integer_fields(frm) {\n\n    // ✅ ONLY true numeric identifiers\n    const integer_fields = ['mobile_no', 'pincode', 'imei'];\n\n    integer_fields.forEach(fieldname => {\n\n        const field = frm.fields_dict[fieldname];\n        if (!field || !field.$input) return;\n\n        const input = field.$input;\n\n        // remove previous bindings\n        input.off('.numeric');\n\n    \n        input.on('keypress.numeric', function (e) {\n\n            const allowedKeys = [\n                \"Backspace\", \"Delete\", \"Tab\",\n                \"ArrowLeft\", \"ArrowRight\",\n                \"Home\", \"End\"\n            ];\n\n            if (e.ctrlKey || e.metaKey || allowedKeys.includes(e.key)) {\n                return;\n            }\n\n            if (!/^[0-9]$/.test(e.key)) {\n                e.preventDefault();\n            }\n        });\n\n            input.on('paste.numeric', function (e) {\n            const pasted = (e.originalEvent || e).clipboardData.getData('text');\n            if (!/^\\d+$/.test(pasted)) {\n                e.preventDefault();\n            }\n        });\n\n        \n        input.on('input.numeric', function () {\n            this.value = this.value.replace(/\\D/g, '');\n        });\n    });\n}",
   "view": "Form"
  },
  {
@@ -92,10 +92,10 @@
   "doctype": "Client Script",
   "dt": "Buyback Price Master",
   "enabled": 1,
-  "modified": "2026-02-16 11:36:02.400700",
+  "modified": "2026-02-26 11:36:51.856802",
   "module": "BuyBack",
   "name": "Buyback Price Master Numeric Columns",
-  "script": "frappe.ui.form.on('Buyback Price Master', {\n    refresh(frm) {\n        bind_numeric(frm);\n    }\n});\n\nfunction bind_numeric(frm) {\n\n    const numeric_fields = [\n        \"sku_id\",\n        \"current_market_price\",\n        \"vendor_price\",\n        \"a_grade_iw_0_3\",\n        \"b_grade_iw_0_3\",\n        \"c_grade_iw_0_3\",\n        \"a_grade_iw_0_6\",\n        \"b_grade_iw_0_6\",\n        \"c_grade_iw_0_6\",\n        \"d_grade_iw_0_6\",\n        \"a_grade_iw_6_11\",\n        \"b_grade_iw_6_11\",\n        \"c_grade_iw_6_11\",\n        \"d_grade_iw_6_11\",\n        \"a_grade_oow_11\",\n        \"b_grade_oow_11\",\n        \"c_grade_oow_11\",\n        \"d_grade_oow_11\"\n    ];\n\n    numeric_fields.forEach(fieldname => {\n\n        let input = frm.fields_dict[fieldname]?.$input;\n        if (!input) return;\n\n        input.off('keypress.numeric');\n\n        input.on('keypress.numeric', function(e) {\n\n            // allow control keys\n            if (e.ctrlKey || e.metaKey || e.key === \"Backspace\" || e.key === \"Tab\") return;\n\n            // block non-numeric\n            if (!/[0-9]/.test(e.key)) {\n                e.preventDefault();\n            }\n        });\n    });\n\n}\n",
+  "script": "frappe.ui.form.on('Buyback Price Master', {\n    refresh(frm) {\n        bind_integer_only(frm);\n    }\n});\n\nfunction bind_integer_only(frm) {\n\n    \n    const integer_fields = [\"buyback_price_id\"];\n\n    integer_fields.forEach(fieldname => {\n\n        let field = frm.fields_dict[fieldname];\n        if (!field || !field.$input) return;\n\n        let input = field.$input;\n\n        // remove previous binding\n        input.off('keypress.numeric');\n\n        input.on('keypress.numeric', function (e) {\n\n            const allowedKeys = [\n                \"Backspace\", \"Delete\", \"Tab\",\n                \"ArrowLeft\", \"ArrowRight\",\n                \"Home\", \"End\"\n            ];\n\n            // allow navigation + shortcuts\n            if (e.ctrlKey || e.metaKey || allowedKeys.includes(e.key)) {\n                return;\n            }\n\n            // allow digits only\n            if (!/^[0-9]$/.test(e.key)) {\n                e.preventDefault();\n            }\n        });\n    });\n}",
   "view": "Form"
  }
 ]
