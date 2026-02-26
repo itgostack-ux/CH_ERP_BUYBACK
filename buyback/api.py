@@ -1,12 +1,9 @@
-
 import frappe
 import csv
 import io
 
 
-# ---------------------------
-# Upload CSV
-# ---------------------------
+
 
 @frappe.whitelist()
 def upload_buyback_csv(file_url):
@@ -28,57 +25,59 @@ def upload_buyback_csv(file_url):
     duplicates = []
     errors = []
 
-    for idx, row in enumerate(reader, start=2):
-        try:
-            # 🔹 trim all string values
-            row = {
-                k: (v.strip() if isinstance(v, str) else v)
-                for k, v in row.items()
-            }
+    frappe.db.savepoint("buyback_csv")
 
-            item_code = (row.get("item_code") or "").strip()
+    try:
+        for idx, row in enumerate(reader, start=2):
+            try:
+                row = {
+                    k: (v.strip() if isinstance(v, str) else v)
+                    for k, v in row.items()
+                }
 
-            if not item_code:
-                skipped.append(f"Row {idx}: Missing item_code")
-                continue
+                item_code = (row.get("item_code") or "").strip()
 
-            if frappe.db.exists("Buyback Price Master", {"item_code": item_code}):
-                duplicates.append(f"Row {idx}: Duplicate item_code {item_code}")
-                continue
-
-            doc = frappe.new_doc("Buyback Price Master")
-
-            for key, value in row.items():
-                if key not in field_map:
+                if not item_code:
+                    skipped.append(f"Row {idx}: Missing item_code")
                     continue
 
-                fieldtype = field_map[key]
+                if frappe.db.exists("Buyback Price Master", {"item_code": item_code}):
+                    duplicates.append(f"Row {idx}: Duplicate item_code {item_code}")
+                    continue
 
-                # empty handling
-                if value in ("", None):
-                    if fieldtype in ("Int", "Float", "Currency", "Percent"):
-                        setattr(doc, key, 0)
+                doc = frappe.new_doc("Buyback Price Master")
+
+                for key, value in row.items():
+                    if key not in field_map:
+                        continue
+
+                    fieldtype = field_map[key]
+
+                    # empty handling
+                    if value in ("", None):
+                        if fieldtype in ("Int", "Float", "Currency", "Percent"):
+                            setattr(doc, key, 0)
+                        else:
+                            setattr(doc, key, None)
+                        continue
+
+                    # numeric casting
+                    if fieldtype == "Int":
+                        setattr(doc, key, int(float(value)))
+                    elif fieldtype in ("Float", "Currency", "Percent"):
+                        setattr(doc, key, float(value))
                     else:
-                        setattr(doc, key, None)
-                    continue
+                        setattr(doc, key, str(value))
 
-                # numeric casting
-                if fieldtype == "Int":
-                    setattr(doc, key, int(value))
+                doc.insert(ignore_permissions=True)
+                inserted += 1
 
-                elif fieldtype in ("Float", "Currency", "Percent"):
-                    setattr(doc, key, float(value))
+            except Exception as e:
+                errors.append(f"Row {idx}: {str(e)}")
 
-                else:
-                    setattr(doc, key, str(value))
-
-            doc.insert(ignore_permissions=True)
-            inserted += 1
-
-        except Exception as e:
-            errors.append(f"Row {idx}: {str(e)}")
-
-    frappe.db.commit()
+    except Exception:
+        frappe.db.rollback(save_point="buyback_csv")
+        raise
 
     return {
         "message": (
@@ -96,12 +95,6 @@ def upload_buyback_csv(file_url):
 
 
 
-
-
-
-
-
-
 @frappe.whitelist()
 def download_buyback_template():
 
@@ -109,7 +102,7 @@ def download_buyback_template():
         "Item",
         filters={"item_group": "Mobiles", "disabled": 0},
         fields=["item_code", "item_name"],
-        ignore_permissions=True
+        ignore_permissions=True,
     )
 
     output = io.StringIO()
@@ -136,140 +129,49 @@ def download_buyback_template():
         "b_grade_oow_11",
         "c_grade_oow_11",
         "d_grade_oow_11",
-        "is_active"
+        "is_active",
     ]
 
     writer.writerow(headers)
 
-    # default values row
     for i in items:
-        row = [
-            "",  # sku_id auto
+        writer.writerow([
+            "",
             i.item_code,
             i.item_name,
-            0, 0, 0, 0, 0,
-            0, 0, 0, 0,
-            0, 0, 0, 0,
-            0, 0, 0, 0,1
-        ]
-        writer.writerow(row)
+            *([0] * 16),
+            1,
+        ])
 
     frappe.response.filename = "buyback_template.csv"
     frappe.response.filecontent = output.getvalue()
     frappe.response.type = "download"
+
+
+
 @frappe.whitelist(allow_guest=True)
 def get_buyback(id):
 
-    doc = frappe.db.get_value(
+    return frappe.db.get_value(
         "Buyback Request",
         {"buybackid": id},
         "*",
-        as_dict=True
+        as_dict=True,
     )
 
-    return doc
-
-
-
-
-
-@frappe.whitelist(allow_guest=True)
-def confirm_deal(name):
-
-    doc = frappe.get_doc("Buyback Request", name)
-
-    # prevent double approval
-    if doc.status != "Open Request":
-        return {"status": "already_processed"}
-
-    doc.status = "Customer Approved"
-    doc.save(ignore_permissions=True)
-
-    frappe.db.commit()
-
-    return {"status": "success"}
 
 
 @frappe.whitelist()
-def download_buyback_template():
-
-    items = frappe.get_all(
-        "Item",
-        filters={"item_group": "Mobiles", "disabled": 0},
-        fields=["item_code", "item_name"],
-        ignore_permissions=True
-    )
-
-    output = io.StringIO()
-    writer = csv.writer(output)
-
-    headers = [
-        "buyback_price_id",
-        "item_code",
-        "item_name",
-        "current_market_price",
-        "vendor_price",
-        "a_grade_iw_0_3",
-        "b_grade_iw_0_3",
-        "c_grade_iw_0_3",
-        "a_grade_iw_0_6",
-        "b_grade_iw_0_6",
-        "c_grade_iw_0_6",
-        "d_grade_iw_0_6",
-        "a_grade_iw_6_11",
-        "b_grade_iw_6_11",
-        "c_grade_iw_6_11",
-        "d_grade_iw_6_11",
-        "a_grade_oow_11",
-        "b_grade_oow_11",
-        "c_grade_oow_11",
-        "d_grade_oow_11",
-        "is_active"
-    ]
-
-    writer.writerow(headers)
-
-    # default values row
-    for i in items:
-        row = [
-            "",  # sku_id auto
-            i.item_code,
-            i.item_name,
-            0, 0, 0, 0, 0,
-            0, 0, 0, 0,
-            0, 0, 0, 0,
-            0, 0, 0, 0,1
-        ]
-        writer.writerow(row)
-
-    frappe.response.filename = "buyback_template.csv"
-    frappe.response.filecontent = output.getvalue()
-    frappe.response.type = "download"
-@frappe.whitelist(allow_guest=True)
-def get_buyback(id):
-
-    doc = frappe.db.get_value(
-        "Buyback Request",
-        {"buybackid": id},  
-        "*",
-        as_dict=True
-    )
-
-    return doc
-
-
-@frappe.whitelist(allow_guest=True)
 def confirm_deal(name):
 
     doc = frappe.get_doc("Buyback Request", name)
 
-    # prevent double approval
+    doc.check_permission("write")
+
     if doc.status != "Open Request":
         return {"status": "already_processed"}
 
     doc.status = "Customer Approved"
-    doc.save(ignore_permissions=True)
-
-    frappe.db.commit()
+    doc.save()
 
     return {"status": "success"}

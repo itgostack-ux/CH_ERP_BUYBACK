@@ -4,9 +4,6 @@ from frappe.model.document import Document
 from frappe.utils import get_url, validate_email_address
 
 
-# =========================================================
-# EMAIL FUNCTION (outside class)
-# =========================================================
 def send_approval_email(doc):
     """Send approval email to customer"""
 
@@ -43,9 +40,7 @@ def send_approval_email(doc):
     )
 
 
-# =========================================================
-# BUYBACK REQUEST
-# =========================================================
+
 class BuybackRequest(Document):
 
     # -----------------------------------------------------
@@ -61,13 +56,25 @@ class BuybackRequest(Document):
         self.buybackid = last + 1
         self.created_by_user = frappe.session.user
 
-    # -----------------------------------------------------
-    # AFTER INSERT
-    # -----------------------------------------------------
-    def after_insert(self):
-        """Send email only for Deal"""
-        if self.deal_status == "Deal":
-            send_approval_email(self)
+
+ # -----------------------------------------------------
+# AFTER INSERT
+# -----------------------------------------------------
+def after_insert(self):
+    """Send email only for valid Deal"""
+
+    deal_status = (self.deal_status or "").strip().lower()
+
+    if deal_status != "deal":
+        return
+
+    if not self.email:
+        return
+
+    if not self.buyback_price or float(self.buyback_price) <= 0:
+        return
+
+    send_approval_email(self)
 
     # -----------------------------------------------------
     # MAIN VALIDATION
