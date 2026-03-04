@@ -53,22 +53,25 @@
    "fieldtype": "Currency",
    "in_list_view": 1,
    "label": "Vendor Price",
-   "reqd": 1
+   "read_only": 1
   },
   {
    "fieldname": "a_grade_iw_0_3",
    "fieldtype": "Currency",
-   "label": "A_Grade_IW_0_3"
+   "label": "A_Grade_IW_0_3",
+   "read_only": 1
   },
   {
    "fieldname": "b_grade_iw_0_3",
    "fieldtype": "Currency",
-   "label": "B_Grade_IW_0_3"
+   "label": "B_Grade_IW_0_3",
+   "read_only": 1
   },
   {
    "fieldname": "c_grade_iw_0_3",
    "fieldtype": "Currency",
-   "label": "C_Grade_IW_0_3"
+   "label": "C_Grade_IW_0_3",
+   "read_only": 1
   },
   {
    "fieldname": "buyback_price_configuration_column",
@@ -78,62 +81,74 @@
   {
    "fieldname": "a_grade_iw_0_6",
    "fieldtype": "Currency",
-   "label": "A_Grade_IW_0_6"
+   "label": "A_Grade_IW_0_6",
+   "read_only": 1
   },
   {
    "fieldname": "b_grade_iw_0_6",
    "fieldtype": "Currency",
-   "label": "B_Grade_IW_0_6"
+   "label": "B_Grade_IW_0_6",
+   "read_only": 1
   },
   {
    "fieldname": "c_grade_iw_0_6",
    "fieldtype": "Currency",
-   "label": "C_Grade_IW_0_6"
+   "label": "C_Grade_IW_0_6",
+   "read_only": 1
   },
   {
    "fieldname": "d_grade_iw_0_6",
    "fieldtype": "Currency",
-   "label": "D_Grade_IW_0_6"
+   "label": "D_Grade_IW_0_6",
+   "read_only": 1
   },
   {
    "fieldname": "a_grade_iw_6_11",
    "fieldtype": "Currency",
-   "label": "A_Grade_IW_6_11"
+   "label": "A_Grade_IW_6_11",
+   "read_only": 1
   },
   {
    "fieldname": "b_grade_iw_6_11",
    "fieldtype": "Currency",
-   "label": "B_Grade_IW_6_11"
+   "label": "B_Grade_IW_6_11",
+   "read_only": 1
   },
   {
    "fieldname": "c_grade_iw_6_11",
    "fieldtype": "Currency",
-   "label": "C_Grade_IW_6_11"
+   "label": "C_Grade_IW_6_11",
+   "read_only": 1
   },
   {
    "fieldname": "d_grade_iw_6_11",
    "fieldtype": "Currency",
-   "label": "D_Grade_IW_6_11"
+   "label": "D_Grade_IW_6_11",
+   "read_only": 1
   },
   {
    "fieldname": "a_grade_oow_11",
    "fieldtype": "Currency",
-   "label": "A_Grade_OOW_11"
+   "label": "A_Grade_OOW_11",
+   "read_only": 1
   },
   {
    "fieldname": "b_grade_oow_11",
    "fieldtype": "Currency",
-   "label": "B_Grade_OOW_11"
+   "label": "B_Grade_OOW_11",
+   "read_only": 1
   },
   {
    "fieldname": "c_grade_oow_11",
    "fieldtype": "Currency",
-   "label": "C_Grade_OOW_11"
+   "label": "C_Grade_OOW_11",
+   "read_only": 1
   },
   {
    "fieldname": "d_grade_oow_11",
    "fieldtype": "Currency",
-   "label": "D_Grade_OOW_11"
+   "label": "D_Grade_OOW_11",
+   "read_only": 1
   },
   {
    "default": "0",
@@ -146,7 +161,7 @@
    "fieldtype": "Currency",
    "in_list_view": 1,
    "label": "Current Market  Price ",
-   "reqd": 1
+   "read_only": 1
   },
   {
    "columns": 1,

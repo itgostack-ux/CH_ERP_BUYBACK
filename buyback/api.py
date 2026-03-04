@@ -69,6 +69,8 @@ def upload_buyback_csv(file_url):
                     else:
                         setattr(doc, key, str(value))
 
+                # CSV bulk upload is an admin-only action; allow price fields
+                doc.flags.from_price_batch = True
                 doc.insert(ignore_permissions=True)
                 inserted += 1
 
