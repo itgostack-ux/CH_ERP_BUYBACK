@@ -4,6 +4,18 @@ from frappe.model.document import Document
 from frappe.utils import get_url, validate_email_address
 
 
+def _normalize_mobile(mobile):
+    """Normalize mobile to last 10 digits."""
+    if not mobile:
+        return ""
+    mobile = mobile.strip().replace(" ", "").replace("-", "")
+    if mobile.startswith("+91"):
+        mobile = mobile[3:]
+    elif mobile.startswith("91") and len(mobile) == 12:
+        mobile = mobile[2:]
+    return mobile[-10:] if len(mobile) >= 10 else mobile
+
+
 def send_approval_email(doc):
     """Send approval email to customer"""
 
@@ -83,6 +95,14 @@ class BuybackRequest(Document):
     def validate(self):
         if not self.deal_status:
             frappe.throw("Select Deal or No Deal")
+
+        # Auto-set company from user defaults if not set
+        if not self.company:
+            self.company = frappe.defaults.get_user_default("company") or \
+                           frappe.defaults.get_global_default("company")
+
+        # Auto-link customer by mobile number
+        self._auto_link_customer()
 
         self.validate_customer()
         self.validate_product()
@@ -203,3 +223,39 @@ class BuybackRequest(Document):
 
         else:
             frappe.throw(f"Invalid payment mode: {self.payment_mode_name}")
+
+    # -----------------------------------------------------
+    # AUTO-LINK CUSTOMER
+    # -----------------------------------------------------
+    def _auto_link_customer(self):
+        """Auto-link to existing Customer by exact mobile match."""
+        if self.customer:
+            return  # already linked
+
+        mobile = _normalize_mobile(self.mobile_no)
+        if not mobile or len(mobile) != 10:
+            return
+
+        # Exact match on last 10 digits — no LIKE
+        customer = frappe.db.get_value(
+            "Customer",
+            {"mobile_no": mobile},
+            "name",
+        )
+        if not customer:
+            # Try with +91 prefix
+            customer = frappe.db.get_value(
+                "Customer",
+                {"mobile_no": f"+91{mobile}"},
+                "name",
+            )
+        if not customer:
+            # Try with 91 prefix
+            customer = frappe.db.get_value(
+                "Customer",
+                {"mobile_no": f"91{mobile}"},
+                "name",
+            )
+
+        if customer:
+            self.customer = customer

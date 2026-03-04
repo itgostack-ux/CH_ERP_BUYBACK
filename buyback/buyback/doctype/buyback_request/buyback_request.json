@@ -11,6 +11,8 @@
   "section_break_utum",
   "mode",
   "buybackid",
+  "company",
+  "customer",
   "customer_name",
   "mobile_no",
   "email",
@@ -52,7 +54,8 @@
   "upload_phone_image_tab",
   "upload_phone_images",
   "status",
-  "is_active"
+  "is_active",
+  "customer_id"
  ],
  "fields": [
   {
@@ -323,6 +326,31 @@
    "label": "Item ID",
    "options": "Buyback Price Master",
    "reqd": 1
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "Company",
+   "options": "Company",
+   "reqd": 1,
+   "remember_last_selected_value": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "customer",
+   "fieldtype": "Link",
+   "label": "Customer",
+   "options": "Customer",
+   "in_standard_filter": 1,
+   "description": "Auto-linked by mobile number. Leave blank to auto-detect."
+  },
+  {
+   "fetch_from": "customer.ch_customer_id",
+   "fieldname": "customer_id",
+   "fieldtype": "Int",
+   "label": "Customer ID",
+   "read_only": 1,
+   "hidden": 1
   }
  ],
  "grid_page_length": 50,
