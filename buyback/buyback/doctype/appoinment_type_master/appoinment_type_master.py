@@ -8,15 +8,15 @@ from frappe.model.document import Document
 class AppoinmentTypeMaster(Document):
 
     def before_insert(self):
-        # get last max id
-        last = frappe.db.sql("""
-            SELECT MAX(appoinment_id)
-            FROM `tabAppoinment Type Master`
-        """)[0][0] or 0
+        frappe.db.sql("SELECT GET_LOCK('appoinment_type_master_id', 10)")
+        try:
+            last = frappe.db.sql("""
+                SELECT MAX(appoinment_id)
+                FROM `tabAppoinment Type Master`
+            """)[0][0] or 0
+            self.appoinment_id = last + 1
+        finally:
+            frappe.db.sql("SELECT RELEASE_LOCK('appoinment_type_master_id')")
 
-        # increment
-        self.appoinment_id = last + 1
-
-        # default active (optional)
         if self.is_active is None:
             self.is_active = 1

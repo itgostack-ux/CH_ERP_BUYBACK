@@ -98,9 +98,24 @@ def upload_buyback_csv(file_url):
 @frappe.whitelist()
 def download_buyback_template():
 
+    # Pull all device item groups from CH Category mapping;
+    # fall back to common device groups if CH Category not installed
+    try:
+        item_groups = frappe.get_all(
+            "CH Category",
+            filters={"disabled": 0},
+            pluck="item_group",
+        )
+        item_groups = list(set(ig for ig in item_groups if ig))
+    except Exception:
+        item_groups = []
+
+    if not item_groups:
+        item_groups = ["Mobiles", "Smartphones", "Devices", "Accessories"]
+
     items = frappe.get_all(
         "Item",
-        filters={"item_group": "Mobiles", "disabled": 0},
+        filters={"item_group": ["in", item_groups], "disabled": 0, "has_variants": 0},
         fields=["item_code", "item_name"],
         ignore_permissions=True,
     )
@@ -149,15 +164,20 @@ def download_buyback_template():
 
 
 
-@frappe.whitelist(allow_guest=True)
+@frappe.whitelist()
 def get_buyback(id):
-
-    return frappe.db.get_value(
+    """Return a Buyback Request by its buybackid. Requires login."""
+    result = frappe.db.get_value(
         "Buyback Request",
         {"buybackid": id},
-        "*",
+        ["name", "buybackid", "customer_name", "mobile_no", "item_code",
+         "item_full_name", "grade", "usage_key", "buyback_price",
+         "final_buyback_amount", "status", "deal_status", "mode"],
         as_dict=True,
     )
+    if not result:
+        frappe.throw("Buyback Request not found", frappe.DoesNotExistError)
+    return result
 
 
 

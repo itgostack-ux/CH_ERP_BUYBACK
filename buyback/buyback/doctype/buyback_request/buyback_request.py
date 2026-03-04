@@ -47,34 +47,35 @@ class BuybackRequest(Document):
     # BEFORE INSERT
     # -----------------------------------------------------
     def before_insert(self):
-        """Generate incremental buybackid (temporary approach)"""
+        """Generate incremental buybackid with advisory lock."""
 
-        last = frappe.db.sql(
-            """SELECT MAX(buybackid) FROM `tabBuyback Request`"""
-        )[0][0] or 0
+        frappe.db.sql("SELECT GET_LOCK('buyback_request_id', 10)")
+        try:
+            last = frappe.db.sql(
+                """SELECT MAX(buybackid) FROM `tabBuyback Request`"""
+            )[0][0] or 0
+            self.buybackid = last + 1
+        finally:
+            frappe.db.sql("SELECT RELEASE_LOCK('buyback_request_id')")
 
-        self.buybackid = last + 1
-        self.created_by_user = frappe.session.user
+    # -----------------------------------------------------
+    # AFTER INSERT
+    # -----------------------------------------------------
+    def after_insert(self):
+        """Send email only for valid Deal"""
 
+        deal_status = (self.deal_status or "").strip().lower()
 
- # -----------------------------------------------------
-# AFTER INSERT
-# -----------------------------------------------------
-def after_insert(self):
-    """Send email only for valid Deal"""
+        if deal_status != "deal":
+            return
 
-    deal_status = (self.deal_status or "").strip().lower()
+        if not self.email:
+            return
 
-    if deal_status != "deal":
-        return
+        if not self.buyback_price or float(self.buyback_price) <= 0:
+            return
 
-    if not self.email:
-        return
-
-    if not self.buyback_price or float(self.buyback_price) <= 0:
-        return
-
-    send_approval_email(self)
+        send_approval_email(self)
 
     # -----------------------------------------------------
     # MAIN VALIDATION
@@ -110,13 +111,11 @@ def after_insert(self):
             if not value:
                 frappe.throw(f"{label} is required")
 
-        
         mobile = (self.mobile_no or "").strip()
         if not re.fullmatch(r"\d{10}", mobile):
             frappe.throw("Mobile number must be exactly 10 digits")
         self.mobile_no = mobile
 
-       
         pin = (self.pincode or "").strip()
         if not re.fullmatch(r"\d{6}", pin):
             frappe.throw("PIN code must be exactly 6 digits")
@@ -132,7 +131,7 @@ def after_insert(self):
         """Validate selected item and pricing"""
 
         required = {
-            "Item": self.item_id,  
+            "Item": self.item_id,
             "Usage Months": self.usage_key,
             "Grade": self.grade,
         }
