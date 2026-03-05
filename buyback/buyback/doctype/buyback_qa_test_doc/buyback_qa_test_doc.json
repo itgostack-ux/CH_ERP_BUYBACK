@@ -1,0 +1,51 @@
+{
+  "actions": [],
+  "creation": "2025-01-01 00:00:00.000000",
+  "doctype": "DocType",
+  "engine": "InnoDB",
+  "field_order": [
+    "doctype_name",
+    "doc_name",
+    "column_break_0",
+    "description"
+  ],
+  "fields": [
+    {
+      "fieldname": "doctype_name",
+      "fieldtype": "Data",
+      "in_list_view": 1,
+      "label": "DocType Name",
+      "reqd": 1
+    },
+    {
+      "fieldname": "doc_name",
+      "fieldtype": "Data",
+      "in_list_view": 1,
+      "label": "Doc Name",
+      "reqd": 1
+    },
+    {
+      "fieldname": "column_break_0",
+      "fieldtype": "Column Break"
+    },
+    {
+      "fieldname": "description",
+      "fieldtype": "Data",
+      "in_list_view": 1,
+      "label": "Description"
+    }
+  ],
+  "index_web_pages_for_search": 0,
+  "istable": 1,
+  "links": [],
+  "modified": "2025-01-01 00:00:00.000000",
+  "modified_by": "Administrator",
+  "module": "BuyBack",
+  "name": "Buyback QA Test Doc",
+  "owner": "Administrator",
+  "permissions": [],
+  "sort_field": "creation",
+  "sort_order": "DESC",
+  "states": [],
+  "track_changes": 0
+}

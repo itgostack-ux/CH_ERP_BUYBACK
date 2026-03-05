@@ -1,7 +1,7 @@
 import frappe
 from frappe import _
 from frappe.model.document import Document
-from frappe.utils import now_datetime, flt
+from frappe.utils import now_datetime, flt, nowdate, add_days, cint
 
 from buyback.exceptions import BuybackStatusError
 from buyback.utils import log_audit
@@ -21,25 +21,87 @@ class BuybackOrder(Document):
 
         self.status = "Draft"
 
+        # Generate approval token for customer-facing page
+        if not self.approval_token:
+            self.approval_token = frappe.generate_hash(length=32)
+
     def validate(self):
+        self._populate_item_hierarchy()
         self._calculate_payment_totals()
         self._check_approval_requirement()
+        self._validate_kyc_for_otp_stage()
+
+    def _populate_item_hierarchy(self):
+        """Auto-fill brand, item_name from Item if not set."""
+        if not self.item:
+            return
+        if not self.brand or not self.item_name:
+            item_data = frappe.db.get_value(
+                "Item", self.item,
+                ["brand", "item_name"],
+                as_dict=True,
+            )
+            if item_data:
+                if not self.brand:
+                    self.brand = item_data.brand
+                if not self.item_name:
+                    self.item_name = item_data.item_name
+
+    def on_update_after_submit(self):
+        """Handle status transitions triggered by workflow on submitted docs.
+
+        For the Buyback Order Workflow, this fires when the doc is already
+        submitted (docstatus=1) and a workflow action changes state, e.g.
+        Paid → Closed.  The "Confirm Payment" transition (docstatus 0→1)
+        fires on_submit() instead — JE/SE creation is handled there too.
+        """
+        status = self.workflow_state or self.status
+
+        # Safety net: create JE + SE if somehow on_submit missed it
+        if status == "Paid" and not self.journal_entry and not self.stock_entry:
+            self._create_accounting_entries()
+
+        if status == "Closed":
+            # Award loyalty points (once)
+            if not self.loyalty_points_earned:
+                self._award_loyalty_points()
+            # Update Customer activity summary & device photos
+            self._update_customer_activity()
+            # Mark Serial No as Bought Back
+            self._update_serial_no_bought_back()
 
     def on_submit(self):
-        """Create accounting entries on submit (atomic — rollback both on failure)."""
-        try:
-            self._create_journal_entry()
-            self._create_stock_entry()
-        except Exception:
-            frappe.log_error(
-                title=_("Buyback Order {0}: JE/SE creation failed").format(self.name),
-            )
-            raise
+        """Submit order — JE/SE created at payment stage.
 
+        The workflow "Confirm Payment" transitions from Ready to Pay (docstatus=0)
+        to Paid (docstatus=1), which triggers on_submit (NOT on_update_after_submit).
+        The workflow sets self.status = "Paid" BEFORE submit, so we check here.
+        """
         if self.status == "Draft":
             self.status = "Awaiting Approval" if self.requires_approval else "Approved"
         log_audit("Order Created", "Buyback Order", self.name,
                   new_value={"final_price": self.final_price, "status": self.status})
+
+        # Update Serial No status
+        from buyback.serial_no_utils import update_serial_buyback_status
+        if self.status == "Paid":
+            # Workflow brought us directly to Paid — create accounting entries
+            self._create_accounting_entries()
+            update_serial_buyback_status(
+                self.imei_serial,
+                status="Bought Back",
+                order_name=self.name,
+                customer=self.customer,
+                comment=f"Buyback Order {self.name} paid — price ₹{self.final_price}",
+            )
+        else:
+            update_serial_buyback_status(
+                self.imei_serial,
+                status="Under Inspection",
+                order_name=self.name,
+                customer=self.customer,
+                comment=f"Buyback Order {self.name} submitted — price ₹{self.final_price}",
+            )
 
     def on_cancel(self):
         """Reverse GL and Stock entries on cancellation."""
@@ -197,6 +259,252 @@ class BuybackOrder(Document):
         self.save()
         log_audit("Order Closed", "Buyback Order", self.name)
 
+    def _validate_kyc_for_otp_stage(self):
+        """Ensure mandatory KYC fields and device photos are filled before OTP stage.
+
+        This runs in validate() — triggered by both workflow and API saves.
+        Only enforced when status moves to Awaiting OTP or beyond.
+        """
+        otp_and_beyond = ("Awaiting OTP", "OTP Verified", "Ready to Pay", "Paid", "Closed")
+        status = self.status or self.workflow_state
+        if status not in otp_and_beyond:
+            return
+        # Only check on transition (not every re-save of a Paid/Closed order)
+        prev_status = None
+        if hasattr(self, "_doc_before_save") and self._doc_before_save:
+            prev_status = self._doc_before_save.status
+        if prev_status in otp_and_beyond:
+            return  # already past this gate
+
+        missing = []
+        if not self.customer_photo:
+            missing.append(_("Customer Photo"))
+        if not self.customer_id_type:
+            missing.append(_("ID Proof Type"))
+        if not self.customer_id_number:
+            missing.append(_("ID Number"))
+        if not self.customer_id_front:
+            missing.append(_("ID Front Image"))
+        if not self.device_photo_front:
+            missing.append(_("Device Front Photo"))
+        if not self.device_photo_back:
+            missing.append(_("Device Back Photo"))
+        if missing:
+            frappe.throw(
+                _("The following are mandatory before sending OTP: {0}").format(
+                    ", ".join(missing)
+                ),
+                exc=BuybackStatusError,
+            )
+
+    def verify_kyc(self):
+        """Mark KYC as verified by the current user and sync to Customer."""
+        if not self.customer_id_type or not self.customer_id_number:
+            frappe.throw(
+                _("ID proof type and number are required for KYC verification."),
+                exc=BuybackStatusError,
+            )
+        if not self.customer_photo:
+            frappe.throw(
+                _("Customer photo is required for KYC verification."),
+                exc=BuybackStatusError,
+            )
+        if not self.customer_id_front:
+            frappe.throw(
+                _("ID front image is required for KYC verification."),
+                exc=BuybackStatusError,
+            )
+        self.kyc_verified = 1
+        self.kyc_verified_by = frappe.session.user
+        self.kyc_verified_at = now_datetime()
+        self.save()
+        # Sync KYC data to Customer master
+        self._sync_kyc_to_customer()
+        log_audit("KYC Verified", "Buyback Order", self.name,
+                  new_value={"id_type": self.customer_id_type, "verified_by": self.kyc_verified_by})
+
+    def _sync_kyc_to_customer(self):
+        """Copy KYC data and photos from this order to the Customer record."""
+        if not self.customer:
+            return
+        try:
+            update = {
+                "ch_customer_photo": self.customer_photo,
+                "ch_customer_photo_source": f"Buyback Order {self.name}",
+                "ch_id_type": self.customer_id_type,
+                "ch_id_number": self.customer_id_number,
+                "ch_id_front_image": self.customer_id_front,
+                "ch_id_back_image": self.customer_id_back,
+                "ch_kyc_verified": 1,
+                "ch_kyc_verified_by": self.kyc_verified_by,
+                "ch_kyc_verified_on": nowdate(),
+                "ch_kyc_source_order": self.name,
+            }
+            # Extract Aadhaar number specifically if ID type is Aadhar
+            if self.customer_id_type == "Aadhar Card":
+                update["ch_aadhaar_number"] = self.customer_id_number
+
+            # Increment total verifications
+            cur_count = cint(frappe.db.get_value(
+                "Customer", self.customer, "ch_total_kyc_verifications"
+            ))
+            update["ch_total_kyc_verifications"] = cur_count + 1
+
+            frappe.db.set_value("Customer", self.customer, update, update_modified=False)
+        except Exception:
+            frappe.log_error(
+                title=f"KYC Sync Error: {self.name} → {self.customer}",
+                message=frappe.get_traceback(),
+            )
+
+    def _update_customer_activity(self):
+        """Update Customer profile after this order is closed.
+
+        Syncs: total buyback count, loyalty balance, device photos,
+        last visit, store visit log.
+        """
+        if not self.customer:
+            return
+        try:
+            # Count total buyback orders for this customer
+            total_buybacks = frappe.db.count(
+                "Buyback Order", {"customer": self.customer, "docstatus": 1}
+            )
+
+            # Loyalty balance from Loyalty Point Entries
+            loyalty_balance = 0
+            lp_result = frappe.db.sql(
+                """SELECT IFNULL(SUM(loyalty_points), 0) FROM `tabLoyalty Point Entry`
+                WHERE customer = %s AND expiry_date >= CURDATE()""",
+                self.customer,
+            )
+            if lp_result:
+                loyalty_balance = cint(lp_result[0][0])
+
+            update = {
+                "ch_total_buybacks": cint(total_buybacks),
+                "ch_loyalty_points_balance": loyalty_balance,
+                "ch_last_visit_date": nowdate(),
+            }
+            if self.store:
+                store_name = frappe.db.get_value(
+                    "CH Store", self.store, "store_name"
+                ) or self.store
+                update["ch_last_visit_store"] = store_name
+
+            # Sync device photos from this order to Customer
+            if self.device_photo_front:
+                update["ch_device_photo_front"] = self.device_photo_front
+            if self.device_photo_back:
+                update["ch_device_photo_back"] = self.device_photo_back
+            if self.device_photo_screen:
+                update["ch_device_photo_screen"] = self.device_photo_screen
+            if self.device_photo_imei:
+                update["ch_device_photo_imei"] = self.device_photo_imei
+            if any(self.get(f) for f in ("device_photo_front", "device_photo_back",
+                                         "device_photo_screen", "device_photo_imei")):
+                update["ch_device_photo_source"] = f"Buyback Order {self.name}"
+
+            frappe.db.set_value("Customer", self.customer, update, update_modified=False)
+
+            # Log store visit via ch_item_master hooks (if available)
+            try:
+                from ch_item_master.ch_customer_master.hooks import _log_store_visit
+                _log_store_visit(
+                    customer=self.customer,
+                    company=self.company,
+                    visit_type="Buyback",
+                    reference_doctype="Buyback Order",
+                    reference_name=self.name,
+                    store=self.store,
+                    staff=frappe.session.user,
+                )
+            except (ImportError, Exception):
+                pass  # ch_item_master not installed or error — non-critical
+        except Exception:
+            frappe.log_error(
+                title=f"Customer Activity Update Error: {self.name}",
+                message=frappe.get_traceback(),
+            )
+
+    def _create_accounting_entries(self):
+        """Create JE + SE atomically — called when status transitions to Paid."""
+        _prev_user = frappe.session.user
+        try:
+            frappe.set_user("Administrator")
+            self._create_journal_entry()
+            self._create_stock_entry()
+            # Persist the JE/SE links via db.set_value (avoid recursive save)
+            frappe.db.set_value("Buyback Order", self.name, {
+                "journal_entry": self.journal_entry,
+                "stock_entry": self.stock_entry,
+            }, update_modified=False)
+        except Exception:
+            frappe.log_error(
+                title=_("Buyback Order {0}: JE/SE creation failed").format(self.name),
+            )
+            raise
+        finally:
+            frappe.set_user(_prev_user)
+
+    def _update_serial_no_bought_back(self):
+        """Mark Serial No as 'Bought Back' and add timeline comment on close."""
+        from buyback.serial_no_utils import update_serial_buyback_status
+        update_serial_buyback_status(
+            self.imei_serial,
+            status="Bought Back",
+            order_name=self.name,
+            price=self.final_price,
+            grade=self.condition_grade,
+            customer=self.customer,
+            comment=(
+                f"✅ Bought back via {self.name} — "
+                f"₹{self.final_price}, Grade: {self.condition_grade}, "
+                f"Customer: {self.customer}"
+            ),
+        )
+
+    def _award_loyalty_points(self):
+        """Create a Loyalty Point Entry if loyalty points are enabled."""
+        settings = frappe.get_single("Buyback Settings")
+        if not cint(settings.enable_loyalty_points):
+            return
+        if not settings.loyalty_program:
+            return
+        if flt(self.final_price) <= 0:
+            return
+
+        points_per_100 = cint(settings.loyalty_points_per_100) or 10
+        points = int(flt(self.final_price) / 100) * points_per_100
+        if points <= 0:
+            return
+
+        expiry_days = cint(settings.loyalty_point_expiry_days) or 365
+        company = self.company or settings.default_company
+
+        lpe = frappe.get_doc({
+            "doctype": "Loyalty Point Entry",
+            "loyalty_program": settings.loyalty_program,
+            "customer": self.customer,
+            "invoice_type": "Buyback Order",
+            "invoice": self.name,
+            "loyalty_points": points,
+            "purchase_amount": self.final_price,
+            "posting_date": nowdate(),
+            "expiry_date": add_days(nowdate(), expiry_days),
+            "company": company,
+        })
+        lpe.insert(ignore_permissions=True)
+        # Use db.set_value to avoid recursive save (called from on_update)
+        frappe.db.set_value("Buyback Order", self.name, {
+            "loyalty_points_earned": points,
+            "loyalty_point_entry": lpe.name,
+        }, update_modified=False)
+        self.loyalty_points_earned = points
+        self.loyalty_point_entry = lpe.name
+        log_audit("Loyalty Points Awarded", "Buyback Order", self.name,
+                  new_value={"points": points, "entry": lpe.name})
+
     def _create_journal_entry(self):
         """
         Create a Journal Entry for the buyback expense.
@@ -215,13 +523,15 @@ class BuybackOrder(Document):
         if not company:
             return
 
-        # Use default payable account from company
-        payable_account = frappe.db.get_value(
-            "Company", company, "default_payable_account"
+        # Use default cash/bank account (buyback pays customer cash)
+        credit_account = (
+            frappe.db.get_value("Company", company, "default_cash_account")
+            or frappe.db.get_value("Company", company, "default_bank_account")
+            or frappe.db.get_value("Company", company, "default_payable_account")
         )
-        if not payable_account:
+        if not credit_account:
             frappe.logger("buyback").warning(
-                f"No default_payable_account for company {company} — skipping JE"
+                f"No cash/bank/payable account for company {company} — skipping JE"
             )
             return
 
@@ -240,14 +550,13 @@ class BuybackOrder(Document):
                     ),
                 },
                 {
-                    "account": payable_account,
+                    "account": credit_account,
                     "credit_in_account_currency": flt(self.final_price),
-                    "party_type": "Customer",
-                    "party": self.customer,
                 },
             ],
         })
         je.insert(ignore_permissions=True)
+        je.flags.ignore_permissions = True
         je.submit()
         self.journal_entry = je.name
 
@@ -292,5 +601,6 @@ class BuybackOrder(Document):
             ],
         })
         se.insert(ignore_permissions=True)
+        se.flags.ignore_permissions = True
         se.submit()
         self.stock_entry = se.name

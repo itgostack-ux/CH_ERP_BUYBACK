@@ -1,0 +1,57 @@
+"""
+Document event hooks for the Buyback app.
+
+Registered in hooks.py doc_events — these fire on standard Frappe
+document lifecycle events for buyback-related doctypes.
+
+Purpose: Update Serial No (IMEI) buyback status and timeline at each
+stage of the buyback flow — Quote → Inspection → Order → Close.
+"""
+
+import frappe
+from buyback.serial_no_utils import update_serial_buyback_status
+
+
+def on_quote_created(doc, method=None):
+    """After a Buyback Quote is inserted, mark the IMEI as 'Quoted'."""
+    if doc.imei_serial:
+        update_serial_buyback_status(
+            doc.imei_serial,
+            status="Quoted",
+            comment=f"📋 Buyback Quote {doc.name} created — ₹{doc.quoted_price}",
+        )
+
+
+def on_inspection_update(doc, method=None):
+    """When a Buyback Inspection is completed, update IMEI status."""
+    if not doc.imei_serial:
+        return
+
+    if doc.status == "In Progress":
+        update_serial_buyback_status(
+            doc.imei_serial,
+            status="Under Inspection",
+            comment=f"🔍 Physical inspection started — {doc.name}",
+        )
+    elif doc.status == "Completed":
+        grade_name = ""
+        if doc.condition_grade:
+            grade_name = frappe.db.get_value(
+                "Grade Master", doc.condition_grade, "grade_name"
+            ) or doc.condition_grade
+        update_serial_buyback_status(
+            doc.imei_serial,
+            status="Under Inspection",
+            grade=doc.condition_grade,
+            comment=(
+                f"✅ Inspection completed — {doc.name}, "
+                f"Grade: {grade_name}, "
+                f"Revised Price: ₹{doc.revised_price or 'N/A'}"
+            ),
+        )
+    elif doc.status == "Rejected":
+        update_serial_buyback_status(
+            doc.imei_serial,
+            status="Available",
+            comment=f"❌ Device rejected in inspection {doc.name}",
+        )

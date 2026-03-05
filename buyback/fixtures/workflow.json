@@ -95,6 +95,7 @@
   "transitions": [
    {
     "action": "Submit for Approval",
+    "allow_self_approval": 1,
     "allowed": "Buyback Agent",
     "condition": "doc.requires_approval == 1",
     "next_state": "Awaiting Approval",
@@ -102,6 +103,7 @@
    },
    {
     "action": "Auto Approve",
+    "allow_self_approval": 1,
     "allowed": "Buyback Agent",
     "condition": "doc.requires_approval == 0",
     "next_state": "Approved",
@@ -109,24 +111,28 @@
    },
    {
     "action": "Approve",
+    "allow_self_approval": 1,
     "allowed": "Buyback Manager",
     "next_state": "Approved",
     "state": "Awaiting Approval"
    },
    {
     "action": "Reject",
+    "allow_self_approval": 1,
     "allowed": "Buyback Manager",
     "next_state": "Rejected",
     "state": "Awaiting Approval"
    },
    {
     "action": "Send OTP",
+    "allow_self_approval": 1,
     "allowed": "Buyback Agent",
     "next_state": "Awaiting OTP",
     "state": "Approved"
    },
    {
     "action": "Verify OTP",
+    "allow_self_approval": 1,
     "allowed": "Buyback Agent",
     "condition": "doc.otp_verified == 1",
     "next_state": "OTP Verified",
@@ -134,12 +140,14 @@
    },
    {
     "action": "Proceed to Payment",
+    "allow_self_approval": 1,
     "allowed": "Buyback Agent",
     "next_state": "Ready to Pay",
     "state": "OTP Verified"
    },
    {
     "action": "Confirm Payment",
+    "allow_self_approval": 1,
     "allowed": "Buyback Agent",
     "condition": "doc.payment_status == 'Paid'",
     "next_state": "Paid",
@@ -147,30 +155,35 @@
    },
    {
     "action": "Close",
+    "allow_self_approval": 1,
     "allowed": "Buyback Manager",
     "next_state": "Closed",
     "state": "Paid"
    },
    {
     "action": "Reject",
+    "allow_self_approval": 1,
     "allowed": "Buyback Manager",
     "next_state": "Rejected",
     "state": "Draft"
    },
    {
     "action": "Reject",
+    "allow_self_approval": 1,
     "allowed": "Buyback Manager",
     "next_state": "Rejected",
     "state": "Approved"
    },
    {
     "action": "Cancel",
+    "allow_self_approval": 1,
     "allowed": "Buyback Manager",
     "next_state": "Cancelled",
     "state": "Paid"
    },
    {
     "action": "Cancel",
+    "allow_self_approval": 1,
     "allowed": "Buyback Manager",
     "next_state": "Cancelled",
     "state": "Closed"
@@ -257,48 +270,56 @@
   "transitions": [
    {
     "action": "Submit",
+    "allow_self_approval": 1,
     "allowed": "Buyback Agent",
     "next_state": "New Device Delivered",
     "state": "Draft"
    },
    {
     "action": "Mark Awaiting Pickup",
+    "allow_self_approval": 1,
     "allowed": "Buyback Agent",
     "next_state": "Awaiting Pickup",
     "state": "New Device Delivered"
    },
    {
     "action": "Receive Old Device",
+    "allow_self_approval": 1,
     "allowed": "Buyback Agent",
     "next_state": "Old Device Received",
     "state": "Awaiting Pickup"
    },
    {
     "action": "Complete Inspection",
+    "allow_self_approval": 1,
     "allowed": "Buyback Agent",
     "next_state": "Inspected",
     "state": "Old Device Received"
    },
    {
     "action": "Settle",
+    "allow_self_approval": 1,
     "allowed": "Buyback Manager",
     "next_state": "Settled",
     "state": "Inspected"
    },
    {
     "action": "Close",
+    "allow_self_approval": 1,
     "allowed": "Buyback Manager",
     "next_state": "Closed",
     "state": "Settled"
    },
    {
     "action": "Cancel",
+    "allow_self_approval": 1,
     "allowed": "Buyback Manager",
     "next_state": "Cancelled",
     "state": "New Device Delivered"
    },
    {
     "action": "Cancel",
+    "allow_self_approval": 1,
     "allowed": "Buyback Manager",
     "next_state": "Cancelled",
     "state": "Awaiting Pickup"

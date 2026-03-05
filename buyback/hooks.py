@@ -29,7 +29,7 @@ app_include_css = "/assets/buyback/css/buyback.css"
 app_include_js = "/assets/buyback/js/buyback.js"
 
 # include js, css files in header of web template
-# web_include_css = "/assets/buyback/css/buyback.css"
+web_include_css = "/assets/buyback/css/buyback.css"
 # web_include_js = "/assets/buyback/js/buyback.js"
 
 # include custom scss in every website theme (without file extension ".scss")
@@ -84,6 +84,7 @@ app_include_js = "/assets/buyback/js/buyback.js"
 
 # before_install = "buyback.install.before_install"
 after_install = "buyback.install.after_install"
+after_migrate = "buyback.custom_fields.setup_custom_fields"
 
 # Uninstallation
 # ------------
@@ -136,13 +137,14 @@ before_uninstall = "buyback.uninstall.before_uninstall"
 # ---------------
 # Hook on document methods and events
 
-# doc_events = {
-# 	"*": {
-# 		"on_update": "method",
-# 		"on_cancel": "method",
-# 		"on_trash": "method"
-# 	}
-# }
+doc_events = {
+    "Buyback Quote": {
+        "after_insert": "buyback.doc_events.on_quote_created",
+    },
+    "Buyback Inspection": {
+        "on_update": "buyback.doc_events.on_inspection_update",
+    },
+}
 
 # Scheduled Tasks
 # ---------------
@@ -172,9 +174,10 @@ scheduler_events = {
 # each overriding function accepts a `data` argument;
 # generated from the base implementation of the doctype dashboard,
 # along with any modifications made in other Frappe apps
-# override_doctype_dashboards = {
-# 	"Task": "buyback.task.get_dashboard_data"
-# }
+override_doctype_dashboards = {
+	"Customer": "buyback.overrides.dashboard_overrides.get_dashboard_for_customer",
+	"Item": "buyback.overrides.dashboard_overrides.get_dashboard_for_item",
+}
 
 # exempt linked doctypes from being automatically cancelled
 #

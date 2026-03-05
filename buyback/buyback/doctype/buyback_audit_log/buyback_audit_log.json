@@ -34,7 +34,7 @@
    "fieldname": "action",
    "fieldtype": "Select",
    "label": "Action",
-   "options": "Quote Created\nQuote Accepted\nQuote Expired\nInspection Started\nInspection Completed\nGrade Changed\nPrice Override\nOrder Created\nOrder Approved\nOrder Rejected\nOTP Sent\nOTP Verified\nPayment Made\nOrder Closed\nExchange Created\nDevice Swapped\nSettlement Done",
+   "options": "Quote Created\nQuote Accepted\nQuote Expired\nInspection Started\nInspection Completed\nInspection Rejected\nGrade Changed\nPrice Override\nOrder Created\nOrder Approved\nOrder Rejected\nOTP Sent\nOTP Verified\nPayment Made\nOrder Closed\nOrder Cancelled\nExchange Created\nDevice Swapped\nSettlement Done\nKYC Verified\nLoyalty Points Awarded",
    "reqd": 1,
    "in_list_view": 1,
    "in_standard_filter": 1

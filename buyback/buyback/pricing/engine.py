@@ -247,7 +247,7 @@ def _get_base_price(item_code, grade, warranty_status=None, device_age_months=No
     """Look up price from Buyback Price Master grade×warranty matrix."""
     bpm = frappe.db.get_value(
         "Buyback Price Master",
-        {"item": item_code},
+        {"item_code": item_code},
         ["name", "current_market_price",
          "a_grade_iw_0_3", "b_grade_iw_0_3", "c_grade_iw_0_3",
          "a_grade_iw_0_6", "b_grade_iw_0_6", "c_grade_iw_0_6", "d_grade_iw_0_6",

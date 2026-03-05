@@ -50,6 +50,9 @@ def after_install():
     """Run after the Buyback app is installed."""
     _create_roles()
     _create_default_settings()
+    # Create custom fields on Serial No etc.
+    from buyback.custom_fields import setup_custom_fields
+    setup_custom_fields()
 
 
 def _create_roles():

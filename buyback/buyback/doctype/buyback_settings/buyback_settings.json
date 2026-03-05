@@ -34,7 +34,13 @@
   "accounting_section",
   "buyback_expense_account",
   "column_break_acct",
-  "buyback_stock_account"
+  "buyback_stock_account",
+  "loyalty_section",
+  "enable_loyalty_points",
+  "loyalty_program",
+  "column_break_loyalty",
+  "loyalty_points_per_100",
+  "loyalty_point_expiry_days"
  ],
  "fields": [
   {
@@ -211,6 +217,46 @@
    "fieldtype": "Link",
    "label": "Buyback Stock Account",
    "options": "Account"
+  },
+  {
+   "fieldname": "loyalty_section",
+   "fieldtype": "Section Break",
+   "label": "Loyalty Points"
+  },
+  {
+   "default": "0",
+   "fieldname": "enable_loyalty_points",
+   "fieldtype": "Check",
+   "label": "Enable Loyalty Points",
+   "description": "Award loyalty points to customers on buyback completion"
+  },
+  {
+   "fieldname": "loyalty_program",
+   "fieldtype": "Link",
+   "label": "Loyalty Program",
+   "options": "Loyalty Program",
+   "depends_on": "enable_loyalty_points",
+   "mandatory_depends_on": "enable_loyalty_points"
+  },
+  {
+   "fieldname": "column_break_loyalty",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "10",
+   "fieldname": "loyalty_points_per_100",
+   "fieldtype": "Int",
+   "label": "Points per ₹100",
+   "depends_on": "enable_loyalty_points",
+   "description": "Number of loyalty points awarded per ₹100 of buyback value"
+  },
+  {
+   "default": "365",
+   "fieldname": "loyalty_point_expiry_days",
+   "fieldtype": "Int",
+   "label": "Point Expiry (Days)",
+   "depends_on": "enable_loyalty_points",
+   "description": "Days after which earned loyalty points expire"
   }
  ],
  "index_web_pages_for_search": 0,

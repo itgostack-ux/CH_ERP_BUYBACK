@@ -8,8 +8,11 @@
   "naming_series",
   "inspection_id",
   "buyback_quote",
+  "diagnostic_source",
+  "mobile_diagnostic_id",
   "customer",
   "customer_name",
+  "mobile_no",
   "column_break_01",
   "store",
   "company",
@@ -36,6 +39,8 @@
   "column_break_pricing",
   "revised_price",
   "price_override_reason",
+  "diagnostic_section",
+  "diagnostic_data",
   "timing_section",
   "inspection_started_at",
   "column_break_time",
@@ -69,8 +74,25 @@
    "fieldtype": "Link",
    "label": "Buyback Quote",
    "options": "Buyback Quote",
-   "reqd": 1,
    "in_standard_filter": 1
+  },
+  {
+   "default": "In-Store",
+   "fieldname": "diagnostic_source",
+   "fieldtype": "Select",
+   "label": "Diagnostic Source",
+   "options": "In-Store\nMobile App",
+   "in_standard_filter": 1,
+   "read_only": 1,
+   "description": "Where the initial diagnostic was performed"
+  },
+  {
+   "fieldname": "mobile_diagnostic_id",
+   "fieldtype": "Data",
+   "label": "Mobile Diagnostic ID",
+   "read_only": 1,
+   "depends_on": "eval:doc.diagnostic_source == 'Mobile App'",
+   "description": "External reference from the mobile diagnostic app"
   },
   {
    "fieldname": "customer",
@@ -78,7 +100,6 @@
    "label": "Customer",
    "options": "Customer",
    "fetch_from": "buyback_quote.customer",
-   "read_only": 1,
    "in_standard_filter": 1
   },
   {
@@ -88,6 +109,14 @@
    "fetch_from": "buyback_quote.customer_name",
    "read_only": 1,
    "in_list_view": 1
+  },
+  {
+   "fieldname": "mobile_no",
+   "fieldtype": "Data",
+   "label": "Mobile No",
+   "description": "Customer mobile number for lookup",
+   "fetch_from": "buyback_quote.mobile_no",
+   "read_only": 1
   },
   {
    "fieldname": "column_break_01",
@@ -254,6 +283,20 @@
    "mandatory_depends_on": "eval:doc.revised_price && doc.quoted_price && doc.revised_price != doc.quoted_price"
   },
   {
+   "fieldname": "diagnostic_section",
+   "fieldtype": "Section Break",
+   "label": "Mobile Diagnostic Data",
+   "collapsible": 1,
+   "depends_on": "eval:doc.diagnostic_source == 'Mobile App'"
+  },
+  {
+   "fieldname": "diagnostic_data",
+   "fieldtype": "JSON",
+   "label": "Diagnostic Data",
+   "read_only": 1,
+   "description": "Raw diagnostic results received from the mobile diagnostic app"
+  },
+  {
    "fieldname": "timing_section",
    "fieldtype": "Section Break",
    "label": "Timing"
@@ -302,6 +345,59 @@
    "read": 1,
    "report": 1,
    "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Buyback Agent",
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Buyback Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Buyback Auditor"
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Buyback Admin",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Buyback Store Manager",
    "share": 1,
    "write": 1
   }

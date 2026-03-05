@@ -53,6 +53,26 @@
   "journal_entry",
   "column_break_acct",
   "stock_entry",
+  "kyc_section",
+  "customer_photo",
+  "customer_id_type",
+  "customer_id_number",
+  "column_break_kyc",
+  "customer_id_front",
+  "customer_id_back",
+  "kyc_verified",
+  "kyc_verified_by",
+  "kyc_verified_at",
+  "device_photos_section",
+  "device_photo_front",
+  "device_photo_back",
+  "column_break_device_photos",
+  "device_photo_screen",
+  "device_photo_imei",
+  "loyalty_section",
+  "loyalty_points_earned",
+  "column_break_loyalty",
+  "loyalty_point_entry",
   "remarks_section",
   "remarks"
  ],
@@ -142,7 +162,8 @@
    "in_list_view": 1,
    "in_standard_filter": 1,
    "read_only": 1,
-   "no_copy": 1
+   "no_copy": 1,
+   "allow_on_submit": 1
   },
   {
    "fieldname": "amended_from",
@@ -367,6 +388,121 @@
    "read_only": 1
   },
   {
+   "fieldname": "kyc_section",
+   "fieldtype": "Section Break",
+   "label": "Customer KYC",
+   "collapsible": 1
+  },
+  {
+   "fieldname": "customer_photo",
+   "fieldtype": "Attach Image",
+   "label": "Customer Photo",
+   "description": "Customer selfie / photo for identity verification"
+  },
+  {
+   "fieldname": "customer_id_type",
+   "fieldtype": "Select",
+   "label": "ID Proof Type",
+   "options": "\nAadhar Card\nPAN Card\nDriving License\nVoter ID\nPassport"
+  },
+  {
+   "fieldname": "customer_id_number",
+   "fieldtype": "Data",
+   "label": "ID Number",
+   "depends_on": "customer_id_type"
+  },
+  {
+   "fieldname": "column_break_kyc",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "customer_id_front",
+   "fieldtype": "Attach Image",
+   "label": "ID Front Image",
+   "depends_on": "customer_id_type"
+  },
+  {
+   "fieldname": "customer_id_back",
+   "fieldtype": "Attach Image",
+   "label": "ID Back Image",
+   "depends_on": "customer_id_type"
+  },
+  {
+   "default": "0",
+   "fieldname": "kyc_verified",
+   "fieldtype": "Check",
+   "label": "KYC Verified",
+   "read_only": 1
+  },
+  {
+   "fieldname": "kyc_verified_by",
+   "fieldtype": "Link",
+   "label": "KYC Verified By",
+   "options": "User",
+   "read_only": 1,
+   "depends_on": "kyc_verified"
+  },
+  {
+   "fieldname": "kyc_verified_at",
+   "fieldtype": "Datetime",
+   "label": "KYC Verified At",
+   "read_only": 1,
+   "depends_on": "kyc_verified"
+  },
+  {
+   "fieldname": "device_photos_section",
+   "fieldtype": "Section Break",
+   "label": "Device / Phone Photos"
+  },
+  {
+   "fieldname": "device_photo_front",
+   "fieldtype": "Attach Image",
+   "label": "Device Front Photo"
+  },
+  {
+   "fieldname": "device_photo_back",
+   "fieldtype": "Attach Image",
+   "label": "Device Back Photo"
+  },
+  {
+   "fieldname": "column_break_device_photos",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "device_photo_screen",
+   "fieldtype": "Attach Image",
+   "label": "Screen Photo"
+  },
+  {
+   "fieldname": "device_photo_imei",
+   "fieldtype": "Attach Image",
+   "label": "IMEI / Serial Photo"
+  },
+  {
+   "fieldname": "loyalty_section",
+   "fieldtype": "Section Break",
+   "label": "Loyalty Points",
+   "collapsible": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "loyalty_points_earned",
+   "fieldtype": "Int",
+   "label": "Loyalty Points Earned",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_loyalty",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "loyalty_point_entry",
+   "fieldtype": "Link",
+   "label": "Loyalty Point Entry",
+   "options": "Loyalty Point Entry",
+   "read_only": 1
+  },
+  {
    "fieldname": "remarks_section",
    "fieldtype": "Section Break",
    "label": "Remarks",
@@ -376,6 +512,16 @@
    "fieldname": "remarks",
    "fieldtype": "Text",
    "label": "Remarks"
+  },
+  {
+   "fieldname": "approval_token",
+   "label": "Approval Token",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "read_only": 1,
+   "no_copy": 1,
+   "unique": 0,
+   "description": "Token for customer-facing approval page URL. Auto-generated on order creation."
   }
  ],
  "index_web_pages_for_search": 1,
@@ -398,6 +544,67 @@
    "read": 1,
    "report": 1,
    "role": "System Manager",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Buyback Agent",
+   "submit": 1,
+   "write": 1
+  },
+  {
+   "amend": 1,
+   "cancel": 1,
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Buyback Manager",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  },
+  {
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Buyback Auditor"
+  },
+  {
+   "amend": 1,
+   "cancel": 1,
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Buyback Admin",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Buyback Store Manager",
    "share": 1,
    "submit": 1,
    "write": 1

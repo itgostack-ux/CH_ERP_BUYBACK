@@ -1,0 +1,166 @@
+{% extends "templates/web.html" %}
+
+{% block page_content %}
+<div class="container my-5" style="max-width: 600px;">
+
+  {% if error %}
+    <div class="alert alert-danger">{{ error }}</div>
+  {% elif order %}
+    <div class="card shadow-sm">
+      <div class="card-header bg-primary text-white text-center">
+        <h4 class="mb-0">Buyback Approval</h4>
+        <small>Order #{{ order.order_id }}</small>
+      </div>
+
+      <div class="card-body">
+        <!-- Device Info -->
+        <h5 class="mb-3">Device Details</h5>
+        <table class="table table-sm">
+          <tr><td class="text-muted">Item</td><td><strong>{{ order.item_name }}</strong></td></tr>
+          <tr><td class="text-muted">Brand</td><td>{{ order.brand or '-' }}</td></tr>
+          <tr><td class="text-muted">IMEI/Serial</td><td><code>{{ order.imei_serial or '-' }}</code></td></tr>
+          <tr><td class="text-muted">Condition Grade</td><td>{{ order.condition_grade or '-' }}</td></tr>
+          <tr><td class="text-muted">Warranty</td><td>{{ order.warranty_status or '-' }}</td></tr>
+          <tr><td class="text-muted">Store</td><td>{{ order.store_name or '-' }}</td></tr>
+        </table>
+
+        <!-- Device Photos -->
+        {% if order.device_photo_front or order.device_photo_back %}
+        <h5 class="mt-4 mb-2">Device Photos</h5>
+        <div class="row">
+          {% if order.device_photo_front %}
+          <div class="col-6">
+            <img src="{{ order.device_photo_front }}" class="img-fluid rounded" alt="Front">
+            <small class="text-muted d-block text-center">Front</small>
+          </div>
+          {% endif %}
+          {% if order.device_photo_back %}
+          <div class="col-6">
+            <img src="{{ order.device_photo_back }}" class="img-fluid rounded" alt="Back">
+            <small class="text-muted d-block text-center">Back</small>
+          </div>
+          {% endif %}
+        </div>
+        {% endif %}
+
+        <!-- Price -->
+        <div class="text-center my-4 p-3 bg-light rounded">
+          <small class="text-muted d-block">Buyback Price</small>
+          <h2 class="text-success mb-0">₹{{ "%.2f"|format(order.final_price) }}</h2>
+        </div>
+
+        <!-- Status / Actions -->
+        {% if order.otp_verified %}
+          <div class="alert alert-success text-center">
+            <strong>✅ Verified & Approved</strong><br>
+            You have already approved this buyback.
+          </div>
+        {% elif order.status in ('Approved', 'Awaiting OTP') %}
+          <!-- OTP Section -->
+          <div id="otp-section">
+            <p class="text-center text-muted">
+              To approve this buyback, we'll send an OTP to your registered mobile number
+              ending in <strong>****{{ order.mobile_no[-4:] }}</strong>.
+            </p>
+
+            <div id="send-otp-section" class="text-center">
+              <button id="btn-send-otp" class="btn btn-primary btn-lg" onclick="sendOTP()">
+                Send OTP
+              </button>
+            </div>
+
+            <div id="verify-otp-section" class="text-center" style="display:none;">
+              <div class="form-group mx-auto" style="max-width: 200px;">
+                <input type="text" id="otp-input" class="form-control form-control-lg text-center"
+                       maxlength="6" placeholder="Enter OTP" pattern="[0-9]{6}">
+              </div>
+              <button id="btn-verify-otp" class="btn btn-success btn-lg mt-3" onclick="verifyOTP()">
+                Verify & Approve
+              </button>
+              <p class="text-muted mt-2">
+                <a href="#" onclick="sendOTP(); return false;">Resend OTP</a>
+              </p>
+            </div>
+
+            <div id="otp-message" class="mt-3 text-center"></div>
+          </div>
+        {% else %}
+          <div class="alert alert-info text-center">
+            Status: <strong>{{ order.status }}</strong>
+          </div>
+        {% endif %}
+      </div>
+
+      <div class="card-footer text-center text-muted small">
+        {{ order.customer_name }} &middot; {{ order.name }}
+      </div>
+    </div>
+
+  {% else %}
+    <div class="alert alert-warning">No order data available.</div>
+  {% endif %}
+</div>
+
+<script>
+  const ORDER_NAME = "{{ order.name if order else '' }}";
+  const TOKEN = "{{ token or '' }}";
+
+  function sendOTP() {
+    const btn = document.getElementById('btn-send-otp');
+    const msg = document.getElementById('otp-message');
+    btn.disabled = true;
+    btn.textContent = 'Sending...';
+    msg.innerHTML = '';
+
+    frappe.call({
+      method: 'buyback.api.send_otp',
+      args: { order_name: ORDER_NAME },
+      callback: function(r) {
+        document.getElementById('send-otp-section').style.display = 'none';
+        document.getElementById('verify-otp-section').style.display = 'block';
+        msg.innerHTML = '<span class="text-success">OTP sent to your mobile.</span>';
+      },
+      error: function(r) {
+        btn.disabled = false;
+        btn.textContent = 'Send OTP';
+        msg.innerHTML = '<span class="text-danger">Failed to send OTP. Please try again.</span>';
+      }
+    });
+  }
+
+  function verifyOTP() {
+    const otp = document.getElementById('otp-input').value.trim();
+    const btn = document.getElementById('btn-verify-otp');
+    const msg = document.getElementById('otp-message');
+
+    if (!otp || otp.length !== 6) {
+      msg.innerHTML = '<span class="text-danger">Please enter a 6-digit OTP.</span>';
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'Verifying...';
+    msg.innerHTML = '';
+
+    frappe.call({
+      method: 'buyback.api.verify_otp',
+      args: { order_name: ORDER_NAME, otp_code: otp },
+      callback: function(r) {
+        if (r.message && r.message.valid) {
+          msg.innerHTML = '<div class="alert alert-success"><strong>✅ Approved!</strong> Your buyback has been confirmed.</div>';
+          document.getElementById('verify-otp-section').style.display = 'none';
+        } else {
+          btn.disabled = false;
+          btn.textContent = 'Verify & Approve';
+          msg.innerHTML = '<span class="text-danger">' + (r.message ? r.message.message : 'Invalid OTP') + '</span>';
+        }
+      },
+      error: function() {
+        btn.disabled = false;
+        btn.textContent = 'Verify & Approve';
+        msg.innerHTML = '<span class="text-danger">Verification failed. Please try again.</span>';
+      }
+    });
+  }
+</script>
+{% endblock %}
