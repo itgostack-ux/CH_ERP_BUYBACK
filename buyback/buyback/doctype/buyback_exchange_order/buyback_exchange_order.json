@@ -1,0 +1,335 @@
+{
+ "actions": [],
+ "autoname": "naming_series:",
+ "creation": "2026-03-05 10:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "is_submittable": 1,
+ "field_order": [
+  "naming_series",
+  "exchange_id",
+  "buyback_order",
+  "customer",
+  "customer_name",
+  "mobile_no",
+  "column_break_01",
+  "store",
+  "company",
+  "status",
+  "amended_from",
+  "old_device_section",
+  "old_item",
+  "old_item_name",
+  "old_imei_serial",
+  "column_break_old",
+  "old_condition_grade",
+  "buyback_amount",
+  "new_device_section",
+  "new_item",
+  "new_item_name",
+  "new_imei_serial",
+  "column_break_new",
+  "new_device_price",
+  "exchange_section",
+  "exchange_discount",
+  "column_break_exc",
+  "amount_to_pay",
+  "amount_received_from_customer",
+  "logistics_section",
+  "new_device_delivered_at",
+  "old_device_received_at",
+  "column_break_log",
+  "old_device_inspected_at",
+  "settlement_section",
+  "settlement_date",
+  "column_break_settle",
+  "settlement_reference",
+  "remarks_section",
+  "remarks"
+ ],
+ "fields": [
+  {
+   "default": "BBX-.YYYY.-.#####",
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "hidden": 1,
+   "label": "Series",
+   "options": "BBX-.YYYY.-.#####",
+   "print_hide": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "exchange_id",
+   "fieldtype": "Int",
+   "label": "Exchange ID",
+   "read_only": 1,
+   "unique": 1,
+   "no_copy": 1,
+   "in_list_view": 1,
+   "description": "Auto-generated sequential ID for mobile/API integration"
+  },
+  {
+   "fieldname": "buyback_order",
+   "fieldtype": "Link",
+   "label": "Buyback Order",
+   "options": "Buyback Order",
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "customer",
+   "fieldtype": "Link",
+   "label": "Customer",
+   "options": "Customer",
+   "reqd": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "customer_name",
+   "fieldtype": "Data",
+   "label": "Customer Name",
+   "fetch_from": "customer.customer_name",
+   "read_only": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "mobile_no",
+   "fieldtype": "Data",
+   "label": "Mobile No",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_01",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "store",
+   "fieldtype": "Link",
+   "label": "Store",
+   "options": "CH Store",
+   "reqd": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "Company",
+   "options": "Company",
+   "fetch_from": "store.company",
+   "read_only": 1
+  },
+  {
+   "default": "Draft",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "options": "Draft\nNew Device Delivered\nAwaiting Pickup\nOld Device Received\nInspected\nSettled\nClosed\nCancelled",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "options": "Buyback Exchange Order",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "old_device_section",
+   "fieldtype": "Section Break",
+   "label": "Old Device (Trade-In)"
+  },
+  {
+   "fieldname": "old_item",
+   "fieldtype": "Link",
+   "label": "Old Item",
+   "options": "Item",
+   "reqd": 1
+  },
+  {
+   "fieldname": "old_item_name",
+   "fieldtype": "Data",
+   "label": "Old Item Name",
+   "fetch_from": "old_item.item_name",
+   "read_only": 1
+  },
+  {
+   "fieldname": "old_imei_serial",
+   "fieldtype": "Data",
+   "label": "Old IMEI / Serial No"
+  },
+  {
+   "fieldname": "column_break_old",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "old_condition_grade",
+   "fieldtype": "Link",
+   "label": "Old Device Grade",
+   "options": "Grade Master"
+  },
+  {
+   "default": "0",
+   "fieldname": "buyback_amount",
+   "fieldtype": "Currency",
+   "label": "Buyback Amount",
+   "in_list_view": 1,
+   "description": "Value of old device"
+  },
+  {
+   "fieldname": "new_device_section",
+   "fieldtype": "Section Break",
+   "label": "New Device"
+  },
+  {
+   "fieldname": "new_item",
+   "fieldtype": "Link",
+   "label": "New Item",
+   "options": "Item",
+   "reqd": 1
+  },
+  {
+   "fieldname": "new_item_name",
+   "fieldtype": "Data",
+   "label": "New Item Name",
+   "fetch_from": "new_item.item_name",
+   "read_only": 1
+  },
+  {
+   "fieldname": "new_imei_serial",
+   "fieldtype": "Data",
+   "label": "New IMEI / Serial No"
+  },
+  {
+   "fieldname": "column_break_new",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "new_device_price",
+   "fieldtype": "Currency",
+   "label": "New Device Price"
+  },
+  {
+   "fieldname": "exchange_section",
+   "fieldtype": "Section Break",
+   "label": "Exchange Calculation"
+  },
+  {
+   "default": "0",
+   "fieldname": "exchange_discount",
+   "fieldtype": "Currency",
+   "label": "Exchange Discount / Bonus",
+   "description": "Additional exchange bonus on top of buyback value"
+  },
+  {
+   "fieldname": "column_break_exc",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "amount_to_pay",
+   "fieldtype": "Currency",
+   "label": "Amount Customer Pays",
+   "in_list_view": 1,
+   "bold": 1,
+   "read_only": 1,
+   "description": "new_device_price - buyback_amount - exchange_discount"
+  },
+  {
+   "default": "0",
+   "fieldname": "amount_received_from_customer",
+   "fieldtype": "Currency",
+   "label": "Amount Received",
+   "description": "Actual amount received from customer"
+  },
+  {
+   "fieldname": "logistics_section",
+   "fieldtype": "Section Break",
+   "label": "Logistics Timeline"
+  },
+  {
+   "fieldname": "new_device_delivered_at",
+   "fieldtype": "Datetime",
+   "label": "New Device Delivered At"
+  },
+  {
+   "fieldname": "old_device_received_at",
+   "fieldtype": "Datetime",
+   "label": "Old Device Received At"
+  },
+  {
+   "fieldname": "column_break_log",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "old_device_inspected_at",
+   "fieldtype": "Datetime",
+   "label": "Old Device Inspected At"
+  },
+  {
+   "fieldname": "settlement_section",
+   "fieldtype": "Section Break",
+   "label": "Settlement"
+  },
+  {
+   "fieldname": "settlement_date",
+   "fieldtype": "Date",
+   "label": "Settlement Date"
+  },
+  {
+   "fieldname": "column_break_settle",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "settlement_reference",
+   "fieldtype": "Data",
+   "label": "Settlement Reference"
+  },
+  {
+   "fieldname": "remarks_section",
+   "fieldtype": "Section Break",
+   "label": "Remarks",
+   "collapsible": 1
+  },
+  {
+   "fieldname": "remarks",
+   "fieldtype": "Text",
+   "label": "Remarks"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-03-05 10:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "BuyBack",
+ "name": "Buyback Exchange Order",
+ "naming_rule": "By \"Naming Series\" field",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "amend": 1,
+   "cancel": 1,
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  }
+ ],
+ "search_fields": "customer_name,old_item_name,new_item_name,status",
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "customer_name",
+ "show_title_field_in_link": 1,
+ "track_changes": 1
+}

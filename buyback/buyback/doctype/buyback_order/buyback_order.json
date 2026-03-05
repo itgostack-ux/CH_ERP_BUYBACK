@@ -1,0 +1,413 @@
+{
+ "actions": [],
+ "autoname": "naming_series:",
+ "creation": "2026-03-05 10:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "is_submittable": 1,
+ "field_order": [
+  "naming_series",
+  "order_id",
+  "buyback_quote",
+  "buyback_inspection",
+  "customer",
+  "customer_name",
+  "mobile_no",
+  "column_break_01",
+  "store",
+  "company",
+  "status",
+  "amended_from",
+  "device_section",
+  "item",
+  "item_name",
+  "brand",
+  "column_break_device",
+  "imei_serial",
+  "condition_grade",
+  "warranty_status",
+  "pricing_section",
+  "base_price",
+  "total_deductions",
+  "column_break_pricing",
+  "final_price",
+  "approved_price",
+  "approval_section",
+  "requires_approval",
+  "approved_by",
+  "column_break_approval",
+  "approval_date",
+  "approval_remarks",
+  "otp_section",
+  "otp_verified",
+  "otp_verified_at",
+  "column_break_otp",
+  "otp_reference",
+  "payment_section",
+  "payments",
+  "payment_summary_section",
+  "total_paid",
+  "column_break_paysum",
+  "payment_status",
+  "accounting_section",
+  "journal_entry",
+  "column_break_acct",
+  "stock_entry",
+  "remarks_section",
+  "remarks"
+ ],
+ "fields": [
+  {
+   "default": "BBO-.YYYY.-.#####",
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "hidden": 1,
+   "label": "Series",
+   "options": "BBO-.YYYY.-.#####",
+   "print_hide": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "order_id",
+   "fieldtype": "Int",
+   "label": "Order ID",
+   "read_only": 1,
+   "unique": 1,
+   "no_copy": 1,
+   "in_list_view": 1,
+   "description": "Auto-generated sequential ID for mobile/API integration"
+  },
+  {
+   "fieldname": "buyback_quote",
+   "fieldtype": "Link",
+   "label": "Buyback Quote",
+   "options": "Buyback Quote",
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "buyback_inspection",
+   "fieldtype": "Link",
+   "label": "Buyback Inspection",
+   "options": "Buyback Inspection",
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "customer",
+   "fieldtype": "Link",
+   "label": "Customer",
+   "options": "Customer",
+   "reqd": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "customer_name",
+   "fieldtype": "Data",
+   "label": "Customer Name",
+   "fetch_from": "customer.customer_name",
+   "read_only": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "mobile_no",
+   "fieldtype": "Data",
+   "label": "Mobile No",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_01",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "store",
+   "fieldtype": "Link",
+   "label": "Store",
+   "options": "CH Store",
+   "reqd": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "Company",
+   "options": "Company",
+   "fetch_from": "store.company",
+   "read_only": 1
+  },
+  {
+   "default": "Draft",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "options": "Draft\nAwaiting Approval\nApproved\nAwaiting OTP\nOTP Verified\nReady to Pay\nPaid\nClosed\nRejected\nCancelled",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "options": "Buyback Order",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "device_section",
+   "fieldtype": "Section Break",
+   "label": "Device Details"
+  },
+  {
+   "fieldname": "item",
+   "fieldtype": "Link",
+   "label": "Item",
+   "options": "Item",
+   "reqd": 1
+  },
+  {
+   "fieldname": "item_name",
+   "fieldtype": "Data",
+   "label": "Item Name",
+   "fetch_from": "item.item_name",
+   "read_only": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "brand",
+   "fieldtype": "Link",
+   "label": "Brand",
+   "options": "Brand",
+   "fetch_from": "item.brand",
+   "read_only": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "column_break_device",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "imei_serial",
+   "fieldtype": "Data",
+   "label": "IMEI / Serial No"
+  },
+  {
+   "fieldname": "condition_grade",
+   "fieldtype": "Link",
+   "label": "Condition Grade",
+   "options": "Grade Master",
+   "reqd": 1
+  },
+  {
+   "fieldname": "warranty_status",
+   "fieldtype": "Select",
+   "label": "Warranty Status",
+   "options": "\nIn Warranty\nOut of Warranty"
+  },
+  {
+   "fieldname": "pricing_section",
+   "fieldtype": "Section Break",
+   "label": "Pricing"
+  },
+  {
+   "default": "0",
+   "fieldname": "base_price",
+   "fieldtype": "Currency",
+   "label": "Base Price",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "total_deductions",
+   "fieldtype": "Currency",
+   "label": "Total Deductions",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_pricing",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "final_price",
+   "fieldtype": "Currency",
+   "label": "Final Price",
+   "in_list_view": 1,
+   "bold": 1,
+   "description": "Amount to be paid to customer"
+  },
+  {
+   "default": "0",
+   "fieldname": "approved_price",
+   "fieldtype": "Currency",
+   "label": "Approved Price",
+   "read_only": 1,
+   "description": "Set when manager approves"
+  },
+  {
+   "fieldname": "approval_section",
+   "fieldtype": "Section Break",
+   "label": "Approval",
+   "collapsible": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "requires_approval",
+   "fieldtype": "Check",
+   "label": "Requires Manager Approval",
+   "read_only": 1
+  },
+  {
+   "fieldname": "approved_by",
+   "fieldtype": "Link",
+   "label": "Approved By",
+   "options": "User",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_approval",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "approval_date",
+   "fieldtype": "Datetime",
+   "label": "Approval Date",
+   "read_only": 1
+  },
+  {
+   "fieldname": "approval_remarks",
+   "fieldtype": "Small Text",
+   "label": "Approval Remarks"
+  },
+  {
+   "fieldname": "otp_section",
+   "fieldtype": "Section Break",
+   "label": "OTP Verification"
+  },
+  {
+   "default": "0",
+   "fieldname": "otp_verified",
+   "fieldtype": "Check",
+   "label": "OTP Verified",
+   "read_only": 1
+  },
+  {
+   "fieldname": "otp_verified_at",
+   "fieldtype": "Datetime",
+   "label": "OTP Verified At",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_otp",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "otp_reference",
+   "fieldtype": "Link",
+   "label": "OTP Reference",
+   "options": "CH OTP Log",
+   "read_only": 1
+  },
+  {
+   "fieldname": "payment_section",
+   "fieldtype": "Section Break",
+   "label": "Payment Details"
+  },
+  {
+   "fieldname": "payments",
+   "fieldtype": "Table",
+   "label": "Payments",
+   "options": "Buyback Order Payment"
+  },
+  {
+   "fieldname": "payment_summary_section",
+   "fieldtype": "Section Break",
+   "label": ""
+  },
+  {
+   "default": "0",
+   "fieldname": "total_paid",
+   "fieldtype": "Currency",
+   "label": "Total Paid",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_paysum",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Unpaid",
+   "fieldname": "payment_status",
+   "fieldtype": "Select",
+   "label": "Payment Status",
+   "options": "Unpaid\nPartially Paid\nPaid\nOverpaid",
+   "read_only": 1
+  },
+  {
+   "fieldname": "accounting_section",
+   "fieldtype": "Section Break",
+   "label": "Accounting References",
+   "collapsible": 1
+  },
+  {
+   "fieldname": "journal_entry",
+   "fieldtype": "Link",
+   "label": "Journal Entry",
+   "options": "Journal Entry",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_acct",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "stock_entry",
+   "fieldtype": "Link",
+   "label": "Stock Entry",
+   "options": "Stock Entry",
+   "read_only": 1
+  },
+  {
+   "fieldname": "remarks_section",
+   "fieldtype": "Section Break",
+   "label": "Remarks",
+   "collapsible": 1
+  },
+  {
+   "fieldname": "remarks",
+   "fieldtype": "Text",
+   "label": "Remarks"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-03-05 10:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "BuyBack",
+ "name": "Buyback Order",
+ "naming_rule": "By \"Naming Series\" field",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "amend": 1,
+   "cancel": 1,
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  }
+ ],
+ "search_fields": "customer_name,item_name,status,store",
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "customer_name",
+ "show_title_field_in_link": 1,
+ "track_changes": 1
+}

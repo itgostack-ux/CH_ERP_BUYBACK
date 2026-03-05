@@ -1,0 +1,229 @@
+{
+ "actions": [],
+ "autoname": "naming_series:",
+ "creation": "2026-03-05 10:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "naming_series",
+  "pricing_rule_id",
+  "rule_name",
+  "column_break_01",
+  "priority",
+  "disabled",
+  "conditions_section",
+  "applies_to_brand",
+  "applies_to_category",
+  "column_break_cond",
+  "applies_to_grade",
+  "warranty_status",
+  "age_section",
+  "min_age_months",
+  "column_break_age",
+  "max_age_months",
+  "pricing_section",
+  "rule_type",
+  "flat_deduction",
+  "column_break_pricing",
+  "percent_deduction",
+  "slabs_section",
+  "slabs",
+  "validity_section",
+  "valid_from",
+  "column_break_valid",
+  "valid_to"
+ ],
+ "fields": [
+  {
+   "default": "BPR-.#####",
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "hidden": 1,
+   "label": "Series",
+   "options": "BPR-.#####",
+   "print_hide": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "pricing_rule_id",
+   "fieldtype": "Int",
+   "label": "Pricing Rule ID",
+   "read_only": 1,
+   "unique": 1,
+   "no_copy": 1,
+   "in_list_view": 1,
+   "description": "Auto-generated sequential ID for mobile/API integration"
+  },
+  {
+   "fieldname": "rule_name",
+   "fieldtype": "Data",
+   "label": "Rule Name",
+   "reqd": 1,
+   "in_list_view": 1,
+   "description": "Descriptive name e.g. 'Apple Grade-A Deduction', 'Laptop Age Penalty'"
+  },
+  {
+   "fieldname": "column_break_01",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "priority",
+   "fieldtype": "Int",
+   "label": "Priority",
+   "in_list_view": 1,
+   "description": "Higher number = evaluated first"
+  },
+  {
+   "default": "0",
+   "fieldname": "disabled",
+   "fieldtype": "Check",
+   "label": "Disabled"
+  },
+  {
+   "fieldname": "conditions_section",
+   "fieldtype": "Section Break",
+   "label": "Matching Conditions"
+  },
+  {
+   "fieldname": "applies_to_brand",
+   "fieldtype": "Link",
+   "label": "Brand",
+   "options": "Brand"
+  },
+  {
+   "fieldname": "applies_to_category",
+   "fieldtype": "Link",
+   "label": "Item Group",
+   "options": "Item Group"
+  },
+  {
+   "fieldname": "column_break_cond",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "applies_to_grade",
+   "fieldtype": "Link",
+   "label": "Grade",
+   "options": "Grade Master"
+  },
+  {
+   "fieldname": "warranty_status",
+   "fieldtype": "Select",
+   "label": "Warranty Status",
+   "options": "\nIn Warranty\nOut of Warranty"
+  },
+  {
+   "fieldname": "age_section",
+   "fieldtype": "Section Break",
+   "label": "Device Age (Months)",
+   "collapsible": 1
+  },
+  {
+   "fieldname": "min_age_months",
+   "fieldtype": "Int",
+   "label": "Min Age (Months)"
+  },
+  {
+   "fieldname": "column_break_age",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "max_age_months",
+   "fieldtype": "Int",
+   "label": "Max Age (Months)"
+  },
+  {
+   "fieldname": "pricing_section",
+   "fieldtype": "Section Break",
+   "label": "Pricing Action"
+  },
+  {
+   "default": "Flat Deduction",
+   "fieldname": "rule_type",
+   "fieldtype": "Select",
+   "label": "Rule Type",
+   "options": "Flat Deduction\nPercentage Deduction\nSlab-Based",
+   "in_list_view": 1,
+   "reqd": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "flat_deduction",
+   "fieldtype": "Currency",
+   "label": "Flat Deduction Amount",
+   "depends_on": "eval:doc.rule_type === 'Flat Deduction'"
+  },
+  {
+   "fieldname": "column_break_pricing",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "percent_deduction",
+   "fieldtype": "Percent",
+   "label": "Percentage Deduction",
+   "depends_on": "eval:doc.rule_type === 'Percentage Deduction'"
+  },
+  {
+   "fieldname": "slabs_section",
+   "fieldtype": "Section Break",
+   "label": "Pricing Slabs",
+   "depends_on": "eval:doc.rule_type === 'Slab-Based'"
+  },
+  {
+   "fieldname": "slabs",
+   "fieldtype": "Table",
+   "label": "Slabs",
+   "options": "Buyback Pricing Slab"
+  },
+  {
+   "fieldname": "validity_section",
+   "fieldtype": "Section Break",
+   "label": "Validity Period",
+   "collapsible": 1
+  },
+  {
+   "fieldname": "valid_from",
+   "fieldtype": "Date",
+   "label": "Valid From"
+  },
+  {
+   "fieldname": "column_break_valid",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "valid_to",
+   "fieldtype": "Date",
+   "label": "Valid To"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-03-05 10:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "BuyBack",
+ "name": "Buyback Pricing Rule",
+ "naming_rule": "By \"Naming Series\" field",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "search_fields": "rule_name,rule_type,applies_to_brand",
+ "sort_field": "priority",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "rule_name",
+ "show_title_field_in_link": 1
+}

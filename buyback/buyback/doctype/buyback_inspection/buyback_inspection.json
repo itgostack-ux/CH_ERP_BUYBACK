@@ -1,0 +1,316 @@
+{
+ "actions": [],
+ "autoname": "naming_series:",
+ "creation": "2026-03-05 10:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "naming_series",
+  "inspection_id",
+  "buyback_quote",
+  "customer",
+  "customer_name",
+  "column_break_01",
+  "store",
+  "company",
+  "status",
+  "inspector",
+  "device_section",
+  "item",
+  "item_name",
+  "imei_serial",
+  "column_break_device",
+  "condition_grade",
+  "checklist_template",
+  "grading_section",
+  "pre_inspection_grade",
+  "column_break_grade",
+  "post_inspection_grade",
+  "grade_changed_reason",
+  "results_section",
+  "results",
+  "photos_section",
+  "device_photos",
+  "pricing_section",
+  "quoted_price",
+  "column_break_pricing",
+  "revised_price",
+  "price_override_reason",
+  "timing_section",
+  "inspection_started_at",
+  "column_break_time",
+  "inspection_completed_at",
+  "remarks_section",
+  "remarks"
+ ],
+ "fields": [
+  {
+   "default": "BBI-.YYYY.-.#####",
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "hidden": 1,
+   "label": "Series",
+   "options": "BBI-.YYYY.-.#####",
+   "print_hide": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "inspection_id",
+   "fieldtype": "Int",
+   "label": "Inspection ID",
+   "read_only": 1,
+   "unique": 1,
+   "no_copy": 1,
+   "in_list_view": 1,
+   "description": "Auto-generated sequential ID for mobile/API integration"
+  },
+  {
+   "fieldname": "buyback_quote",
+   "fieldtype": "Link",
+   "label": "Buyback Quote",
+   "options": "Buyback Quote",
+   "reqd": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "customer",
+   "fieldtype": "Link",
+   "label": "Customer",
+   "options": "Customer",
+   "fetch_from": "buyback_quote.customer",
+   "read_only": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "customer_name",
+   "fieldtype": "Data",
+   "label": "Customer Name",
+   "fetch_from": "buyback_quote.customer_name",
+   "read_only": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "column_break_01",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "store",
+   "fieldtype": "Link",
+   "label": "Store",
+   "options": "CH Store",
+   "fetch_from": "buyback_quote.store",
+   "read_only": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "Company",
+   "options": "Company",
+   "fetch_from": "buyback_quote.company",
+   "read_only": 1
+  },
+  {
+   "default": "Draft",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "options": "Draft\nIn Progress\nCompleted\nRejected",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "inspector",
+   "fieldtype": "Link",
+   "label": "Inspector",
+   "options": "User"
+  },
+  {
+   "fieldname": "device_section",
+   "fieldtype": "Section Break",
+   "label": "Device Details"
+  },
+  {
+   "fieldname": "item",
+   "fieldtype": "Link",
+   "label": "Item",
+   "options": "Item",
+   "fetch_from": "buyback_quote.item",
+   "read_only": 1
+  },
+  {
+   "fieldname": "item_name",
+   "fieldtype": "Data",
+   "label": "Item Name",
+   "fetch_from": "buyback_quote.item_name",
+   "read_only": 1
+  },
+  {
+   "fieldname": "imei_serial",
+   "fieldtype": "Data",
+   "label": "IMEI / Serial No",
+   "fetch_from": "buyback_quote.imei_serial"
+  },
+  {
+   "fieldname": "column_break_device",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "condition_grade",
+   "fieldtype": "Link",
+   "label": "Final Condition Grade",
+   "options": "Grade Master",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "checklist_template",
+   "fieldtype": "Link",
+   "label": "Checklist Template",
+   "options": "Buyback Checklist Template"
+  },
+  {
+   "fieldname": "grading_section",
+   "fieldtype": "Section Break",
+   "label": "Grade Assessment"
+  },
+  {
+   "fieldname": "pre_inspection_grade",
+   "fieldtype": "Link",
+   "label": "Pre-Inspection Grade (Customer Claim)",
+   "options": "Grade Master",
+   "description": "Grade based on customer's self-assessment from quote"
+  },
+  {
+   "fieldname": "column_break_grade",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "post_inspection_grade",
+   "fieldtype": "Link",
+   "label": "Post-Inspection Grade (Actual)",
+   "options": "Grade Master",
+   "description": "Actual grade determined by physical inspection"
+  },
+  {
+   "fieldname": "grade_changed_reason",
+   "fieldtype": "Small Text",
+   "label": "Grade Change Reason",
+   "depends_on": "eval:doc.pre_inspection_grade !== doc.post_inspection_grade",
+   "mandatory_depends_on": "eval:doc.pre_inspection_grade && doc.post_inspection_grade && doc.pre_inspection_grade !== doc.post_inspection_grade"
+  },
+  {
+   "fieldname": "results_section",
+   "fieldtype": "Section Break",
+   "label": "Inspection Results"
+  },
+  {
+   "fieldname": "results",
+   "fieldtype": "Table",
+   "label": "Results",
+   "options": "Buyback Inspection Result"
+  },
+  {
+   "fieldname": "photos_section",
+   "fieldtype": "Section Break",
+   "label": "Device Photos",
+   "collapsible": 1
+  },
+  {
+   "fieldname": "device_photos",
+   "fieldtype": "Attach Image",
+   "label": "Device Photos"
+  },
+  {
+   "fieldname": "pricing_section",
+   "fieldtype": "Section Break",
+   "label": "Pricing Impact"
+  },
+  {
+   "default": "0",
+   "fieldname": "quoted_price",
+   "fieldtype": "Currency",
+   "label": "Original Quoted Price",
+   "fetch_from": "buyback_quote.quoted_price",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_pricing",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "revised_price",
+   "fieldtype": "Currency",
+   "label": "Revised Price",
+   "in_list_view": 1,
+   "description": "Price after physical inspection (may differ from quote)"
+  },
+  {
+   "fieldname": "price_override_reason",
+   "fieldtype": "Small Text",
+   "label": "Price Override Reason",
+   "depends_on": "eval:doc.revised_price && doc.quoted_price && doc.revised_price != doc.quoted_price",
+   "mandatory_depends_on": "eval:doc.revised_price && doc.quoted_price && doc.revised_price != doc.quoted_price"
+  },
+  {
+   "fieldname": "timing_section",
+   "fieldtype": "Section Break",
+   "label": "Timing"
+  },
+  {
+   "fieldname": "inspection_started_at",
+   "fieldtype": "Datetime",
+   "label": "Started At"
+  },
+  {
+   "fieldname": "column_break_time",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "inspection_completed_at",
+   "fieldtype": "Datetime",
+   "label": "Completed At"
+  },
+  {
+   "fieldname": "remarks_section",
+   "fieldtype": "Section Break",
+   "label": "Remarks",
+   "collapsible": 1
+  },
+  {
+   "fieldname": "remarks",
+   "fieldtype": "Text",
+   "label": "Remarks"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-03-05 10:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "BuyBack",
+ "name": "Buyback Inspection",
+ "naming_rule": "By \"Naming Series\" field",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "search_fields": "customer_name,item_name,condition_grade,status",
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "customer_name",
+ "show_title_field_in_link": 1,
+ "track_changes": 1
+}

@@ -1,0 +1,62 @@
+{
+ "actions": [],
+ "creation": "2026-03-05 10:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "checklist_item",
+  "check_code",
+  "check_type",
+  "result",
+  "notes"
+ ],
+ "fields": [
+  {
+   "fieldname": "checklist_item",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Check Item",
+   "reqd": 1
+  },
+  {
+   "fieldname": "check_code",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Check Code",
+   "reqd": 1
+  },
+  {
+   "fieldname": "check_type",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Check Type",
+   "read_only": 1
+  },
+  {
+   "fieldname": "result",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Result",
+   "reqd": 1,
+   "description": "Pass/Fail, Grade value, numeric score, or text note"
+  },
+  {
+   "fieldname": "notes",
+   "fieldtype": "Small Text",
+   "label": "Notes"
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-03-05 10:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "BuyBack",
+ "name": "Buyback Inspection Result",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "creation",
+ "sort_order": "ASC",
+ "states": []
+}

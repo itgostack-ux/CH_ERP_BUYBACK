@@ -1,0 +1,238 @@
+{
+ "actions": [],
+ "creation": "2026-03-05 10:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "general_section",
+  "default_company",
+  "default_currency",
+  "column_break_gen",
+  "quote_validity_days",
+  "max_otp_attempts",
+  "otp_expiry_minutes",
+  "pricing_section",
+  "enable_auto_pricing",
+  "price_rounding",
+  "column_break_price",
+  "min_buyback_amount",
+  "max_buyback_amount",
+  "approval_section",
+  "require_manager_approval_above",
+  "require_otp_verification",
+  "column_break_approval",
+  "auto_expire_quotes",
+  "payment_section",
+  "default_payment_method",
+  "column_break_pay",
+  "enable_split_payment",
+  "notification_section",
+  "send_sms_on_quote",
+  "send_sms_on_order",
+  "column_break_notif",
+  "send_email_on_order",
+  "accounting_section",
+  "buyback_expense_account",
+  "column_break_acct",
+  "buyback_stock_account"
+ ],
+ "fields": [
+  {
+   "fieldname": "general_section",
+   "fieldtype": "Section Break",
+   "label": "General"
+  },
+  {
+   "fieldname": "default_company",
+   "fieldtype": "Link",
+   "label": "Default Company",
+   "options": "Company"
+  },
+  {
+   "default": "INR",
+   "fieldname": "default_currency",
+   "fieldtype": "Link",
+   "label": "Default Currency",
+   "options": "Currency"
+  },
+  {
+   "fieldname": "column_break_gen",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "7",
+   "fieldname": "quote_validity_days",
+   "fieldtype": "Int",
+   "label": "Quote Validity (Days)",
+   "description": "Number of days a buyback quote remains valid"
+  },
+  {
+   "default": "5",
+   "fieldname": "max_otp_attempts",
+   "fieldtype": "Int",
+   "label": "Max OTP Attempts"
+  },
+  {
+   "default": "5",
+   "fieldname": "otp_expiry_minutes",
+   "fieldtype": "Int",
+   "label": "OTP Expiry (Minutes)"
+  },
+  {
+   "fieldname": "pricing_section",
+   "fieldtype": "Section Break",
+   "label": "Pricing"
+  },
+  {
+   "default": "1",
+   "fieldname": "enable_auto_pricing",
+   "fieldtype": "Check",
+   "label": "Enable Auto Pricing",
+   "description": "Use pricing engine for automatic quote generation"
+  },
+  {
+   "default": "Round to nearest 10",
+   "fieldname": "price_rounding",
+   "fieldtype": "Select",
+   "label": "Price Rounding",
+   "options": "No Rounding\nRound to nearest 10\nRound to nearest 50\nRound to nearest 100"
+  },
+  {
+   "fieldname": "column_break_price",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "100",
+   "fieldname": "min_buyback_amount",
+   "fieldtype": "Currency",
+   "label": "Minimum Buyback Amount"
+  },
+  {
+   "default": "200000",
+   "fieldname": "max_buyback_amount",
+   "fieldtype": "Currency",
+   "label": "Maximum Buyback Amount"
+  },
+  {
+   "fieldname": "approval_section",
+   "fieldtype": "Section Break",
+   "label": "Approval & Verification"
+  },
+  {
+   "default": "50000",
+   "fieldname": "require_manager_approval_above",
+   "fieldtype": "Currency",
+   "label": "Require Manager Approval Above",
+   "description": "Orders above this amount need manager approval"
+  },
+  {
+   "default": "1",
+   "fieldname": "require_otp_verification",
+   "fieldtype": "Check",
+   "label": "Require OTP Verification"
+  },
+  {
+   "fieldname": "column_break_approval",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "1",
+   "fieldname": "auto_expire_quotes",
+   "fieldtype": "Check",
+   "label": "Auto-Expire Quotes",
+   "description": "Automatically expire quotes past validity period"
+  },
+  {
+   "fieldname": "payment_section",
+   "fieldtype": "Section Break",
+   "label": "Payment"
+  },
+  {
+   "fieldname": "default_payment_method",
+   "fieldtype": "Link",
+   "label": "Default Payment Method",
+   "options": "CH Payment Method"
+  },
+  {
+   "fieldname": "column_break_pay",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "enable_split_payment",
+   "fieldtype": "Check",
+   "label": "Enable Split Payment",
+   "description": "Allow splitting payment across multiple methods"
+  },
+  {
+   "fieldname": "notification_section",
+   "fieldtype": "Section Break",
+   "label": "Notifications"
+  },
+  {
+   "default": "1",
+   "fieldname": "send_sms_on_quote",
+   "fieldtype": "Check",
+   "label": "Send SMS on Quote"
+  },
+  {
+   "default": "1",
+   "fieldname": "send_sms_on_order",
+   "fieldtype": "Check",
+   "label": "Send SMS on Order"
+  },
+  {
+   "fieldname": "column_break_notif",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "1",
+   "fieldname": "send_email_on_order",
+   "fieldtype": "Check",
+   "label": "Send Email on Order"
+  },
+  {
+   "fieldname": "accounting_section",
+   "fieldtype": "Section Break",
+   "label": "Accounting"
+  },
+  {
+   "fieldname": "buyback_expense_account",
+   "fieldtype": "Link",
+   "label": "Buyback Expense Account",
+   "options": "Account"
+  },
+  {
+   "fieldname": "column_break_acct",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "buyback_stock_account",
+   "fieldtype": "Link",
+   "label": "Buyback Stock Account",
+   "options": "Account"
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "issingle": 1,
+ "links": [],
+ "modified": "2026-03-05 10:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "BuyBack",
+ "name": "Buyback Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

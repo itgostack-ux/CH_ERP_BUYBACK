@@ -1,16 +1,27 @@
 {
  "actions": [],
  "allow_rename": 1,
- "autoname": "field:payment_id",
+ "autoname": "naming_series:",
  "creation": "2026-02-10 18:30:57.020438",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
+  "naming_series",
   "payment_id",
   "payment_method",
   "is_active"
  ],
  "fields": [
+  {
+   "default": "PMM-.#####",
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "hidden": 1,
+   "label": "Series",
+   "options": "PMM-.#####",
+   "print_hide": 1,
+   "no_copy": 1
+  },
   {
    "fieldname": "payment_id",
    "fieldtype": "Int",
@@ -36,11 +47,11 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-02-11 11:15:12.619066",
+ "modified": "2026-03-04 15:00:00.000000",
  "modified_by": "Administrator",
  "module": "BuyBack",
  "name": "Payment Method Master",
- "naming_rule": "By fieldname",
+ "naming_rule": "By \"Naming Series\" field",
  "owner": "Administrator",
  "permissions": [
   {

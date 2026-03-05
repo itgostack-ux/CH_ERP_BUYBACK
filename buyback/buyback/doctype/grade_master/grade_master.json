@@ -1,21 +1,38 @@
 {
  "actions": [],
  "allow_rename": 1,
- "autoname": "field:grade_id",
+ "autoname": "naming_series:",
  "creation": "2026-02-09 13:19:33.793107",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
+  "naming_series",
   "grade_id",
-  "grade_name"
+  "grade_name",
+  "column_break_01",
+  "description",
+  "display_order",
+  "disabled"
  ],
  "fields": [
+  {
+   "default": "GRD-.#####",
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "hidden": 1,
+   "label": "Series",
+   "options": "GRD-.#####",
+   "print_hide": 1,
+   "no_copy": 1
+  },
   {
    "fieldname": "grade_id",
    "fieldtype": "Int",
    "label": "Grade ID",
    "read_only": 1,
-   "unique": 1
+   "unique": 1,
+   "no_copy": 1,
+   "in_list_view": 1
   },
   {
    "fieldname": "grade_name",
@@ -24,16 +41,39 @@
    "label": "Grade Name",
    "reqd": 1,
    "unique": 1
+  },
+  {
+   "fieldname": "column_break_01",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "description",
+   "fieldtype": "Small Text",
+   "label": "Description",
+   "description": "Criteria that define this grade e.g. 'No scratches, fully functional'"
+  },
+  {
+   "default": "0",
+   "fieldname": "display_order",
+   "fieldtype": "Int",
+   "label": "Display Order",
+   "in_list_view": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "disabled",
+   "fieldtype": "Check",
+   "label": "Disabled"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-02-16 10:38:47.606399",
+ "modified": "2026-03-04 15:00:00.000000",
  "modified_by": "Administrator",
  "module": "BuyBack",
  "name": "Grade Master",
- "naming_rule": "By fieldname",
+ "naming_rule": "By \"Naming Series\" field",
  "owner": "Administrator",
  "permissions": [
   {

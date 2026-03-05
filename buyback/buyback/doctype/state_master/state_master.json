@@ -2,16 +2,27 @@
  "actions": [],
  "allow_import": 1,
  "allow_rename": 1,
- "autoname": "field:state_id",
+ "autoname": "naming_series:",
  "creation": "2026-02-11 11:57:22.606173",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
+  "naming_series",
   "state_id",
   "state_name",
   "isactive"
  ],
  "fields": [
+  {
+   "default": "STM-.#####",
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "hidden": 1,
+   "label": "Series",
+   "options": "STM-.#####",
+   "print_hide": 1,
+   "no_copy": 1
+  },
   {
    "fieldname": "state_id",
    "fieldtype": "Int",
@@ -37,11 +48,11 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-02-25 15:02:07.549582",
+ "modified": "2026-03-04 15:00:00.000000",
  "modified_by": "Administrator",
  "module": "BuyBack",
  "name": "State Master",
- "naming_rule": "By fieldname",
+ "naming_rule": "By \"Naming Series\" field",
  "owner": "Administrator",
  "permissions": [
   {

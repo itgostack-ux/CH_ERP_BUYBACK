@@ -1,0 +1,308 @@
+[
+ {
+  "allow_self_approval": 0,
+  "docstatus": 0,
+  "doctype": "Workflow",
+  "document_type": "Buyback Order",
+  "is_active": 1,
+  "name": "Buyback Order Workflow",
+  "override_status": 0,
+  "send_email_alert": 0,
+  "workflow_name": "Buyback Order Workflow",
+  "workflow_state_field": "workflow_state",
+  "states": [
+   {
+    "allow_edit": "Buyback Agent",
+    "doc_status": "0",
+    "is_optional_state": 0,
+    "state": "Draft",
+    "update_field": "status",
+    "update_value": "Draft"
+   },
+   {
+    "allow_edit": "Buyback Manager",
+    "doc_status": "0",
+    "is_optional_state": 0,
+    "state": "Awaiting Approval",
+    "update_field": "status",
+    "update_value": "Awaiting Approval"
+   },
+   {
+    "allow_edit": "Buyback Agent",
+    "doc_status": "0",
+    "is_optional_state": 0,
+    "state": "Approved",
+    "update_field": "status",
+    "update_value": "Approved"
+   },
+   {
+    "allow_edit": "Buyback Agent",
+    "doc_status": "0",
+    "is_optional_state": 0,
+    "state": "Awaiting OTP",
+    "update_field": "status",
+    "update_value": "Awaiting OTP"
+   },
+   {
+    "allow_edit": "Buyback Agent",
+    "doc_status": "0",
+    "is_optional_state": 0,
+    "state": "OTP Verified",
+    "update_field": "status",
+    "update_value": "OTP Verified"
+   },
+   {
+    "allow_edit": "Buyback Agent",
+    "doc_status": "0",
+    "is_optional_state": 0,
+    "state": "Ready to Pay",
+    "update_field": "status",
+    "update_value": "Ready to Pay"
+   },
+   {
+    "allow_edit": "Buyback Agent",
+    "doc_status": "1",
+    "is_optional_state": 0,
+    "state": "Paid",
+    "update_field": "status",
+    "update_value": "Paid"
+   },
+   {
+    "allow_edit": "Buyback Manager",
+    "doc_status": "1",
+    "is_optional_state": 0,
+    "state": "Closed",
+    "update_field": "status",
+    "update_value": "Closed"
+   },
+   {
+    "allow_edit": "Buyback Manager",
+    "doc_status": "0",
+    "is_optional_state": 0,
+    "state": "Rejected",
+    "update_field": "status",
+    "update_value": "Rejected"
+   },
+   {
+    "allow_edit": "Buyback Manager",
+    "doc_status": "2",
+    "is_optional_state": 0,
+    "state": "Cancelled",
+    "update_field": "status",
+    "update_value": "Cancelled"
+   }
+  ],
+  "transitions": [
+   {
+    "action": "Submit for Approval",
+    "allowed": "Buyback Agent",
+    "condition": "doc.requires_approval == 1",
+    "next_state": "Awaiting Approval",
+    "state": "Draft"
+   },
+   {
+    "action": "Auto Approve",
+    "allowed": "Buyback Agent",
+    "condition": "doc.requires_approval == 0",
+    "next_state": "Approved",
+    "state": "Draft"
+   },
+   {
+    "action": "Approve",
+    "allowed": "Buyback Manager",
+    "next_state": "Approved",
+    "state": "Awaiting Approval"
+   },
+   {
+    "action": "Reject",
+    "allowed": "Buyback Manager",
+    "next_state": "Rejected",
+    "state": "Awaiting Approval"
+   },
+   {
+    "action": "Send OTP",
+    "allowed": "Buyback Agent",
+    "next_state": "Awaiting OTP",
+    "state": "Approved"
+   },
+   {
+    "action": "Verify OTP",
+    "allowed": "Buyback Agent",
+    "condition": "doc.otp_verified == 1",
+    "next_state": "OTP Verified",
+    "state": "Awaiting OTP"
+   },
+   {
+    "action": "Proceed to Payment",
+    "allowed": "Buyback Agent",
+    "next_state": "Ready to Pay",
+    "state": "OTP Verified"
+   },
+   {
+    "action": "Confirm Payment",
+    "allowed": "Buyback Agent",
+    "condition": "doc.payment_status == 'Paid'",
+    "next_state": "Paid",
+    "state": "Ready to Pay"
+   },
+   {
+    "action": "Close",
+    "allowed": "Buyback Manager",
+    "next_state": "Closed",
+    "state": "Paid"
+   },
+   {
+    "action": "Reject",
+    "allowed": "Buyback Manager",
+    "next_state": "Rejected",
+    "state": "Draft"
+   },
+   {
+    "action": "Reject",
+    "allowed": "Buyback Manager",
+    "next_state": "Rejected",
+    "state": "Approved"
+   },
+   {
+    "action": "Cancel",
+    "allowed": "Buyback Manager",
+    "next_state": "Cancelled",
+    "state": "Paid"
+   },
+   {
+    "action": "Cancel",
+    "allowed": "Buyback Manager",
+    "next_state": "Cancelled",
+    "state": "Closed"
+   }
+  ]
+ },
+ {
+  "allow_self_approval": 0,
+  "docstatus": 0,
+  "doctype": "Workflow",
+  "document_type": "Buyback Exchange Order",
+  "is_active": 1,
+  "name": "Buyback Exchange Order Workflow",
+  "override_status": 0,
+  "send_email_alert": 0,
+  "workflow_name": "Buyback Exchange Order Workflow",
+  "workflow_state_field": "workflow_state",
+  "states": [
+   {
+    "allow_edit": "Buyback Agent",
+    "doc_status": "0",
+    "is_optional_state": 0,
+    "state": "Draft",
+    "update_field": "status",
+    "update_value": "Draft"
+   },
+   {
+    "allow_edit": "Buyback Agent",
+    "doc_status": "1",
+    "is_optional_state": 0,
+    "state": "New Device Delivered",
+    "update_field": "status",
+    "update_value": "New Device Delivered"
+   },
+   {
+    "allow_edit": "Buyback Agent",
+    "doc_status": "1",
+    "is_optional_state": 0,
+    "state": "Awaiting Pickup",
+    "update_field": "status",
+    "update_value": "Awaiting Pickup"
+   },
+   {
+    "allow_edit": "Buyback Agent",
+    "doc_status": "1",
+    "is_optional_state": 0,
+    "state": "Old Device Received",
+    "update_field": "status",
+    "update_value": "Old Device Received"
+   },
+   {
+    "allow_edit": "Buyback Agent",
+    "doc_status": "1",
+    "is_optional_state": 0,
+    "state": "Inspected",
+    "update_field": "status",
+    "update_value": "Inspected"
+   },
+   {
+    "allow_edit": "Buyback Manager",
+    "doc_status": "1",
+    "is_optional_state": 0,
+    "state": "Settled",
+    "update_field": "status",
+    "update_value": "Settled"
+   },
+   {
+    "allow_edit": "Buyback Manager",
+    "doc_status": "1",
+    "is_optional_state": 0,
+    "state": "Closed",
+    "update_field": "status",
+    "update_value": "Closed"
+   },
+   {
+    "allow_edit": "Buyback Manager",
+    "doc_status": "2",
+    "is_optional_state": 0,
+    "state": "Cancelled",
+    "update_field": "status",
+    "update_value": "Cancelled"
+   }
+  ],
+  "transitions": [
+   {
+    "action": "Submit",
+    "allowed": "Buyback Agent",
+    "next_state": "New Device Delivered",
+    "state": "Draft"
+   },
+   {
+    "action": "Mark Awaiting Pickup",
+    "allowed": "Buyback Agent",
+    "next_state": "Awaiting Pickup",
+    "state": "New Device Delivered"
+   },
+   {
+    "action": "Receive Old Device",
+    "allowed": "Buyback Agent",
+    "next_state": "Old Device Received",
+    "state": "Awaiting Pickup"
+   },
+   {
+    "action": "Complete Inspection",
+    "allowed": "Buyback Agent",
+    "next_state": "Inspected",
+    "state": "Old Device Received"
+   },
+   {
+    "action": "Settle",
+    "allowed": "Buyback Manager",
+    "next_state": "Settled",
+    "state": "Inspected"
+   },
+   {
+    "action": "Close",
+    "allowed": "Buyback Manager",
+    "next_state": "Closed",
+    "state": "Settled"
+   },
+   {
+    "action": "Cancel",
+    "allowed": "Buyback Manager",
+    "next_state": "Cancelled",
+    "state": "New Device Delivered"
+   },
+   {
+    "action": "Cancel",
+    "allowed": "Buyback Manager",
+    "next_state": "Cancelled",
+    "state": "Awaiting Pickup"
+   }
+  ]
+ }
+]

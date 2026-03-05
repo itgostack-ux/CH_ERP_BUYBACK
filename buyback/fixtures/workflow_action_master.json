@@ -1,0 +1,17 @@
+[
+ {"doctype": "Workflow Action Master", "name": "Submit for Approval", "workflow_action_name": "Submit for Approval"},
+ {"doctype": "Workflow Action Master", "name": "Auto Approve", "workflow_action_name": "Auto Approve"},
+ {"doctype": "Workflow Action Master", "name": "Approve", "workflow_action_name": "Approve"},
+ {"doctype": "Workflow Action Master", "name": "Reject", "workflow_action_name": "Reject"},
+ {"doctype": "Workflow Action Master", "name": "Send OTP", "workflow_action_name": "Send OTP"},
+ {"doctype": "Workflow Action Master", "name": "Verify OTP", "workflow_action_name": "Verify OTP"},
+ {"doctype": "Workflow Action Master", "name": "Proceed to Payment", "workflow_action_name": "Proceed to Payment"},
+ {"doctype": "Workflow Action Master", "name": "Confirm Payment", "workflow_action_name": "Confirm Payment"},
+ {"doctype": "Workflow Action Master", "name": "Close", "workflow_action_name": "Close"},
+ {"doctype": "Workflow Action Master", "name": "Cancel", "workflow_action_name": "Cancel"},
+ {"doctype": "Workflow Action Master", "name": "Submit", "workflow_action_name": "Submit"},
+ {"doctype": "Workflow Action Master", "name": "Mark Awaiting Pickup", "workflow_action_name": "Mark Awaiting Pickup"},
+ {"doctype": "Workflow Action Master", "name": "Receive Old Device", "workflow_action_name": "Receive Old Device"},
+ {"doctype": "Workflow Action Master", "name": "Complete Inspection", "workflow_action_name": "Complete Inspection"},
+ {"doctype": "Workflow Action Master", "name": "Settle", "workflow_action_name": "Settle"}
+]

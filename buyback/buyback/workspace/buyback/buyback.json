@@ -1,7 +1,7 @@
 {
  "charts": [],
- "content": "[{\"id\":\"5gB648mewX\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\">BuyBack</span>\",\"col\":12}},{\"id\":\"DmPPMkMGva\",\"type\":\"spacer\",\"data\":{\"col\":12}},{\"id\":\"9mjh68WPB7\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Buyback Request\",\"col\":3}},{\"id\":\"i5tFCGnsXE\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Buyback Price Master\",\"col\":3}},{\"id\":\"125rOoW8y9\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Question Master\",\"col\":3}},{\"id\":\"YJJnmgl57M\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Grade Master\",\"col\":3}},{\"id\":\"2TdBbXI_V_\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Option Master\",\"col\":3}},{\"id\":\"7NpNsdwqd4\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Payment Method Master\",\"col\":3}},{\"id\":\"Q6nyvGH4Q3\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Test Master\",\"col\":3}},{\"id\":\"e2CMRYAou-\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"State Master\",\"col\":3}},{\"id\":\"5f2vns2Tr7\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"View Buybacks\",\"col\":3}},{\"id\":\"iSdBOs8qlm\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Web Page\",\"col\":3}},{\"id\":\"yTAkjL3ZEL\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Option Percentage Link\",\"col\":3}},{\"id\":\"qIoqSO3mb3\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Device Services\",\"col\":3}},{\"id\":\"Yq_vK6xDaH\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Diagnosis Master\",\"col\":3}},{\"id\":\"9GcG3gwcTE\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Appoinment Type Master\",\"col\":3}}]",
- "creation": "2026-02-17 17:41:00.183230",
+ "content": "[{\"id\": \"buyback_header\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Buyback Dashboard</b></span>\", \"col\": 12}}, {\"id\": \"nc_quotes\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"Todays Buyback Quotes\", \"col\": 3}}, {\"id\": \"nc_inspections\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"Pending Inspections\", \"col\": 3}}, {\"id\": \"nc_approvals\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"Awaiting Approval Orders\", \"col\": 3}}, {\"id\": \"nc_revenue\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"Todays Buyback Revenue\", \"col\": 3}}, {\"id\": \"spacer_1\", \"type\": \"spacer\", \"data\": {\"col\": 12}}, {\"id\": \"shortcuts_header\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Quick Actions</b></span>\", \"col\": 12}}, {\"id\": \"sc_quote\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"New Quote\", \"col\": 3}}, {\"id\": \"sc_inspection\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Inspections\", \"col\": 3}}, {\"id\": \"sc_order\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Orders\", \"col\": 3}}, {\"id\": \"sc_exchange\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Exchange\", \"col\": 3}}, {\"id\": \"spacer_2\", \"type\": \"spacer\", \"data\": {\"col\": 12}}, {\"id\": \"links_header\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Masters &amp; Reports</b></span>\", \"col\": 12}}, {\"id\": \"card_txn\", \"type\": \"card\", \"data\": {\"card_name\": \"Transaction Flow\", \"col\": 4}}, {\"id\": \"card_masters\", \"type\": \"card\", \"data\": {\"card_name\": \"Masters\", \"col\": 4}}, {\"id\": \"card_shared\", \"type\": \"card\", \"data\": {\"card_name\": \"Shared Masters\", \"col\": 4}}]",
+ "creation": "2026-03-05 09:04:32.771756",
  "custom_blocks": [],
  "docstatus": 0,
  "doctype": "Workspace",
@@ -12,12 +12,212 @@
  "indicator_color": "",
  "is_hidden": 0,
  "label": "BuyBack",
- "links": [],
- "modified": "2026-02-25 11:03:59.717383",
+ "links": [
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Transaction Flow",
+   "link_count": 0,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Buyback Quote",
+   "link_count": 0,
+   "link_to": "Buyback Quote",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Buyback Inspection",
+   "link_count": 0,
+   "link_to": "Buyback Inspection",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Buyback Order",
+   "link_count": 0,
+   "link_to": "Buyback Order",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Buyback Exchange Order",
+   "link_count": 0,
+   "link_to": "Buyback Exchange Order",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Buyback Audit Log",
+   "link_count": 0,
+   "link_to": "Buyback Audit Log",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Masters",
+   "link_count": 0,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Buyback Price Master",
+   "link_count": 0,
+   "link_to": "Buyback Price Master",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Grade Master",
+   "link_count": 0,
+   "link_to": "Grade Master",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Buyback Question Bank",
+   "link_count": 0,
+   "link_to": "Buyback Question Bank",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Buyback Checklist Template",
+   "link_count": 0,
+   "link_to": "Buyback Checklist Template",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Buyback Pricing Rule",
+   "link_count": 0,
+   "link_to": "Buyback Pricing Rule",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Shared Masters",
+   "link_count": 0,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "CH Store",
+   "link_count": 0,
+   "link_to": "CH Store",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "CH Payment Method",
+   "link_count": 0,
+   "link_to": "CH Payment Method",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "CH State",
+   "link_count": 0,
+   "link_to": "CH State",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "CH OTP Log",
+   "link_count": 0,
+   "link_to": "CH OTP Log",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Settings & Configuration",
+   "link_count": 0,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Buyback Settings",
+   "link_count": 0,
+   "link_to": "Buyback Settings",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  }
+ ],
+ "modified": "2026-03-05 11:48:31.991556",
  "modified_by": "Administrator",
  "module": "BuyBack",
  "name": "BuyBack",
- "number_cards": [],
+ "number_cards": [
+  {
+   "number_card_name": "Todays Buyback Quotes"
+  },
+  {
+   "number_card_name": "Pending Inspections"
+  },
+  {
+   "number_card_name": "Awaiting Approval Orders"
+  },
+  {
+   "number_card_name": "Todays Buyback Revenue"
+  }
+ ],
  "owner": "Administrator",
  "parent_page": "",
  "public": 1,
@@ -26,115 +226,33 @@
  "sequence_id": 2.0,
  "shortcuts": [
   {
-   "color": "Grey",
-   "doc_view": "List",
-   "label": "Payment Method Master",
-   "link_to": "Payment Method Master",
-   "stats_filter": "[]",
+   "doc_view": "",
+   "label": "New Quote",
+   "link_to": "Buyback Quote",
    "type": "DocType"
   },
   {
-   "color": "Grey",
-   "doc_view": "List",
-   "label": "Device Services",
-   "link_to": "Device Services",
-   "stats_filter": "[]",
+   "doc_view": "",
+   "label": "Inspections",
+   "link_to": "Buyback Inspection",
    "type": "DocType"
   },
   {
-   "color": "Grey",
-   "doc_view": "List",
-   "label": "View Buybacks",
-   "link_to": "View Buybacks",
-   "report_ref_doctype": "Buyback Request",
-   "type": "Report"
-  },
-  {
-   "color": "Grey",
-   "doc_view": "List",
-   "label": "Diagnosis Master",
-   "link_to": "Diagnosis Master",
-   "stats_filter": "[]",
+   "doc_view": "",
+   "label": "Orders",
+   "link_to": "Buyback Order",
    "type": "DocType"
   },
   {
-   "color": "Grey",
-   "doc_view": "List",
-   "label": "Web Page",
-   "link_to": "Web Page",
-   "stats_filter": "[]",
+   "doc_view": "",
+   "label": "Exchange",
+   "link_to": "Buyback Exchange Order",
    "type": "DocType"
   },
   {
-   "color": "Grey",
-   "doc_view": "List",
-   "label": "Option Percentage Link",
-   "link_to": "Option Percentage Link",
-   "stats_filter": "[]",
-   "type": "DocType"
-  },
-  {
-   "color": "Grey",
-   "doc_view": "List",
-   "label": "Appoinment Type Master",
-   "link_to": "Appoinment Type Master",
-   "stats_filter": "[]",
-   "type": "DocType"
-  },
-  {
-   "color": "Grey",
-   "doc_view": "List",
-   "label": "Buyback Request",
-   "link_to": "Buyback Request",
-   "stats_filter": "[]",
-   "type": "DocType"
-  },
-  {
-   "color": "Grey",
-   "doc_view": "List",
-   "label": "State Master",
-   "link_to": "State Master",
-   "stats_filter": "[]",
-   "type": "DocType"
-  },
-  {
-   "color": "Grey",
-   "doc_view": "List",
-   "label": "Grade Master",
-   "link_to": "Grade Master",
-   "stats_filter": "[]",
-   "type": "DocType"
-  },
-  {
-   "color": "Grey",
-   "doc_view": "List",
-   "label": "Option Master",
-   "link_to": "Option Master",
-   "stats_filter": "[]",
-   "type": "DocType"
-  },
-  {
-   "color": "Blue",
-   "doc_view": "List",
-   "label": "Buyback Price Master",
-   "link_to": "Buyback Price Master",
-   "stats_filter": "[]",
-   "type": "DocType"
-  },
-  {
-   "color": "Grey",
-   "doc_view": "List",
-   "label": "Question Master",
-   "link_to": "Question Master",
-   "stats_filter": "[]",
-   "type": "DocType"
-  },
-  {
-   "color": "Grey",
-   "doc_view": "List",
-   "label": "Test Master",
-   "link_to": "Test Master",
-   "stats_filter": "[]",
+   "doc_view": "",
+   "label": "Settings",
+   "link_to": "Buyback Settings",
    "type": "DocType"
   }
  ],

@@ -1,11 +1,12 @@
 {
  "actions": [],
  "allow_rename": 1,
- "autoname": "field:option_percentage_id",
+ "autoname": "naming_series:",
  "creation": "2026-02-13 18:32:12.772953",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
+  "naming_series",
   "option_percentage_id",
   "question_id",
   "question_name",
@@ -15,6 +16,16 @@
   "is_active"
  ],
  "fields": [
+  {
+   "default": "OPL-.#####",
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "hidden": 1,
+   "label": "Series",
+   "options": "OPL-.#####",
+   "print_hide": 1,
+   "no_copy": 1
+  },
   {
    "fieldname": "question_id",
    "fieldtype": "Link",
@@ -66,11 +77,11 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-02-13 18:46:43.761645",
+ "modified": "2026-03-04 15:00:00.000000",
  "modified_by": "Administrator",
  "module": "BuyBack",
  "name": "Option Percentage Link",
- "naming_rule": "By fieldname",
+ "naming_rule": "By \"Naming Series\" field",
  "owner": "Administrator",
  "permissions": [
   {

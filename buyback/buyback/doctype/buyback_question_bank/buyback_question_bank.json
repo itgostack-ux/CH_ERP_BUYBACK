@@ -1,0 +1,142 @@
+{
+ "actions": [],
+ "autoname": "naming_series:",
+ "creation": "2026-03-05 10:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "naming_series",
+  "question_id",
+  "question_text",
+  "question_code",
+  "column_break_01",
+  "question_type",
+  "applies_to_category",
+  "display_order",
+  "is_mandatory",
+  "disabled",
+  "options_section",
+  "options"
+ ],
+ "fields": [
+  {
+   "default": "BQB-.#####",
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "hidden": 1,
+   "label": "Series",
+   "options": "BQB-.#####",
+   "print_hide": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "question_id",
+   "fieldtype": "Int",
+   "label": "Question ID",
+   "read_only": 1,
+   "unique": 1,
+   "no_copy": 1,
+   "in_list_view": 1,
+   "description": "Auto-generated sequential ID for mobile/API integration"
+  },
+  {
+   "fieldname": "question_text",
+   "fieldtype": "Data",
+   "label": "Question Text",
+   "reqd": 1,
+   "in_list_view": 1,
+   "description": "e.g. 'Is the screen cracked?', 'Does the phone turn on?'"
+  },
+  {
+   "fieldname": "question_code",
+   "fieldtype": "Data",
+   "label": "Question Code",
+   "reqd": 1,
+   "unique": 1,
+   "description": "Internal code e.g. 'screen_cracked', 'phone_turns_on'"
+  },
+  {
+   "fieldname": "column_break_01",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Yes/No",
+   "fieldname": "question_type",
+   "fieldtype": "Select",
+   "label": "Question Type",
+   "options": "Yes/No\nSingle Select\nMulti Select\nNumeric",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "applies_to_category",
+   "fieldtype": "Link",
+   "label": "Applies to Category",
+   "options": "Item Group",
+   "description": "Leave blank to apply to all categories"
+  },
+  {
+   "default": "0",
+   "fieldname": "display_order",
+   "fieldtype": "Int",
+   "label": "Display Order",
+   "in_list_view": 1
+  },
+  {
+   "default": "1",
+   "fieldname": "is_mandatory",
+   "fieldtype": "Check",
+   "label": "Is Mandatory"
+  },
+  {
+   "default": "0",
+   "fieldname": "disabled",
+   "fieldtype": "Check",
+   "label": "Disabled"
+  },
+  {
+   "fieldname": "options_section",
+   "fieldtype": "Section Break",
+   "label": "Answer Options",
+   "depends_on": "eval:doc.question_type !== 'Numeric'"
+  },
+  {
+   "fieldname": "options",
+   "fieldtype": "Table",
+   "label": "Options",
+   "options": "Buyback Question Option",
+   "reqd": 0
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-03-05 10:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "BuyBack",
+ "name": "Buyback Question Bank",
+ "naming_rule": "By \"Naming Series\" field",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "read": 1,
+   "role": "All"
+  }
+ ],
+ "search_fields": "question_text,question_code,question_type",
+ "sort_field": "display_order",
+ "sort_order": "ASC",
+ "states": [],
+ "title_field": "question_text",
+ "show_title_field_in_link": 1
+}

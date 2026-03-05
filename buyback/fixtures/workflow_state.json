@@ -1,0 +1,162 @@
+[
+ {
+  "docstatus": 0,
+  "doctype": "Workflow State",
+  "icon": "fa fa-file-text",
+  "name": "Draft",
+  "style": "",
+  "workflow_state_name": "Draft"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow State",
+  "icon": "fa fa-clock-o",
+  "name": "Awaiting Approval",
+  "style": "Warning",
+  "workflow_state_name": "Awaiting Approval"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow State",
+  "icon": "fa fa-check",
+  "name": "Approved",
+  "style": "Success",
+  "workflow_state_name": "Approved"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow State",
+  "icon": "fa fa-mobile",
+  "name": "Awaiting OTP",
+  "style": "Warning",
+  "workflow_state_name": "Awaiting OTP"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow State",
+  "icon": "fa fa-check-circle",
+  "name": "OTP Verified",
+  "style": "Success",
+  "workflow_state_name": "OTP Verified"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow State",
+  "icon": "fa fa-credit-card",
+  "name": "Ready to Pay",
+  "style": "Info",
+  "workflow_state_name": "Ready to Pay"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow State",
+  "icon": "fa fa-money",
+  "name": "Paid",
+  "style": "Success",
+  "workflow_state_name": "Paid"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow State",
+  "icon": "fa fa-lock",
+  "name": "Closed",
+  "style": "Success",
+  "workflow_state_name": "Closed"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow State",
+  "icon": "fa fa-ban",
+  "name": "Rejected",
+  "style": "Danger",
+  "workflow_state_name": "Rejected"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow State",
+  "icon": "fa fa-times",
+  "name": "Cancelled",
+  "style": "Danger",
+  "workflow_state_name": "Cancelled"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow State",
+  "icon": "fa fa-cube",
+  "name": "New Device Delivered",
+  "style": "Info",
+  "workflow_state_name": "New Device Delivered"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow State",
+  "icon": "fa fa-truck",
+  "name": "Awaiting Pickup",
+  "style": "Warning",
+  "workflow_state_name": "Awaiting Pickup"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow State",
+  "icon": "fa fa-inbox",
+  "name": "Old Device Received",
+  "style": "Info",
+  "workflow_state_name": "Old Device Received"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow State",
+  "icon": "fa fa-search",
+  "name": "Inspected",
+  "style": "Info",
+  "workflow_state_name": "Inspected"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow State",
+  "icon": "fa fa-handshake-o",
+  "name": "Settled",
+  "style": "Success",
+  "workflow_state_name": "Settled"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow State",
+  "icon": "fa fa-quote-left",
+  "name": "Quoted",
+  "style": "Info",
+  "workflow_state_name": "Quoted"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow State",
+  "icon": "fa fa-thumbs-up",
+  "name": "Accepted",
+  "style": "Success",
+  "workflow_state_name": "Accepted"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow State",
+  "icon": "fa fa-hourglass-end",
+  "name": "Expired",
+  "style": "Danger",
+  "workflow_state_name": "Expired"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow State",
+  "icon": "fa fa-spinner",
+  "name": "In Progress",
+  "style": "Warning",
+  "workflow_state_name": "In Progress"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow State",
+  "icon": "fa fa-check-square",
+  "name": "Completed",
+  "style": "Success",
+  "workflow_state_name": "Completed"
+ }
+]

@@ -1,11 +1,12 @@
 {
  "actions": [],
  "allow_rename": 1,
- "autoname": "field:question_id",
+ "autoname": "naming_series:",
  "creation": "2026-02-04 18:23:26.992914",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
+  "naming_series",
   "question_master_tab",
   "question__master_section",
   "question_id",
@@ -15,6 +16,16 @@
   "is_active"
  ],
  "fields": [
+  {
+   "default": "QST-.#####",
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "hidden": 1,
+   "label": "Series",
+   "options": "QST-.#####",
+   "print_hide": 1,
+   "no_copy": 1
+  },
   {
    "fieldname": "question_id",
    "fieldtype": "Int",
@@ -61,11 +72,11 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-02-25 15:02:36.474487",
+ "modified": "2026-03-04 15:00:00.000000",
  "modified_by": "Administrator",
  "module": "BuyBack",
  "name": "Question Master",
- "naming_rule": "By fieldname",
+ "naming_rule": "By \"Naming Series\" field",
  "owner": "Administrator",
  "permissions": [
   {

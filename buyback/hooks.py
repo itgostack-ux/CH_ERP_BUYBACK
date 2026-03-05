@@ -8,7 +8,7 @@ app_license = "mit"
 # Apps
 # ------------------
 
-# required_apps = []
+required_apps = ["frappe/erpnext", "AbirJ1/ch_item_master"]
 
 # Each item in the list will be shown as an app in the apps page
 # add_to_apps_screen = [
@@ -25,8 +25,8 @@ app_license = "mit"
 # ------------------
 
 # include js, css files in header of desk.html
-# app_include_css = "/assets/buyback/css/buyback.css"
-# app_include_js = "/assets/buyback/js/buyback.js"
+app_include_css = "/assets/buyback/css/buyback.css"
+app_include_js = "/assets/buyback/js/buyback.js"
 
 # include js, css files in header of web template
 # web_include_css = "/assets/buyback/css/buyback.css"
@@ -83,13 +83,12 @@ app_license = "mit"
 # ------------
 
 # before_install = "buyback.install.before_install"
-# after_install = "buyback.install.after_install"
+after_install = "buyback.install.after_install"
 
 # Uninstallation
 # ------------
 
-# before_uninstall = "buyback.uninstall.before_uninstall"
-# after_uninstall = "buyback.uninstall.after_uninstall"
+before_uninstall = "buyback.uninstall.before_uninstall"
 
 # Integration Setup
 # ------------------
@@ -148,23 +147,15 @@ app_license = "mit"
 # Scheduled Tasks
 # ---------------
 
-# scheduler_events = {
-# 	"all": [
-# 		"buyback.tasks.all"
-# 	],
-# 	"daily": [
-# 		"buyback.tasks.daily"
-# 	],
-# 	"hourly": [
-# 		"buyback.tasks.hourly"
-# 	],
-# 	"weekly": [
-# 		"buyback.tasks.weekly"
-# 	],
-# 	"monthly": [
-# 		"buyback.tasks.monthly"
-# 	],
-# }
+scheduler_events = {
+	"daily": [
+		"buyback.tasks.expire_quotes",
+		"buyback.tasks.daily_buyback_summary",
+	],
+	"hourly": [
+		"buyback.tasks.expire_otps",
+	],
+}
 
 # Testing
 # -------
@@ -192,7 +183,7 @@ app_license = "mit"
 # Ignore links to specified DocTypes when deleting documents
 # -----------------------------------------------------------
 
-# ignore_links_on_delete = ["Communication", "ToDo"]
+ignore_links_on_delete = ["Buyback Audit Log"]
 
 # Request Events
 # ----------------
@@ -247,12 +238,34 @@ app_license = "mit"
 # List of apps whose translatable strings should be excluded from this app's translations.
 # ignore_translatable_strings_from = []
 
-doctype_list_js = {
-    "Buyback Price Master": "buyback/doctype/buyback_price_master/buyback_price_master.js"
-}
 fixtures = [
-    {"doctype": "Custom DocPerm"},
-    {"doctype": "Server Script"},
-    {"doctype": "Client Script"},
-    {"doctype": "Workspace"}
+    {"doctype": "Custom DocPerm", "filters": [["parent", "in", [
+        "Buyback Price Master", "Buyback Request", "Grade Master",
+        "Question Master", "Option Master", "Test Master",
+        "State Master", "Payment Method Master", "Appoinment Type Master",
+        "Device Services", "Option Percentage Link",
+        "Diagnosis Master", "Diagnosis Results", "Question Results",
+        "Buyback Quote", "Buyback Inspection", "Buyback Order",
+        "Buyback Exchange Order", "Buyback Audit Log",
+        "Buyback Question Bank", "Buyback Checklist Template",
+        "Buyback Pricing Rule", "Buyback Settings",
+    ]]]},
+    {"doctype": "Client Script", "filters": [["module", "=", "BuyBack"]]},
+    {"doctype": "Server Script", "filters": [["module", "=", "BuyBack"]]},
+    {"doctype": "Workflow", "filters": [["document_type", "in", [
+        "Buyback Order", "Buyback Exchange Order",
+    ]]]},
+    {"doctype": "Workflow State", "filters": [["name", "in", [
+        "Draft", "Awaiting Approval", "Approved", "Rejected",
+        "Awaiting OTP", "OTP Verified", "Ready to Pay", "Paid", "Closed",
+        "Cancelled", "New Device Delivered", "Awaiting Pickup",
+        "Old Device Received", "Inspected", "Settled",
+        "Quoted", "Accepted", "Expired", "In Progress", "Completed",
+    ]]]},
+    {"doctype": "Workflow Action Master", "filters": [["name", "in", [
+        "Approve", "Reject", "Send for Approval", "Send OTP",
+        "Verify OTP", "Mark Ready to Pay", "Mark Paid", "Close",
+        "Cancel", "Deliver New Device", "Receive Old Device",
+        "Inspect Old Device", "Settle", "Submit", "Reopen",
+    ]]]},
 ]

@@ -2,11 +2,12 @@
  "actions": [],
  "allow_import": 1,
  "allow_rename": 1,
- "autoname": "field:option_id",
+ "autoname": "naming_series:",
  "creation": "2026-02-09 18:03:47.209906",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
+  "naming_series",
   "option_id",
   "question_id",
   "question_name",
@@ -16,6 +17,16 @@
   "is_active"
  ],
  "fields": [
+  {
+   "default": "OPT-.#####",
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "hidden": 1,
+   "label": "Series",
+   "options": "OPT-.#####",
+   "print_hide": 1,
+   "no_copy": 1
+  },
   {
    "fieldname": "option_id",
    "fieldtype": "Int",
@@ -69,11 +80,11 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-02-18 17:18:57.492362",
+ "modified": "2026-03-04 15:00:00.000000",
  "modified_by": "Administrator",
  "module": "BuyBack",
  "name": "Option Master",
- "naming_rule": "By fieldname",
+ "naming_rule": "By \"Naming Series\" field",
  "owner": "Administrator",
  "permissions": [
   {

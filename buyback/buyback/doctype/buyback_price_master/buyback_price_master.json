@@ -2,41 +2,69 @@
  "actions": [],
  "allow_import": 1,
  "allow_rename": 1,
- "autoname": "field:buyback_price_id",
+ "autoname": "naming_series:",
  "creation": "2026-02-05 14:27:58.725197",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
-  "section_break_tgka",
-  "buyback_price_configuration_column",
-  "buyback_price_id",
+  "naming_series",
+  "product_section",
   "item_code",
+  "product_col2",
+  "buyback_price_id",
+  "is_active",
   "item_name",
+  "price_grid_section",
+  "price_grid_html",
+  "reference_section",
   "current_market_price",
+  "ref_col2",
   "vendor_price",
+  "iw_0_3_section",
   "a_grade_iw_0_3",
   "b_grade_iw_0_3",
+  "iw_0_3_col2",
   "c_grade_iw_0_3",
+  "iw_0_6_section",
   "a_grade_iw_0_6",
   "b_grade_iw_0_6",
+  "iw_0_6_col2",
   "c_grade_iw_0_6",
   "d_grade_iw_0_6",
+  "iw_6_11_section",
   "a_grade_iw_6_11",
   "b_grade_iw_6_11",
+  "iw_6_11_col2",
   "c_grade_iw_6_11",
   "d_grade_iw_6_11",
+  "oow_11_section",
   "a_grade_oow_11",
   "b_grade_oow_11",
+  "oow_11_col2",
   "c_grade_oow_11",
-  "d_grade_oow_11",
-  "is_active"
+  "d_grade_oow_11"
  ],
  "fields": [
+  {
+   "default": "BPM-.#####",
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "hidden": 1,
+   "label": "Series",
+   "options": "BPM-.#####",
+   "print_hide": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "product_section",
+   "fieldtype": "Section Break",
+   "label": "Product Details"
+  },
   {
    "fieldname": "item_code",
    "fieldtype": "Link",
    "in_list_view": 1,
-   "label": "Item Code ",
+   "label": "Item Code",
    "options": "Item",
    "reqd": 1
   },
@@ -44,9 +72,54 @@
    "fetch_from": "item_code.item_name",
    "fieldname": "item_name",
    "fieldtype": "Data",
-   "in_list_view": 1,
+   "hidden": 1,
    "label": "Item Name",
-   "reqd": 1
+   "read_only": 1
+  },
+  {
+   "fieldname": "product_col2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "buyback_price_id",
+   "fieldtype": "Int",
+   "label": "Buyback Price ID",
+   "read_only": 1,
+   "unique": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "is_active",
+   "fieldtype": "Check",
+   "label": "Is Active"
+  },
+  {
+   "fieldname": "price_grid_section",
+   "fieldtype": "Section Break",
+   "label": "Buyback Prices"
+  },
+  {
+   "fieldname": "price_grid_html",
+   "fieldtype": "HTML",
+   "label": "Buyback Price Grid"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "reference_section",
+   "fieldtype": "Section Break",
+   "hidden": 1,
+   "label": "Reference Prices"
+  },
+  {
+   "fieldname": "current_market_price",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Current Market Price",
+   "read_only": 1
+  },
+  {
+   "fieldname": "ref_col2",
+   "fieldtype": "Column Break"
   },
   {
    "fieldname": "vendor_price",
@@ -56,134 +129,147 @@
    "read_only": 1
   },
   {
+   "collapsible": 1,
+   "fieldname": "iw_0_3_section",
+   "fieldtype": "Section Break",
+   "hidden": 1,
+   "label": "In Warranty 0–3 Months"
+  },
+  {
    "fieldname": "a_grade_iw_0_3",
    "fieldtype": "Currency",
-   "label": "A_Grade_IW_0_3",
+   "label": "Grade A",
    "read_only": 1
   },
   {
    "fieldname": "b_grade_iw_0_3",
    "fieldtype": "Currency",
-   "label": "B_Grade_IW_0_3",
+   "label": "Grade B",
    "read_only": 1
+  },
+  {
+   "fieldname": "iw_0_3_col2",
+   "fieldtype": "Column Break"
   },
   {
    "fieldname": "c_grade_iw_0_3",
    "fieldtype": "Currency",
-   "label": "C_Grade_IW_0_3",
+   "label": "Grade C",
    "read_only": 1
   },
   {
-   "fieldname": "buyback_price_configuration_column",
-   "fieldtype": "Column Break",
-   "label": "Buyback Price Configuration"
+   "collapsible": 1,
+   "fieldname": "iw_0_6_section",
+   "fieldtype": "Section Break",
+   "hidden": 1,
+   "label": "In Warranty 0–6 Months"
   },
   {
    "fieldname": "a_grade_iw_0_6",
    "fieldtype": "Currency",
-   "label": "A_Grade_IW_0_6",
+   "label": "Grade A",
    "read_only": 1
   },
   {
    "fieldname": "b_grade_iw_0_6",
    "fieldtype": "Currency",
-   "label": "B_Grade_IW_0_6",
+   "label": "Grade B",
    "read_only": 1
+  },
+  {
+   "fieldname": "iw_0_6_col2",
+   "fieldtype": "Column Break"
   },
   {
    "fieldname": "c_grade_iw_0_6",
    "fieldtype": "Currency",
-   "label": "C_Grade_IW_0_6",
+   "label": "Grade C",
    "read_only": 1
   },
   {
    "fieldname": "d_grade_iw_0_6",
    "fieldtype": "Currency",
-   "label": "D_Grade_IW_0_6",
+   "label": "Grade D",
    "read_only": 1
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "iw_6_11_section",
+   "fieldtype": "Section Break",
+   "hidden": 1,
+   "label": "In Warranty 6–11 Months"
   },
   {
    "fieldname": "a_grade_iw_6_11",
    "fieldtype": "Currency",
-   "label": "A_Grade_IW_6_11",
+   "label": "Grade A",
    "read_only": 1
   },
   {
    "fieldname": "b_grade_iw_6_11",
    "fieldtype": "Currency",
-   "label": "B_Grade_IW_6_11",
+   "label": "Grade B",
    "read_only": 1
+  },
+  {
+   "fieldname": "iw_6_11_col2",
+   "fieldtype": "Column Break"
   },
   {
    "fieldname": "c_grade_iw_6_11",
    "fieldtype": "Currency",
-   "label": "C_Grade_IW_6_11",
+   "label": "Grade C",
    "read_only": 1
   },
   {
    "fieldname": "d_grade_iw_6_11",
    "fieldtype": "Currency",
-   "label": "D_Grade_IW_6_11",
+   "label": "Grade D",
    "read_only": 1
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "oow_11_section",
+   "fieldtype": "Section Break",
+   "hidden": 1,
+   "label": "Out of Warranty 11+ Months"
   },
   {
    "fieldname": "a_grade_oow_11",
    "fieldtype": "Currency",
-   "label": "A_Grade_OOW_11",
+   "label": "Grade A",
    "read_only": 1
   },
   {
    "fieldname": "b_grade_oow_11",
    "fieldtype": "Currency",
-   "label": "B_Grade_OOW_11",
+   "label": "Grade B",
    "read_only": 1
+  },
+  {
+   "fieldname": "oow_11_col2",
+   "fieldtype": "Column Break"
   },
   {
    "fieldname": "c_grade_oow_11",
    "fieldtype": "Currency",
-   "label": "C_Grade_OOW_11",
+   "label": "Grade C",
    "read_only": 1
   },
   {
    "fieldname": "d_grade_oow_11",
    "fieldtype": "Currency",
-   "label": "D_Grade_OOW_11",
+   "label": "Grade D",
    "read_only": 1
-  },
-  {
-   "default": "0",
-   "fieldname": "is_active",
-   "fieldtype": "Check",
-   "label": "Is Active"
-  },
-  {
-   "fieldname": "current_market_price",
-   "fieldtype": "Currency",
-   "in_list_view": 1,
-   "label": "Current Market  Price ",
-   "read_only": 1
-  },
-  {
-   "columns": 1,
-   "fieldname": "section_break_tgka",
-   "fieldtype": "Section Break"
-  },
-  {
-   "fieldname": "buyback_price_id",
-   "fieldtype": "Int",
-   "label": "Buyback Price ID",
-   "read_only": 1,
-   "unique": 1
   }
  ],
- "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-02-25 16:26:13.643020",
+ "modified": "2026-03-04 14:30:00.000000",
  "modified_by": "Administrator",
  "module": "BuyBack",
  "name": "Buyback Price Master",
- "naming_rule": "By fieldname",
+ "naming_rule": "By \"Naming Series\" field",
  "owner": "Administrator",
  "permissions": [
   {
@@ -199,9 +285,7 @@
    "write": 1
   }
  ],
- "row_format": "Dynamic",
- "rows_threshold_for_grid_search": 20,
- "search_fields": "item_code,item_name",
+ "search_fields": "item_code",
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": []
