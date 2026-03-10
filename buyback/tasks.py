@@ -7,32 +7,32 @@ import frappe
 from frappe.utils import nowdate, getdate
 
 
-def expire_quotes():
+def expire_assessments():
     """
-    Daily job: auto-expire Buyback Quotes past their valid_until date.
-    Moves status from Draft/Quoted → Expired.
+    Daily job: auto-expire Buyback Assessments past their expires_on date.
+    Moves status from Draft/Submitted → Expired.
     """
     expired = frappe.get_all(
-        "Buyback Quote",
+        "Buyback Assessment",
         filters={
-            "status": ["in", ["Draft", "Quoted"]],
-            "valid_until": ["<", nowdate()],
+            "status": ["in", ["Draft", "Submitted"]],
+            "expires_on": ["<", nowdate()],
         },
         pluck="name",
     )
 
     for name in expired:
         try:
-            doc = frappe.get_doc("Buyback Quote", name)
+            doc = frappe.get_doc("Buyback Assessment", name)
             doc.mark_expired()
-            frappe.logger("buyback").info(f"Auto-expired quote {name}")
+            frappe.logger("buyback").info(f"Auto-expired assessment {name}")
         except Exception:
-            frappe.log_error(f"Failed to expire quote {name}", "Buyback Quote Expiry")
+            frappe.log_error(f"Failed to expire assessment {name}", "Buyback Assessment Expiry")
 
     if expired:
         frappe.db.commit()
 
-    return f"Expired {len(expired)} quotes"
+    return f"Expired {len(expired)} assessments"
 
 
 def expire_otps():
@@ -73,7 +73,7 @@ def daily_buyback_summary():
     today = nowdate()
 
     summary = {
-        "quotes_created": frappe.db.count("Buyback Quote", {"creation": [">=", today]}),
+        "assessments_created": frappe.db.count("Buyback Assessment", {"creation": [">=", today]}),
         "inspections_completed": frappe.db.count(
             "Buyback Inspection",
             {"status": "Completed", "inspection_completed_at": [">=", today]},

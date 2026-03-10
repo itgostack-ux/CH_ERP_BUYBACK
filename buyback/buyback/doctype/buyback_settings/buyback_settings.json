@@ -69,8 +69,8 @@
    "default": "7",
    "fieldname": "quote_validity_days",
    "fieldtype": "Int",
-   "label": "Quote Validity (Days)",
-   "description": "Number of days a buyback quote remains valid"
+   "label": "Assessment Validity (Days)",
+   "description": "Number of days a buyback assessment remains valid"
   },
   {
    "default": "5",
@@ -157,7 +157,7 @@
    "fieldname": "default_payment_method",
    "fieldtype": "Link",
    "label": "Default Payment Method",
-   "options": "CH Payment Method"
+   "options": "Mode of Payment"
   },
   {
    "fieldname": "column_break_pay",

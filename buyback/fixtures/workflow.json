@@ -39,6 +39,22 @@
     "allow_edit": "Buyback Agent",
     "doc_status": "0",
     "is_optional_state": 0,
+    "state": "Awaiting Customer Approval",
+    "update_field": "status",
+    "update_value": "Awaiting Customer Approval"
+   },
+   {
+    "allow_edit": "Buyback Agent",
+    "doc_status": "0",
+    "is_optional_state": 0,
+    "state": "Customer Approved",
+    "update_field": "status",
+    "update_value": "Customer Approved"
+   },
+   {
+    "allow_edit": "Buyback Agent",
+    "doc_status": "0",
+    "is_optional_state": 0,
     "state": "Awaiting OTP",
     "update_field": "status",
     "update_value": "Awaiting OTP"
@@ -127,8 +143,39 @@
     "action": "Send OTP",
     "allow_self_approval": 1,
     "allowed": "Buyback Agent",
+    "condition": "doc.price_variance == 0 or not doc.buyback_assessment",
     "next_state": "Awaiting OTP",
     "state": "Approved"
+   },
+   {
+    "action": "Request Customer Approval",
+    "allow_self_approval": 1,
+    "allowed": "Buyback Agent",
+    "condition": "doc.price_variance != 0 and doc.buyback_assessment",
+    "next_state": "Awaiting Customer Approval",
+    "state": "Approved"
+   },
+   {
+    "action": "Customer Approve",
+    "allow_self_approval": 1,
+    "allowed": "Buyback Agent",
+    "condition": "doc.customer_approved == 1",
+    "next_state": "Customer Approved",
+    "state": "Awaiting Customer Approval"
+   },
+   {
+    "action": "Reject",
+    "allow_self_approval": 1,
+    "allowed": "Buyback Agent",
+    "next_state": "Rejected",
+    "state": "Awaiting Customer Approval"
+   },
+   {
+    "action": "Send OTP",
+    "allow_self_approval": 1,
+    "allowed": "Buyback Agent",
+    "next_state": "Awaiting OTP",
+    "state": "Customer Approved"
    },
    {
     "action": "Verify OTP",

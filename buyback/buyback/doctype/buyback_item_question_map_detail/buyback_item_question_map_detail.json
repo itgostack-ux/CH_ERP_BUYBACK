@@ -1,0 +1,57 @@
+{
+ "actions": [],
+ "creation": "2026-03-10 10:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "question",
+  "question_text",
+  "question_code",
+  "display_order"
+ ],
+ "fields": [
+  {
+   "fieldname": "question",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Question",
+   "options": "Buyback Question Bank",
+   "reqd": 1
+  },
+  {
+   "fetch_from": "question.question_text",
+   "fieldname": "question_text",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Question Text",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "question.question_code",
+   "fieldname": "question_code",
+   "fieldtype": "Data",
+   "label": "Question Code",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "display_order",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Display Order"
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-03-10 10:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "BuyBack",
+ "name": "Buyback Item Question Map Detail",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "display_order",
+ "sort_order": "ASC",
+ "states": []
+}

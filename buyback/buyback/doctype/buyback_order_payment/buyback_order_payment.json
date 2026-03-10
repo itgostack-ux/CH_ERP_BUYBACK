@@ -16,7 +16,7 @@
    "fieldtype": "Link",
    "in_list_view": 1,
    "label": "Payment Method",
-   "options": "CH Payment Method",
+   "options": "Mode of Payment",
    "reqd": 1
   },
   {

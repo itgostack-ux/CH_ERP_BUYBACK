@@ -13,5 +13,8 @@
  {"doctype": "Workflow Action Master", "name": "Mark Awaiting Pickup", "workflow_action_name": "Mark Awaiting Pickup"},
  {"doctype": "Workflow Action Master", "name": "Receive Old Device", "workflow_action_name": "Receive Old Device"},
  {"doctype": "Workflow Action Master", "name": "Complete Inspection", "workflow_action_name": "Complete Inspection"},
- {"doctype": "Workflow Action Master", "name": "Settle", "workflow_action_name": "Settle"}
+ {"doctype": "Workflow Action Master", "name": "Settle", "workflow_action_name": "Settle"},
+ {"doctype": "Workflow Action Master", "name": "Request Customer Approval", "workflow_action_name": "Request Customer Approval"},
+ {"doctype": "Workflow Action Master", "name": "Customer Approve", "workflow_action_name": "Customer Approve"},
+ {"doctype": "Workflow Action Master", "name": "Generate Quote", "workflow_action_name": "Generate Quote"}
 ]

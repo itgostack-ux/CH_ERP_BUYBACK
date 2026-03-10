@@ -45,7 +45,7 @@ def get_context(context):
         ),
         "final_price": order.final_price,
         "store_name": (
-            frappe.db.get_value("CH Store", order.store, "store_name")
+            frappe.db.get_value("Warehouse", order.store, "warehouse_name")
             if order.store else ""
         ),
         "status": order.status,

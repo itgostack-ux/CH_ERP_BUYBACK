@@ -84,7 +84,11 @@ web_include_css = "/assets/buyback/css/buyback.css"
 
 # before_install = "buyback.install.before_install"
 after_install = "buyback.install.after_install"
-after_migrate = "buyback.custom_fields.setup_custom_fields"
+after_migrate = [
+    "buyback.custom_fields.setup_custom_fields",
+    "buyback.install.create_reporting_indexes",
+    "buyback.setup_workspace.setup",
+]
 
 # Uninstallation
 # ------------
@@ -138,11 +142,14 @@ before_uninstall = "buyback.uninstall.before_uninstall"
 # Hook on document methods and events
 
 doc_events = {
-    "Buyback Quote": {
-        "after_insert": "buyback.doc_events.on_quote_created",
+    "Buyback Assessment": {
+        "after_insert": "buyback.doc_events.on_assessment_created",
     },
     "Buyback Inspection": {
         "on_update": "buyback.doc_events.on_inspection_update",
+    },
+    "Buyback Order": {
+        "on_update": "buyback.buyback.doc_event_hooks.on_buyback_order_update",
     },
 }
 
@@ -151,12 +158,18 @@ doc_events = {
 
 scheduler_events = {
 	"daily": [
-		"buyback.tasks.expire_quotes",
+		"buyback.tasks.expire_assessments",
 		"buyback.tasks.daily_buyback_summary",
+		"buyback.buyback.alerts.check_daily_alerts",
 	],
 	"hourly": [
 		"buyback.tasks.expire_otps",
 	],
+	"cron": {
+		"*/5 * * * *": [
+			"buyback.buyback.sla_engine.evaluate_all_slas",
+		],
+	},
 }
 
 # Testing
@@ -186,7 +199,7 @@ override_doctype_dashboards = {
 # Ignore links to specified DocTypes when deleting documents
 # -----------------------------------------------------------
 
-ignore_links_on_delete = ["Buyback Audit Log"]
+ignore_links_on_delete = ["Buyback Audit Log", "Buyback SLA Log"]
 
 # Request Events
 # ----------------
@@ -243,32 +256,33 @@ ignore_links_on_delete = ["Buyback Audit Log"]
 
 fixtures = [
     {"doctype": "Custom DocPerm", "filters": [["parent", "in", [
-        "Buyback Price Master", "Buyback Request", "Grade Master",
-        "Question Master", "Option Master", "Test Master",
-        "State Master", "Payment Method Master", "Appoinment Type Master",
-        "Device Services", "Option Percentage Link",
-        "Diagnosis Master", "Diagnosis Results", "Question Results",
-        "Buyback Quote", "Buyback Inspection", "Buyback Order",
+        "Buyback Price Master", "Grade Master",
+        "Buyback Inspection", "Buyback Order",
+        "Buyback Assessment",
         "Buyback Exchange Order", "Buyback Audit Log",
         "Buyback Question Bank", "Buyback Checklist Template",
         "Buyback Pricing Rule", "Buyback Settings",
+        "Buyback SLA Settings",
     ]]]},
     {"doctype": "Client Script", "filters": [["module", "=", "BuyBack"]]},
     {"doctype": "Server Script", "filters": [["module", "=", "BuyBack"]]},
     {"doctype": "Workflow", "filters": [["document_type", "in", [
-        "Buyback Order", "Buyback Exchange Order",
+        "Buyback Order", "Buyback Exchange Order", "Buyback Assessment",
     ]]]},
     {"doctype": "Workflow State", "filters": [["name", "in", [
         "Draft", "Awaiting Approval", "Approved", "Rejected",
+        "Awaiting Customer Approval", "Customer Approved",
         "Awaiting OTP", "OTP Verified", "Ready to Pay", "Paid", "Closed",
         "Cancelled", "New Device Delivered", "Awaiting Pickup",
         "Old Device Received", "Inspected", "Settled",
         "Quoted", "Accepted", "Expired", "In Progress", "Completed",
+        "Submitted", "Quote Generated",
     ]]]},
     {"doctype": "Workflow Action Master", "filters": [["name", "in", [
         "Approve", "Reject", "Send for Approval", "Send OTP",
         "Verify OTP", "Mark Ready to Pay", "Mark Paid", "Close",
         "Cancel", "Deliver New Device", "Receive Old Device",
         "Inspect Old Device", "Settle", "Submit", "Reopen",
+        "Customer Approve", "Generate Quote",
     ]]]},
 ]

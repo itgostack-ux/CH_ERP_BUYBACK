@@ -1,15 +1,14 @@
 {
  "charts": [],
- "content": "[{\"id\": \"buyback_header\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Buyback Dashboard</b></span>\", \"col\": 12}}, {\"id\": \"nc_quotes\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"Todays Buyback Quotes\", \"col\": 3}}, {\"id\": \"nc_inspections\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"Pending Inspections\", \"col\": 3}}, {\"id\": \"nc_approvals\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"Awaiting Approval Orders\", \"col\": 3}}, {\"id\": \"nc_revenue\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"Todays Buyback Revenue\", \"col\": 3}}, {\"id\": \"spacer_1\", \"type\": \"spacer\", \"data\": {\"col\": 12}}, {\"id\": \"shortcuts_header\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Quick Actions</b></span>\", \"col\": 12}}, {\"id\": \"sc_quote\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"New Quote\", \"col\": 3}}, {\"id\": \"sc_inspection\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Inspections\", \"col\": 3}}, {\"id\": \"sc_order\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Orders\", \"col\": 3}}, {\"id\": \"sc_exchange\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Exchange\", \"col\": 3}}, {\"id\": \"spacer_2\", \"type\": \"spacer\", \"data\": {\"col\": 12}}, {\"id\": \"links_header\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Masters &amp; Reports</b></span>\", \"col\": 12}}, {\"id\": \"card_txn\", \"type\": \"card\", \"data\": {\"card_name\": \"Transaction Flow\", \"col\": 4}}, {\"id\": \"card_masters\", \"type\": \"card\", \"data\": {\"card_name\": \"Masters\", \"col\": 4}}, {\"id\": \"card_shared\", \"type\": \"card\", \"data\": {\"card_name\": \"Shared Masters\", \"col\": 4}}]",
- "creation": "2026-03-05 09:04:32.771756",
+ "content": "[{\"id\": \"buyback_header\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Buyback Dashboard</b></span>\", \"col\": 12}}, {\"id\": \"nc_assessments\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"Todays Buyback Assessments\", \"col\": 3}}, {\"id\": \"nc_inspections\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"Pending Inspections\", \"col\": 3}}, {\"id\": \"nc_approvals\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"Awaiting Approval Orders\", \"col\": 3}}, {\"id\": \"nc_revenue\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"Todays Buyback Revenue\", \"col\": 3}}, {\"id\": \"spacer_1\", \"type\": \"spacer\", \"data\": {\"col\": 12}}, {\"id\": \"shortcuts_header\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Quick Actions</b></span>\", \"col\": 12}}, {\"id\": \"sc_assessment\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Assessments\", \"col\": 3}}, {\"id\": \"sc_inspection\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Inspections\", \"col\": 3}}, {\"id\": \"sc_order\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Orders\", \"col\": 3}}, {\"id\": \"sc_exchange\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Exchange\", \"col\": 2}}, {\"id\": \"sc_settings\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Settings\", \"col\": 2}}, {\"id\": \"spacer_2\", \"type\": \"spacer\", \"data\": {\"col\": 12}}, {\"id\": \"links_header\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Documents</b></span>\", \"col\": 12}}, {\"id\": \"card_txn\", \"type\": \"card\", \"data\": {\"card_name\": \"Transaction Flow\", \"col\": 4}}, {\"id\": \"card_masters\", \"type\": \"card\", \"data\": {\"card_name\": \"Masters\", \"col\": 4}}, {\"id\": \"card_settings\", \"type\": \"card\", \"data\": {\"card_name\": \"Settings & Configuration\", \"col\": 4}}, {\"id\": \"spacer_3\", \"type\": \"spacer\", \"data\": {\"col\": 12}}, {\"id\": \"card_shared\", \"type\": \"card\", \"data\": {\"card_name\": \"Shared Masters\", \"col\": 4}}, {\"id\": \"spacer_reports\", \"type\": \"spacer\", \"data\": {\"col\": 12}}, {\"id\": \"reports_header\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Reports</b></span>\", \"col\": 12}}, {\"id\": \"card_rpt_daily\", \"type\": \"card\", \"data\": {\"card_name\": \"Daily Operations\", \"col\": 4}}, {\"id\": \"card_rpt_funnel\", \"type\": \"card\", \"data\": {\"card_name\": \"Funnel & Conversion\", \"col\": 4}}, {\"id\": \"card_rpt_pricing\", \"type\": \"card\", \"data\": {\"card_name\": \"Pricing & Quality\", \"col\": 4}}, {\"id\": \"card_rpt_perf\", \"type\": \"card\", \"data\": {\"card_name\": \"Performance\", \"col\": 4}}, {\"id\": \"card_rpt_finance\", \"type\": \"card\", \"data\": {\"card_name\": \"Finance & Settlement\", \"col\": 4}}, {\"id\": \"card_rpt_audit\", \"type\": \"card\", \"data\": {\"card_name\": \"Compliance & Audit\", \"col\": 4}}]",
+ "creation": "2026-03-07 11:50:46.936819",
  "custom_blocks": [],
  "docstatus": 0,
  "doctype": "Workspace",
  "for_user": "",
  "hide_custom": 0,
- "icon": "external-link",
+ "icon": "retail",
  "idx": 0,
- "indicator_color": "",
  "is_hidden": 0,
  "label": "BuyBack",
  "links": [
@@ -25,9 +24,9 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Buyback Quote",
+   "label": "Buyback Assessment",
    "link_count": 0,
-   "link_to": "Buyback Quote",
+   "link_to": "Buyback Assessment",
    "link_type": "DocType",
    "onboard": 0,
    "type": "Link"
@@ -143,9 +142,9 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "CH Store",
+   "label": "Stores",
    "link_count": 0,
-   "link_to": "CH Store",
+   "link_to": "Warehouse",
    "link_type": "DocType",
    "onboard": 0,
    "type": "Link"
@@ -153,9 +152,9 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "CH Payment Method",
+   "label": "Payment Methods",
    "link_count": 0,
-   "link_to": "CH Payment Method",
+   "link_to": "Mode of Payment",
    "link_type": "DocType",
    "onboard": 0,
    "type": "Link"
@@ -163,17 +162,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "CH State",
-   "link_count": 0,
-   "link_to": "CH State",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "CH OTP Log",
+   "label": "OTP Log",
    "link_count": 0,
    "link_to": "CH OTP Log",
    "link_type": "DocType",
@@ -198,15 +187,329 @@
    "link_type": "DocType",
    "onboard": 0,
    "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Buyback SLA Settings",
+   "link_count": 0,
+   "link_to": "Buyback SLA Settings",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Daily Operations",
+   "link_count": 0,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Daily Ops Queue",
+   "link_count": 0,
+   "link_to": "Daily Ops Queue",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Customer Approval Pending",
+   "link_count": 0,
+   "link_to": "Customer Approval Pending",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Pending Confirmations",
+   "link_count": 0,
+   "link_to": "Pending Confirmations",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Pending Payments",
+   "link_count": 0,
+   "link_to": "Pending Payments",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Pending Settlement",
+   "link_count": 0,
+   "link_to": "Pending Settlement",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Funnel & Conversion",
+   "link_count": 0,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Buyback Funnel",
+   "link_count": 0,
+   "link_to": "Buyback Funnel",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Source Mix",
+   "link_count": 0,
+   "link_to": "Source Mix",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Exchange Conversion",
+   "link_count": 0,
+   "link_to": "Exchange Conversion",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Quote Accuracy",
+   "link_count": 0,
+   "link_to": "Quote Accuracy",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Pricing & Quality",
+   "link_count": 0,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Price Variance",
+   "link_count": 0,
+   "link_to": "Price Variance",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Deduction Breakdown",
+   "link_count": 0,
+   "link_to": "Deduction Breakdown",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Mismatch Analysis",
+   "link_count": 0,
+   "link_to": "Mismatch Analysis",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Grade Distribution",
+   "link_count": 0,
+   "link_to": "Grade Distribution",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Performance",
+   "link_count": 0,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Branch Performance",
+   "link_count": 0,
+   "link_to": "Branch Performance",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Store Scorecard",
+   "link_count": 0,
+   "link_to": "Store Scorecard",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Executive Performance",
+   "link_count": 0,
+   "link_to": "Executive Performance",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Inspector Scorecard",
+   "link_count": 0,
+   "link_to": "Inspector Scorecard",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Finance & Settlement",
+   "link_count": 0,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Settlement Register",
+   "link_count": 0,
+   "link_to": "Settlement Register",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Finance Payout Register",
+   "link_count": 0,
+   "link_to": "Finance Payout Register",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Model Wise Buyback",
+   "link_count": 0,
+   "link_to": "Model Wise Buyback",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Category Trend",
+   "link_count": 0,
+   "link_to": "Category Trend",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Compliance & Audit",
+   "link_count": 0,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "SLA Breach Report",
+   "link_count": 0,
+   "link_to": "SLA Breach Report",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "OTP Failure Report",
+   "link_count": 0,
+   "link_to": "OTP Failure Report",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Manager Overrides Audit",
+   "link_count": 0,
+   "link_to": "Manager Overrides Audit",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Duplicate IMEI Attempts",
+   "link_count": 0,
+   "link_to": "Duplicate IMEI Attempts",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
   }
  ],
- "modified": "2026-03-05 11:48:31.991556",
+ "modified": "2026-03-07 11:51:26.659629",
  "modified_by": "Administrator",
  "module": "BuyBack",
  "name": "BuyBack",
  "number_cards": [
   {
-   "number_card_name": "Todays Buyback Quotes"
+   "number_card_name": "Todays Buyback Assessments"
   },
   {
    "number_card_name": "Pending Inspections"
@@ -222,13 +525,14 @@
  "parent_page": "",
  "public": 1,
  "quick_lists": [],
+ "restrict_to_domain": "",
  "roles": [],
- "sequence_id": 2.0,
+ "sequence_id": 1.5,
  "shortcuts": [
   {
    "doc_view": "",
-   "label": "New Quote",
-   "link_to": "Buyback Quote",
+   "label": "Assessments",
+   "link_to": "Buyback Assessment",
    "type": "DocType"
   },
   {

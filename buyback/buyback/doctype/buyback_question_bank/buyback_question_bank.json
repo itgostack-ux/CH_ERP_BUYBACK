@@ -10,6 +10,7 @@
   "question_text",
   "question_code",
   "column_break_01",
+  "diagnosis_type",
   "question_type",
   "applies_to_category",
   "display_order",
@@ -60,12 +61,24 @@
    "fieldtype": "Column Break"
   },
   {
+   "default": "Customer Question",
+   "fieldname": "diagnosis_type",
+   "fieldtype": "Select",
+   "label": "Diagnosis Type",
+   "options": "Customer Question\nAutomated Test",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "description": "Customer Question = manual multiple-choice; Automated Test = mobile app diagnostic (Pass/Fail/Partial)"
+  },
+  {
    "default": "Yes/No",
    "fieldname": "question_type",
    "fieldtype": "Select",
    "label": "Question Type",
    "options": "Yes/No\nSingle Select\nMulti Select\nNumeric",
-   "in_list_view": 1
+   "in_list_view": 1,
+   "depends_on": "eval:doc.diagnosis_type === 'Customer Question'"
   },
   {
    "fieldname": "applies_to_category",

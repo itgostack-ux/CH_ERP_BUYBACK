@@ -90,6 +90,63 @@ CUSTOM_FIELDS = {
             "read_only": 1,
         },
     ],
+    # ──────────────────────────────────────────────────────────────
+    # Warehouse — store capability flags (replaces CH Store DocType)
+    # ──────────────────────────────────────────────────────────────
+    "Warehouse": [
+        {
+            "fieldname": "ch_store_section",
+            "label": _("Store Settings"),
+            "fieldtype": "Section Break",
+            "insert_after": "disabled",
+            "collapsible": 1,
+            "description": _("Store capability flags used by GoGizmo / GoFix modules"),
+        },
+        {
+            "fieldname": "ch_store_id",
+            "label": _("Store ID"),
+            "fieldtype": "Int",
+            "insert_after": "ch_store_section",
+            "description": _("Legacy numeric store identifier"),
+        },
+        {
+            "fieldname": "ch_store_code",
+            "label": _("Store Code"),
+            "fieldtype": "Data",
+            "insert_after": "ch_store_id",
+            "in_standard_filter": 1,
+            "description": _("Short alphanumeric code for the store (e.g. GOG-CHN-TNAGAR)"),
+        },
+        {
+            "fieldname": "ch_store_col_break",
+            "fieldtype": "Column Break",
+            "insert_after": "ch_store_code",
+        },
+        {
+            "fieldname": "ch_is_buyback_enabled",
+            "label": _("Buyback Enabled"),
+            "fieldtype": "Check",
+            "insert_after": "ch_store_col_break",
+            "default": "0",
+            "description": _("Allow buyback transactions at this store/warehouse"),
+        },
+        {
+            "fieldname": "ch_is_service_enabled",
+            "label": _("Service Enabled"),
+            "fieldtype": "Check",
+            "insert_after": "ch_is_buyback_enabled",
+            "default": "0",
+            "description": _("Allow service/repair orders at this store/warehouse"),
+        },
+        {
+            "fieldname": "ch_is_retail_enabled",
+            "label": _("Retail Enabled"),
+            "fieldtype": "Check",
+            "insert_after": "ch_is_service_enabled",
+            "default": "0",
+            "description": _("Allow retail sales at this store/warehouse"),
+        },
+    ],
 }
 
 

@@ -8,8 +8,9 @@
  "field_order": [
   "naming_series",
   "order_id",
-  "buyback_quote",
+  "buyback_assessment",
   "buyback_inspection",
+  "settlement_type",
   "customer",
   "customer_name",
   "mobile_no",
@@ -32,17 +33,36 @@
   "column_break_pricing",
   "final_price",
   "approved_price",
+  "price_variance_section",
+  "original_quoted_price",
+  "revised_inspection_price",
+  "column_break_variance",
+  "price_variance",
+  "price_variance_pct",
   "approval_section",
   "requires_approval",
   "approved_by",
   "column_break_approval",
   "approval_date",
   "approval_remarks",
+  "customer_approval_section",
+  "customer_approved",
+  "customer_approved_at",
+  "column_break_cust_approval",
+  "customer_approval_method",
   "otp_section",
   "otp_verified",
   "otp_verified_at",
   "column_break_otp",
   "otp_reference",
+  "exchange_section",
+  "new_item",
+  "new_item_name",
+  "new_item_imei",
+  "column_break_exchange",
+  "new_device_price",
+  "exchange_discount",
+  "balance_to_pay",
   "payment_section",
   "payments",
   "payment_summary_section",
@@ -98,10 +118,10 @@
    "description": "Auto-generated sequential ID for mobile/API integration"
   },
   {
-   "fieldname": "buyback_quote",
+   "fieldname": "buyback_assessment",
    "fieldtype": "Link",
-   "label": "Buyback Quote",
-   "options": "Buyback Quote",
+   "label": "Buyback Assessment",
+   "options": "Buyback Assessment",
    "in_standard_filter": 1
   },
   {
@@ -110,6 +130,15 @@
    "label": "Buyback Inspection",
    "options": "Buyback Inspection",
    "in_standard_filter": 1
+  },
+  {
+   "default": "Buyback",
+   "fieldname": "settlement_type",
+   "fieldtype": "Select",
+   "label": "Settlement Type",
+   "options": "Buyback\nExchange",
+   "in_standard_filter": 1,
+   "description": "Buyback = cash payout, Exchange = trade-in for new device"
   },
   {
    "fieldname": "customer",
@@ -131,7 +160,8 @@
    "fieldname": "mobile_no",
    "fieldtype": "Data",
    "label": "Mobile No",
-   "reqd": 1
+   "reqd": 1,
+   "fetch_from": "customer.mobile_no"
   },
   {
    "fieldname": "column_break_01",
@@ -141,7 +171,7 @@
    "fieldname": "store",
    "fieldtype": "Link",
    "label": "Store",
-   "options": "CH Store",
+   "options": "Warehouse",
    "reqd": 1,
    "in_standard_filter": 1
   },
@@ -158,7 +188,7 @@
    "fieldname": "status",
    "fieldtype": "Select",
    "label": "Status",
-   "options": "Draft\nAwaiting Approval\nApproved\nAwaiting OTP\nOTP Verified\nReady to Pay\nPaid\nClosed\nRejected\nCancelled",
+   "options": "Draft\nAwaiting Approval\nApproved\nAwaiting Customer Approval\nCustomer Approved\nAwaiting OTP\nOTP Verified\nReady to Pay\nPaid\nClosed\nRejected\nCancelled",
    "in_list_view": 1,
    "in_standard_filter": 1,
    "read_only": 1,
@@ -265,6 +295,48 @@
    "description": "Set when manager approves"
   },
   {
+   "fieldname": "price_variance_section",
+   "fieldtype": "Section Break",
+   "label": "Price Variance",
+   "collapsible": 1,
+   "description": "Shows difference between customer self-assessment price and inspection price"
+  },
+  {
+   "default": "0",
+   "fieldname": "original_quoted_price",
+   "fieldtype": "Currency",
+   "label": "Original Quoted Price",
+   "read_only": 1,
+   "description": "Price from initial quote/assessment"
+  },
+  {
+   "default": "0",
+   "fieldname": "revised_inspection_price",
+   "fieldtype": "Currency",
+   "label": "Revised Inspection Price",
+   "read_only": 1,
+   "description": "Price after physical inspection"
+  },
+  {
+   "fieldname": "column_break_variance",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "price_variance",
+   "fieldtype": "Currency",
+   "label": "Price Variance",
+   "read_only": 1,
+   "description": "revised_inspection_price - original_quoted_price"
+  },
+  {
+   "default": "0",
+   "fieldname": "price_variance_pct",
+   "fieldtype": "Percent",
+   "label": "Variance %",
+   "read_only": 1
+  },
+  {
    "fieldname": "approval_section",
    "fieldtype": "Section Break",
    "label": "Approval",
@@ -300,6 +372,40 @@
    "label": "Approval Remarks"
   },
   {
+   "fieldname": "customer_approval_section",
+   "fieldtype": "Section Break",
+   "label": "Customer Approval",
+   "collapsible": 1,
+   "description": "Customer must approve the revised price when inspection price differs from quoted price"
+  },
+  {
+   "default": "0",
+   "fieldname": "customer_approved",
+   "fieldtype": "Check",
+   "label": "Customer Approved",
+   "read_only": 1,
+   "allow_on_submit": 1
+  },
+  {
+   "fieldname": "customer_approved_at",
+   "fieldtype": "Datetime",
+   "label": "Customer Approved At",
+   "read_only": 1,
+   "allow_on_submit": 1
+  },
+  {
+   "fieldname": "column_break_cust_approval",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "customer_approval_method",
+   "fieldtype": "Select",
+   "label": "Approval Method",
+   "options": "\nIn-Store Signature\nSMS Link\nApp Confirmation",
+   "read_only": 1,
+   "allow_on_submit": 1
+  },
+  {
    "fieldname": "otp_section",
    "fieldtype": "Section Break",
    "label": "OTP Verification"
@@ -327,6 +433,60 @@
    "label": "OTP Reference",
    "options": "CH OTP Log",
    "read_only": 1
+  },
+  {
+   "fieldname": "exchange_section",
+   "fieldtype": "Section Break",
+   "label": "Exchange Device Details",
+   "collapsible": 1,
+   "depends_on": "eval:doc.settlement_type == 'Exchange'"
+  },
+  {
+   "fieldname": "new_item",
+   "fieldtype": "Link",
+   "label": "New Device",
+   "options": "Item",
+   "depends_on": "eval:doc.settlement_type == 'Exchange'",
+   "mandatory_depends_on": "eval:doc.settlement_type == 'Exchange'"
+  },
+  {
+   "fieldname": "new_item_name",
+   "fieldtype": "Data",
+   "label": "New Device Name",
+   "fetch_from": "new_item.item_name",
+   "read_only": 1
+  },
+  {
+   "fieldname": "new_item_imei",
+   "fieldtype": "Data",
+   "label": "New Device IMEI / Serial"
+  },
+  {
+   "fieldname": "column_break_exchange",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "new_device_price",
+   "fieldtype": "Currency",
+   "label": "New Device Price",
+   "depends_on": "eval:doc.settlement_type == 'Exchange'"
+  },
+  {
+   "default": "0",
+   "fieldname": "exchange_discount",
+   "fieldtype": "Currency",
+   "label": "Exchange Discount",
+   "read_only": 1,
+   "description": "Discount applied (= buyback value of old device)"
+  },
+  {
+   "default": "0",
+   "fieldname": "balance_to_pay",
+   "fieldtype": "Currency",
+   "label": "Balance to Pay",
+   "read_only": 1,
+   "description": "new_device_price - exchange_discount. Customer pays this."
   },
   {
    "fieldname": "payment_section",

@@ -26,51 +26,6 @@ from buyback.exceptions import (
 )
 
 
-# ── Legacy Endpoints (kept for backward compatibility) ───────────
-
-
-@frappe.whitelist()
-def get_buyback(id: int | str) -> dict:
-    """Return a Buyback Request by its buybackid. Legacy endpoint."""
-    name = frappe.db.get_value("Buyback Request", {"buybackid": id}, "name")
-    if not name:
-        frappe.throw(
-            _("Buyback Request {0} not found").format(id),
-            exc=frappe.DoesNotExistError,
-        )
-
-    doc = frappe.get_doc("Buyback Request", name)
-    doc.check_permission("read")
-
-    return {
-        "name": doc.name,
-        "buybackid": doc.buybackid,
-        "customer_name": doc.customer_name,
-        "mobile_no": doc.mobile_no,
-        "item_code": doc.get("item_code"),
-        "item_full_name": doc.get("item_full_name"),
-        "grade": doc.grade,
-        "usage_key": doc.usage_key,
-        "buyback_price": doc.buyback_price,
-        "final_buyback_amount": doc.get("final_buyback_amount"),
-        "status": doc.status,
-        "deal_status": doc.deal_status,
-        "mode": doc.get("mode"),
-    }
-
-
-@frappe.whitelist()
-def confirm_deal(name: str) -> dict:
-    """Legacy endpoint to confirm a deal."""
-    doc = frappe.get_doc("Buyback Request", name)
-    doc.check_permission("write")
-    if doc.status != "Open Request":
-        return {"status": "already_processed"}
-    doc.status = "Customer Approved"
-    doc.save()
-    return {"status": "success"}
-
-
 # ── Step 1: Get Estimate ─────────────────────────────────────────
 
 
@@ -105,138 +60,94 @@ def get_estimate(
     )
 
 
-# ── Step 2: Create Quote ─────────────────────────────────────────
+# ── Step 2: Submit Assessment & Create Inspection ────────────────
 
 
 @frappe.whitelist()
-def create_quote(
-    customer: str,
-    mobile_no: str,
-    store: str,
-    item: str,
-    brand: str | None = None,
-    item_group: str | None = None,
-    imei_serial: str | None = None,
-    warranty_status: str | None = None,
-    device_age_months: int | str | None = None,
-    responses: str | None = None,
-) -> dict:
-    """
-    Create a Buyback Quote with auto-pricing.
-
-    Returns:
-        dict: {name, quote_id, estimated_price, quoted_price, valid_until}
-    """
-    from buyback.buyback.pricing.engine import calculate_estimated_price
-
-    frappe.has_permission("Buyback Quote", ptype="create", throw=True)
-
-    resp_list = json.loads(responses) if isinstance(responses, str) else (responses or [])
-
-    # Auto-calculate price
-    pricing = calculate_estimated_price(
-        item_code=item,
-        grade=None,  # grade determined during inspection
-        warranty_status=warranty_status,
-        device_age_months=int(device_age_months) if device_age_months else None,
-        responses=resp_list,
-        brand=brand,
-        item_group=item_group,
-    )
-
-    doc = frappe.get_doc(
-        {
-            "doctype": "Buyback Quote",
-            "customer": customer,
-            "mobile_no": mobile_no,
-            "store": store,
-            "item": item,
-            "brand": brand,
-            "item_group": item_group,
-            "imei_serial": imei_serial,
-            "warranty_status": warranty_status,
-            "device_age_months": int(device_age_months) if device_age_months else None,
-            "base_price": pricing["base_price"],
-            "total_deductions": pricing["total_deductions"],
-            "estimated_price": pricing["estimated_price"],
-            "quoted_price": pricing["estimated_price"],
-            "responses": [
-                {
-                    "question": _get_question_name(r.get("question_code")),
-                    "question_code": r.get("question_code"),
-                    "answer_value": r.get("answer_value"),
-                    "answer_label": r.get("answer_label", ""),
-                    "price_impact_percent": r.get("price_impact_percent", 0),
-                }
-                for r in resp_list
-            ],
-        }
-    )
-    doc.insert()
-    doc.mark_quoted()
-
+def submit_assessment(assessment_name: str) -> dict:
+    """Submit a draft assessment."""
+    doc = frappe.get_doc("Buyback Assessment", assessment_name)
+    doc.check_permission("write")
+    doc.submit_assessment()
     return {
         "name": doc.name,
-        "quote_id": doc.quote_id,
+        "status": doc.status,
         "estimated_price": doc.estimated_price,
         "quoted_price": doc.quoted_price,
-        "valid_until": str(doc.valid_until),
-        "status": doc.status,
     }
 
 
-# ── Step 3: Accept Quote ─────────────────────────────────────────
+@frappe.whitelist()
+def create_inspection_from_assessment(
+    assessment_name: str,
+    checklist_template: str | None = None,
+) -> dict:
+    """Create a Buyback Inspection directly from a submitted assessment.
+
+    Returns:
+        dict with inspection details (name, inspection_id, status)
+    """
+    doc = frappe.get_doc("Buyback Assessment", assessment_name)
+    doc.check_permission("write")
+    inspection = doc.create_inspection(checklist_template=checklist_template)
+
+    return {
+        "name": inspection.name,
+        "inspection_id": inspection.inspection_id,
+        "status": inspection.status,
+        "assessment_name": doc.name,
+    }
 
 
 @frappe.whitelist()
-def accept_quote(quote_name: str) -> dict:
-    """Customer accepts a buyback quote."""
-    doc = frappe.get_doc("Buyback Quote", quote_name)
-    doc.check_permission("write")
-    doc.mark_accepted()
-    return {"name": doc.name, "status": doc.status}
+def get_assessment(assessment_name: str) -> dict:
+    """Get assessment details including responses and linked inspection."""
+    doc = frappe.get_doc("Buyback Assessment", assessment_name)
+    doc.check_permission("read")
+
+    return {
+        "name": doc.name,
+        "assessment_id": doc.assessment_id,
+        "source": doc.source,
+        "status": doc.status,
+        "customer": doc.customer,
+        "mobile_no": doc.mobile_no,
+        "item": doc.item,
+        "item_name": frappe.db.get_value("Item", doc.item, "item_name") if doc.item else "",
+        "brand": doc.brand,
+        "imei_serial": doc.imei_serial,
+        "estimated_grade": doc.estimated_grade,
+        "estimated_price": doc.estimated_price,
+        "quoted_price": doc.quoted_price,
+        "buyback_inspection": doc.buyback_inspection,
+        "expires_on": str(doc.expires_on) if doc.expires_on else None,
+        "responses": [
+            {
+                "question": r.question,
+                "question_code": r.question_code,
+                "question_text": r.question_text,
+                "answer_value": r.answer_value,
+                "answer_label": r.answer_label,
+                "price_impact_percent": r.price_impact_percent,
+            }
+            for r in (doc.responses or [])
+        ],
+    }
 
 
-# ── Step 4: Create / Manage Inspection ───────────────────────────
+# ── Step 3: Create / Manage Inspection ───────────────────────────
 
 
 @frappe.whitelist()
 def create_inspection(
-    quote_name: str,
+    assessment_name: str,
     checklist_template: str | None = None,
 ) -> dict:
-    """Create a Buyback Inspection from an accepted quote."""
-    quote = frappe.get_doc("Buyback Quote", quote_name)
-    quote.check_permission("read")
+    """Create a Buyback Inspection from a submitted assessment.
 
-    if quote.status != "Accepted":
-        frappe.throw(
-            _("Quote must be in Accepted status."),
-            exc=BuybackStatusError,
-        )
-
-    frappe.has_permission("Buyback Inspection", ptype="create", throw=True)
-
-    doc = frappe.get_doc(
-        {
-            "doctype": "Buyback Inspection",
-            "buyback_quote": quote_name,
-            "checklist_template": checklist_template,
-            "pre_inspection_grade": None,
-            "quoted_price": quote.quoted_price,
-        }
-    )
-    doc.insert()
-
-    if checklist_template:
-        doc.populate_checklist()
-        doc.save()
-
-    return {
-        "name": doc.name,
-        "inspection_id": doc.inspection_id,
-        "status": doc.status,
-    }
+    This is an alternative API endpoint — same as create_inspection_from_assessment.
+    """
+    return create_inspection_from_assessment(assessment_name, checklist_template)
 
 
 @frappe.whitelist()
@@ -297,7 +208,7 @@ def create_order(
     item: str,
     condition_grade: str,
     final_price: float | str,
-    buyback_quote: str | None = None,
+    buyback_assessment: str | None = None,
     buyback_inspection: str | None = None,
     imei_serial: str | None = None,
     warranty_status: str | None = None,
@@ -315,7 +226,7 @@ def create_order(
             "item": item,
             "condition_grade": condition_grade,
             "final_price": flt(final_price),
-            "buyback_quote": buyback_quote,
+            "buyback_assessment": buyback_assessment,
             "buyback_inspection": buyback_inspection,
             "imei_serial": imei_serial,
             "warranty_status": warranty_status,
@@ -355,6 +266,82 @@ def reject_order(order_name: str, remarks: str | None = None) -> dict:
     doc.check_permission("write")
     doc.reject(remarks)
     return {"name": doc.name, "status": doc.status}
+
+
+# ── Customer Approval + Settlement ───────────────────────────────
+
+
+@frappe.whitelist()
+def customer_approve_offer(
+    order_name: str,
+    method: str = "In-Store Signature",
+) -> dict:
+    """Customer approves the revised/final price on a buyback order.
+
+    Required when inspection price differs from the original quoted price.
+    """
+    doc = frappe.get_doc("Buyback Order", order_name)
+    doc.check_permission("write")
+    doc.customer_approve(method)
+    return {
+        "name": doc.name,
+        "status": doc.status,
+        "customer_approved": doc.customer_approved,
+        "customer_approved_at": str(doc.customer_approved_at),
+    }
+
+
+@frappe.whitelist(allow_guest=True)
+def customer_approve_via_token(token: str, method: str = "SMS Link") -> dict:
+    """Customer approves offer via the token-based approval link (no login).
+
+    Used from the customer-facing approval page.
+    """
+    order_name = frappe.db.get_value(
+        "Buyback Order", {"approval_token": token, "docstatus": ["!=", 2]}, "name"
+    )
+    if not order_name:
+        frappe.throw(_("Invalid or expired approval link."), exc=frappe.DoesNotExistError)
+
+    doc = frappe.get_doc("Buyback Order", order_name)
+    doc.flags.ignore_permissions = True
+    doc.customer_approve(method)
+    return {
+        "name": doc.name,
+        "status": doc.status,
+        "customer_approved": doc.customer_approved,
+    }
+
+
+@frappe.whitelist()
+def select_settlement_type(
+    order_name: str,
+    settlement_type: str,
+    new_item: str | None = None,
+    new_device_price: float | str | None = None,
+) -> dict:
+    """Select buyback or exchange settlement for an order.
+
+    Args:
+        order_name: Buyback Order name
+        settlement_type: "Buyback" or "Exchange"
+        new_item: Required if Exchange — item code for new device
+        new_device_price: Optional — price of new device (auto-fetched if omitted)
+    """
+    doc = frappe.get_doc("Buyback Order", order_name)
+    doc.check_permission("write")
+    doc.select_settlement_type(
+        settlement_type,
+        new_item=new_item,
+        new_device_price=flt(new_device_price) if new_device_price else None,
+    )
+    return {
+        "name": doc.name,
+        "settlement_type": doc.settlement_type,
+        "exchange_discount": doc.exchange_discount,
+        "balance_to_pay": doc.balance_to_pay,
+        "new_device_price": doc.new_device_price,
+    }
 
 
 # ── Step 7: OTP Verification ─────────────────────────────────────
@@ -426,7 +413,7 @@ def close_order(order_name: str) -> dict:
     return {"name": doc.name, "status": doc.status}
 
 
-# ── Exchange Endpoints ────────────────────────────────────────────
+# ── Exchange Endpoints (DEPRECATED — use select_settlement_type) ──
 
 
 @frappe.whitelist()
@@ -444,7 +431,17 @@ def create_exchange(
     new_imei_serial: str | None = None,
     old_condition_grade: str | None = None,
 ) -> dict:
-    """Create a Buyback Exchange Order."""
+    """DEPRECATED: Create a Buyback Exchange Order.
+
+    Use select_settlement_type(order_name, 'Exchange', new_item, new_device_price) instead.
+    This endpoint is kept for backward compatibility only.
+    """
+    import warnings
+    warnings.warn(
+        "create_exchange is deprecated. Use select_settlement_type on the Buyback Order.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     frappe.has_permission("Buyback Exchange Order", ptype="create", throw=True)
 
     doc = frappe.get_doc(
@@ -531,7 +528,7 @@ def submit_mobile_diagnostic(
         diagnostic_results: JSON list of diagnostic test results, e.g.
             [{"test": "Battery Health", "code": "BATT", "result": "85%", "status": "Pass"},
              {"test": "Screen Touch", "code": "TOUCH", "result": "OK", "status": "Pass"}]
-        store: Optional store code (CH Store) where device will be physically brought
+        store: Optional Warehouse name where device will be physically brought
         imei_serial: Device IMEI or serial number
         brand: Device brand
         item_group: Device category
@@ -555,7 +552,7 @@ def submit_mobile_diagnostic(
     company = None
     if store:
         store_name = store
-        company = frappe.db.get_value("CH Store", store, "company")
+        company = frappe.db.get_value("Warehouse", store, "company")
 
     # Build inspection result rows from diagnostic data
     result_rows = []
@@ -570,7 +567,7 @@ def submit_mobile_diagnostic(
 
     doc = frappe.get_doc({
         "doctype": "Buyback Inspection",
-        # No buyback_quote — this is a mobile-first flow
+
         "diagnostic_source": "Mobile App",
         "mobile_diagnostic_id": external_diagnostic_id or "",
         "customer": customer,
@@ -707,35 +704,32 @@ def get_stores(
     buyback_enabled: int | str | None = None,
 ) -> list[dict]:
     """Get active stores, optionally filtered."""
-    filters: dict = {"disabled": 0}
+    filters: dict = {"disabled": 0, "is_group": 0}
     if company:
         filters["company"] = company
     if buyback_enabled:
-        filters["is_buyback_enabled"] = 1
+        filters["ch_is_buyback_enabled"] = 1
 
     return frappe.get_all(
-        "CH Store",
+        "Warehouse",
         filters=filters,
         fields=[
-            "name", "store_id", "store_code", "store_name",
-            "company", "city", "state", "pincode",
+            "name", "ch_store_id as store_id", "ch_store_code as store_code",
+            "warehouse_name as store_name",
+            "company", "city", "state", "pin as pincode",
         ],
-        order_by="store_name asc",
+        order_by="warehouse_name asc",
     )
 
 
 @frappe.whitelist()
 def get_payment_methods() -> list[dict]:
-    """Get active payment methods."""
+    """Get active payment methods (standard ERPNext Mode of Payment)."""
     return frappe.get_all(
-        "CH Payment Method",
-        filters={"disabled": 0},
-        fields=[
-            "name", "payment_method_id", "method_name", "method_type",
-            "requires_bank_details", "requires_upi_id",
-            "requires_transaction_proof",
-        ],
-        order_by="method_name asc",
+        "Mode of Payment",
+        filters={"enabled": 1},
+        fields=["name", "mode_of_payment", "type"],
+        order_by="name asc",
     )
 
 
@@ -827,22 +821,19 @@ def search_items(
     )
 
 
-# ── Lookup by Phone (Quotes + Orders) ───────────────────────────
+# ── Lookup by Phone (Quotes + Orders + Assessments) ─────────────
 
 
 @frappe.whitelist()
-def get_quotes_by_phone(mobile_no: str) -> list[dict]:
-    """Look up all Buyback Quotes for a given mobile number.
-
-    Used by store agents to find pending quotes when customer walks in.
-    """
+def get_assessments_by_phone(mobile_no: str) -> list[dict]:
+    """Look up all Buyback Assessments for a given mobile number."""
     return frappe.get_all(
-        "Buyback Quote",
+        "Buyback Assessment",
         filters={"mobile_no": mobile_no},
         fields=[
-            "name", "quote_id", "customer", "customer_name",
-            "item", "item_name", "imei_serial", "quoted_price",
-            "estimated_price", "status", "valid_until", "creation",
+            "name", "assessment_id", "source", "item",
+            "estimated_grade", "estimated_price", "status",
+            "buyback_inspection", "expires_on", "creation",
         ],
         order_by="creation desc",
     )
@@ -913,7 +904,7 @@ def get_buyback_approval_details(token: str) -> dict:
         ) if order.condition_grade else "",
         "final_price": order.final_price,
         "store_name": frappe.db.get_value(
-            "CH Store", order.store, "store_name"
+            "Warehouse", order.store, "warehouse_name"
         ) if order.store else "",
         "status": order.status,
         "device_photo_front": order.device_photo_front,
@@ -999,3 +990,316 @@ def get_diagnostic_comparison(inspection_name: str) -> dict:
         "mismatches": sum(1 for c in comparison if c["match"] is False),
         "comparison": comparison,
     }
+
+
+# ── Question Bank Options ─────────────────────────────────────────
+
+@frappe.whitelist()
+def get_question_options(question_name: str) -> list:
+    """Return the answer options for a Buyback Question Bank entry.
+
+    Used by the Assessment form to populate answer dropdowns.
+    """
+    if not question_name:
+        return []
+
+    options = frappe.get_all(
+        "Buyback Question Option",
+        filters={"parent": question_name},
+        fields=["option_value", "option_label", "price_impact_percent"],
+        order_by="idx asc",
+        limit_page_length=50,
+    )
+    return options
+
+
+# ── Reference Price Lookup ────────────────────────────────────────
+
+@frappe.whitelist()
+def get_reference_prices(item_code: str) -> dict:
+    """Return market price and vendor price from Buyback Price Master.
+
+    Used by the Assessment form to show price cards once device details
+    are filled.
+    """
+    if not item_code:
+        return {"market_price": 0, "vendor_price": 0}
+
+    bpm = frappe.db.get_value(
+        "Buyback Price Master",
+        {"item_code": item_code},
+        ["current_market_price", "vendor_price"],
+        as_dict=True,
+    )
+
+    if not bpm:
+        return {"market_price": 0, "vendor_price": 0}
+
+    return {
+        "market_price": bpm.current_market_price or 0,
+        "vendor_price": bpm.vendor_price or 0,
+    }
+
+
+# ── Live Estimate Calculator ─────────────────────────────────────
+
+@frappe.whitelist()
+def calculate_live_estimate(
+    item_code: str,
+    warranty_status: str = None,
+    device_age_months: str = None,
+    diagnostic_tests: str = None,
+    responses: str = None,
+    brand: str = None,
+    item_group: str = None,
+) -> dict:
+    """Calculate estimated price and auto-determine grade from diagnostic results.
+
+    Called live from the Assessment form as the user fills in answers.
+    Returns grade + price breakdown so the form can update without a full save.
+    """
+    import json
+    from frappe.utils import flt
+
+    diag_data = json.loads(diagnostic_tests or "[]")
+    resp_data = json.loads(responses or "[]")
+
+    # ── Auto-determine grade from diagnostic results ──────────
+    grade = _auto_determine_grade(diag_data)
+    grade_id = frappe.db.get_value("Grade Master", {"grade_name": grade}, "name") or ""
+
+    from buyback.buyback.pricing.engine import calculate_estimated_price
+
+    result = calculate_estimated_price(
+        item_code=item_code,
+        grade=grade_id,
+        warranty_status=warranty_status,
+        device_age_months=device_age_months,
+        responses=resp_data,
+        diagnostic_tests=diag_data,
+        brand=brand,
+        item_group=item_group,
+    )
+
+    result["grade"] = grade
+    result["grade_id"] = grade_id
+    return result
+
+
+def _auto_determine_grade(diagnostic_tests: list) -> str:
+    """Determine device grade based on diagnostic test results.
+
+    Grade rules:
+        A  – all tests Pass (or no tests)
+        B  – all Pass or Partial, at most 2 Partial, zero Fail
+        C  – some Fail but fewer than half
+        D  – half or more Fail
+    """
+    if not diagnostic_tests:
+        return "A"
+
+    results = [d.get("result", "") for d in diagnostic_tests if d.get("result")]
+    if not results:
+        return "A"
+
+    total = len(results)
+    fail_count = sum(1 for r in results if r == "Fail")
+    partial_count = sum(1 for r in results if r == "Partial")
+
+    if fail_count == 0 and partial_count == 0:
+        return "A"
+    elif fail_count == 0 and partial_count <= 2:
+        return "B"
+    elif fail_count < total / 2:
+        return "C"
+    else:
+        return "D"
+
+
+# ── Item Question Map Helper ──────────────────────────────────────
+
+
+def _get_mapped_question_names(item_code: str, diagnosis_type: str) -> list[str] | None:
+    """Return ordered list of Question Bank names mapped to an item.
+
+    Lookup order (independent per question/test type):
+      1. Model-level map (map_type='Model', item_code=item_code)
+      2. Subcategory-level map (map_type='Subcategory', item_group=item's group)
+      3. None — no mapping at any level, caller falls back to all
+
+    If a model-level map exists but has no rows for this type, the lookup
+    continues to the subcategory level instead of returning empty.
+
+    Returns:
+        list[str] of Buyback Question Bank names, or None if no mapping exists.
+        None means "no mapping configured — caller may fall back to all".
+    """
+    item_group = frappe.db.get_value("Item", item_code, "item_group")
+
+    # Build candidate maps: model-level first, then subcategory
+    candidates = []
+
+    item_map = frappe.db.get_value(
+        "Buyback Item Question Map",
+        {"map_type": "Model", "item_code": item_code, "disabled": 0},
+        "name",
+    )
+    if item_map:
+        candidates.append(item_map)
+
+    if item_group:
+        group_map = frappe.db.get_value(
+            "Buyback Item Question Map",
+            {"map_type": "Subcategory", "item_group": item_group, "disabled": 0},
+            "name",
+        )
+        if group_map:
+            candidates.append(group_map)
+
+    if not candidates:
+        return None  # No mapping exists at any level
+
+    # Try each candidate; use the first one that has rows for this type
+    for map_name in candidates:
+        if diagnosis_type == "Automated Test":
+            rows = frappe.get_all(
+                "Buyback Item Test Map Detail",
+                filters={"parent": map_name},
+                fields=["test as question", "display_order"],
+                order_by="display_order asc, idx asc",
+            )
+        else:
+            rows = frappe.get_all(
+                "Buyback Item Question Map Detail",
+                filters={"parent": map_name},
+                fields=["question", "display_order"],
+                order_by="display_order asc, idx asc",
+            )
+
+        if rows:
+            return [r.question for r in rows]
+
+    # Mappings exist but none have rows for this type
+    return []
+
+
+# ── Diagnostic Test Loader ────────────────────────────────────────
+
+
+@frappe.whitelist()
+def get_diagnostic_tests_for_item(item_code: str) -> list:
+    """Return enabled automated diagnostic tests applicable to an item.
+
+    Uses Buyback Item Question Map to filter tests.
+    Falls back to ALL enabled Automated Tests if no mapping exists.
+
+    Returns:
+        list[dict]: [{"name": "BQB-...", "test_code": "...", "test_name": "...",
+                       "options": [{"option_value": "Pass", ...}, ...]}]
+    """
+    if not item_code:
+        return []
+
+    mapped_names = _get_mapped_question_names(item_code, "Automated Test")
+
+    filters = {"diagnosis_type": "Automated Test", "disabled": 0}
+    if mapped_names is not None:
+        if not mapped_names:
+            return []  # Mapping exists but has no automated tests
+        filters["name"] = ("in", mapped_names)
+
+    tests = frappe.get_all(
+        "Buyback Question Bank",
+        filters=filters,
+        fields=["name", "question_code", "question_text"],
+        order_by="idx asc, name asc",
+    )
+
+    # If mapped, preserve mapping order
+    if mapped_names is not None:
+        order_map = {n: i for i, n in enumerate(mapped_names)}
+        tests.sort(key=lambda t: order_map.get(t.name, 999))
+
+    result = []
+    for t in tests:
+        options = frappe.get_all(
+            "Buyback Question Option",
+            filters={"parent": t.name},
+            fields=["option_value", "option_label", "price_impact_percent"],
+            order_by="idx asc",
+        )
+        result.append({
+            "name": t.name,
+            "test_code": t.question_code,
+            "test_name": t.question_text,
+            "options": [
+                {
+                    "value": o.option_value,
+                    "label": o.option_label or o.option_value,
+                    "impact": o.price_impact_percent or 0,
+                }
+                for o in options
+            ],
+        })
+
+    return result
+
+
+@frappe.whitelist()
+def get_customer_questions_for_item(item_code: str) -> list:
+    """Return enabled customer questions applicable to an item.
+
+    Uses Buyback Item Question Map to filter questions.
+    Falls back to ALL enabled Customer Questions if no mapping exists.
+
+    Returns:
+        list[dict]: [{"name": "BQB-...", "question_code": "...",
+                      "question_text": "...",
+                      "options": [{"value": ..., "label": ..., "impact": ...}]}]
+    """
+    if not item_code:
+        return []
+
+    mapped_names = _get_mapped_question_names(item_code, "Customer Question")
+
+    filters = {"diagnosis_type": "Customer Question", "disabled": 0}
+    if mapped_names is not None:
+        if not mapped_names:
+            return []  # Mapping exists but has no customer questions
+        filters["name"] = ("in", mapped_names)
+
+    questions = frappe.get_all(
+        "Buyback Question Bank",
+        filters=filters,
+        fields=["name", "question_code", "question_text"],
+        order_by="idx asc, name asc",
+    )
+
+    # If mapped, preserve mapping order
+    if mapped_names is not None:
+        order_map = {n: i for i, n in enumerate(mapped_names)}
+        questions.sort(key=lambda q: order_map.get(q.name, 999))
+
+    result = []
+    for q in questions:
+        options = frappe.get_all(
+            "Buyback Question Option",
+            filters={"parent": q.name},
+            fields=["option_value", "option_label", "price_impact_percent"],
+            order_by="idx asc",
+        )
+        result.append({
+            "name": q.name,
+            "question_code": q.question_code,
+            "question_text": q.question_text,
+            "options": [
+                {
+                    "value": o.option_value,
+                    "label": o.option_label or o.option_value,
+                    "impact": o.price_impact_percent or 0,
+                }
+                for o in options
+            ],
+        })
+
+    return result

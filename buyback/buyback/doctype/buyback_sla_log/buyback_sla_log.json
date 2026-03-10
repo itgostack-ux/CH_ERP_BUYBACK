@@ -1,0 +1,164 @@
+{
+ "actions": [],
+ "autoname": "hash",
+ "creation": "2026-03-05 10:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "sla_stage",
+  "reference_doctype",
+  "reference_name",
+  "column_break_ref",
+  "store",
+  "company",
+  "section_timing",
+  "start_time",
+  "end_time",
+  "column_break_timing",
+  "expected_minutes",
+  "actual_minutes",
+  "exceeded_by",
+  "section_status",
+  "breached",
+  "status"
+ ],
+ "fields": [
+  {
+   "fieldname": "sla_stage",
+   "fieldtype": "Data",
+   "label": "SLA Stage",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "description": "e.g. approval_to_payment, variance_approval, quote_to_inspection"
+  },
+  {
+   "fieldname": "reference_doctype",
+   "fieldtype": "Link",
+   "label": "Reference DocType",
+   "options": "DocType",
+   "reqd": 1
+  },
+  {
+   "fieldname": "reference_name",
+   "fieldtype": "Dynamic Link",
+   "label": "Reference Name",
+   "options": "reference_doctype",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "column_break_ref",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "store",
+   "fieldtype": "Link",
+   "label": "Store",
+   "options": "Warehouse",
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "Company",
+   "options": "Company",
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "section_timing",
+   "fieldtype": "Section Break",
+   "label": "Timing"
+  },
+  {
+   "fieldname": "start_time",
+   "fieldtype": "Datetime",
+   "label": "Start Time",
+   "read_only": 1
+  },
+  {
+   "fieldname": "end_time",
+   "fieldtype": "Datetime",
+   "label": "End Time",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_timing",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "expected_minutes",
+   "fieldtype": "Float",
+   "label": "Expected Minutes",
+   "precision": "1",
+   "in_list_view": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "actual_minutes",
+   "fieldtype": "Float",
+   "label": "Actual Minutes",
+   "precision": "1",
+   "in_list_view": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "exceeded_by",
+   "fieldtype": "Float",
+   "label": "Exceeded By (min)",
+   "precision": "1",
+   "read_only": 1,
+   "description": "actual_minutes - expected_minutes"
+  },
+  {
+   "fieldname": "section_status",
+   "fieldtype": "Section Break",
+   "label": "Status"
+  },
+  {
+   "fieldname": "breached",
+   "fieldtype": "Check",
+   "label": "Breached",
+   "default": "0",
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "options": "On Time\nWarning\nBreach",
+   "default": "On Time",
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  }
+ ],
+ "in_create": 1,
+ "index_web_pages_for_search": 0,
+ "links": [],
+ "modified": "2026-03-05 10:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "BuyBack",
+ "name": "Buyback SLA Log",
+ "naming_rule": "Random",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "export": 1
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "role": "Buyback Manager"
+  }
+ ],
+ "search_fields": "sla_stage,reference_name,store",
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 0
+}

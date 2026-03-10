@@ -1,0 +1,57 @@
+{
+ "actions": [],
+ "creation": "2026-03-10 10:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "test",
+  "test_name",
+  "test_code",
+  "display_order"
+ ],
+ "fields": [
+  {
+   "fieldname": "test",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Test",
+   "options": "Buyback Question Bank",
+   "reqd": 1
+  },
+  {
+   "fetch_from": "test.question_text",
+   "fieldname": "test_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Test Name",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "test.question_code",
+   "fieldname": "test_code",
+   "fieldtype": "Data",
+   "label": "Test Code",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "display_order",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Display Order"
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-03-10 10:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "BuyBack",
+ "name": "Buyback Item Test Map Detail",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "display_order",
+ "sort_order": "ASC",
+ "states": []
+}

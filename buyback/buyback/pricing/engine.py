@@ -22,6 +22,7 @@ def calculate_estimated_price(
     warranty_status: str = None,
     device_age_months: int = None,
     responses: list = None,
+    diagnostic_tests: list = None,
     brand: str = None,
     item_group: str = None,
 ):
@@ -34,6 +35,7 @@ def calculate_estimated_price(
         warranty_status: "In Warranty" or "Out of Warranty"
         device_age_months: Age of device in months
         responses: List of dicts [{"question_code": "...", "answer_value": "..."}]
+        diagnostic_tests: List of dicts [{"test_code": "...", "result": "Pass/Fail/Partial"}]
         brand: Brand name (for pricing rule matching)
         item_group: Item Group name (for pricing rule matching)
 
@@ -52,6 +54,9 @@ def calculate_estimated_price(
         "estimated_price": 0,
     }
 
+    # Resolve age bracket label to numeric for all downstream logic
+    resolved_age = _resolve_age_months(device_age_months)
+
     # Step 1: Look up base price from BPM
     base_price = _get_base_price(item_code, grade, warranty_status, device_age_months)
     result["base_price"] = base_price
@@ -61,7 +66,15 @@ def calculate_estimated_price(
 
     running_price = base_price
 
-    # Step 2: Apply question-based deductions
+    # Step 2a: Apply diagnostic-test-based deductions
+    if diagnostic_tests:
+        for dt in diagnostic_tests:
+            deduction = _get_diagnostic_deduction(dt, base_price)
+            if deduction:
+                result["deductions"].append(deduction)
+                running_price -= deduction["amount"]
+
+    # Step 2b: Apply question-based deductions
     if responses:
         for resp in responses:
             deduction = _get_question_deduction(resp, base_price)
@@ -76,15 +89,20 @@ def calculate_estimated_price(
         item_group=item_group,
         grade=grade,
         warranty_status=warranty_status,
-        device_age_months=device_age_months,
+        device_age_months=resolved_age,
     )
     result["deductions"].extend(rule_deductions)
 
     # Step 4: Calculate totals
     result["total_deductions"] = sum(d["amount"] for d in result["deductions"])
-    estimated = max(0, base_price - result["total_deductions"])
+    estimated = base_price - result["total_deductions"]
 
-    # Step 5: Round
+    # Step 5: Floor at lowest grade (D) price for this model/warranty/age
+    floor_price = _get_floor_price(item_code, warranty_status, device_age_months)
+    estimated = max(floor_price, estimated)
+    result["floor_price"] = floor_price
+
+    # Step 6: Round
     estimated = _round_price(estimated)
     result["estimated_price"] = estimated
 
@@ -92,7 +110,7 @@ def calculate_estimated_price(
 
 
 def calculate_final_price(
-    buyback_quote_name: str,
+    assessment_name: str,
     condition_grade: str = None,
     override_amount: float = None,
     override_reason: str = None,
@@ -102,8 +120,8 @@ def calculate_final_price(
     May differ from estimated if grade changed or override applied.
 
     Args:
-        buyback_quote_name: Name of the Buyback Quote
-        condition_grade: Actual grade from inspection (may differ from quote)
+        assessment_name: Name of the Buyback Assessment
+        condition_grade: Actual grade from inspection (may differ from assessment)
         override_amount: Manual price override
         override_reason: Reason for override
 
@@ -116,34 +134,39 @@ def calculate_final_price(
             "change_reason": str,
         }
     """
-    quote = frappe.get_doc("Buyback Quote", buyback_quote_name)
+    assessment = frappe.get_doc("Buyback Assessment", assessment_name)
+    original_price = assessment.quoted_price or assessment.estimated_price
 
     result = {
-        "original_estimated": quote.estimated_price,
-        "recalculated_price": quote.estimated_price,
-        "final_price": quote.estimated_price,
+        "original_estimated": original_price,
+        "recalculated_price": original_price,
+        "final_price": original_price,
         "price_changed": False,
         "change_reason": None,
     }
 
     # If grade changed, recalculate
-    effective_grade = condition_grade or (quote.get("condition_grade") if hasattr(quote, "condition_grade") else None)
+    effective_grade = condition_grade or assessment.estimated_grade
     if effective_grade:
         recalc = calculate_estimated_price(
-            item_code=quote.item,
+            item_code=assessment.item,
             grade=effective_grade,
-            warranty_status=quote.warranty_status,
-            device_age_months=quote.device_age_months,
+            warranty_status=assessment.warranty_status,
+            device_age_months=assessment.device_age_months,
             responses=[
                 {"question_code": r.question_code, "answer_value": r.answer_value}
-                for r in (quote.responses or [])
+                for r in (assessment.responses or [])
             ],
-            brand=quote.brand,
-            item_group=quote.item_group,
+            diagnostic_tests=[
+                {"test_code": d.test_code, "result": d.result}
+                for d in (assessment.diagnostic_tests or [])
+            ],
+            brand=assessment.brand,
+            item_group=assessment.item_group,
         )
         result["recalculated_price"] = recalc["estimated_price"]
         result["final_price"] = recalc["estimated_price"]
-        if recalc["estimated_price"] != quote.estimated_price:
+        if recalc["estimated_price"] != original_price:
             result["price_changed"] = True
             result["change_reason"] = f"Grade changed to {effective_grade}"
 
@@ -265,7 +288,7 @@ def _get_base_price(item_code, grade, warranty_status=None, device_age_months=No
         return flt(bpm.get("current_market_price"))
 
     # Determine warranty/age bucket
-    age = device_age_months or 0
+    age = _resolve_age_months(device_age_months)
     is_iw = warranty_status == "In Warranty"
 
     if is_iw and age <= 3:
@@ -278,6 +301,40 @@ def _get_base_price(item_code, grade, warranty_status=None, device_age_months=No
         field = f"{grade_letter}_grade_oow_11"
 
     return flt(bpm.get(field)) or flt(bpm.get("current_market_price"))
+
+
+def _get_floor_price(item_code, warranty_status=None, device_age_months=None):
+    """Return the lowest grade (D) price for this item/warranty/age bucket.
+
+    This is the absolute minimum the price can drop to — ensures the
+    estimated price never goes to zero.
+    """
+    bpm = frappe.db.get_value(
+        "Buyback Price Master",
+        {"item_code": item_code},
+        ["d_grade_iw_0_6", "d_grade_iw_6_11", "d_grade_oow_11",
+         "c_grade_iw_0_3", "c_grade_oow_11"],
+        as_dict=True,
+    )
+    if not bpm:
+        return 0
+
+    age = _resolve_age_months(device_age_months)
+    is_iw = warranty_status == "In Warranty"
+
+    # Grade D doesn't have 0-3 bucket, so fall back through D fields
+    if is_iw and age <= 6:
+        floor = flt(bpm.get("d_grade_iw_0_6"))
+    elif is_iw and age <= 11:
+        floor = flt(bpm.get("d_grade_iw_6_11"))
+    else:
+        floor = flt(bpm.get("d_grade_oow_11"))
+
+    # If D grade price is 0, try C grade OOW as absolute minimum
+    if not floor:
+        floor = flt(bpm.get("c_grade_oow_11"))
+
+    return floor
 
 
 def _resolve_grade_letter(grade):
@@ -294,6 +351,74 @@ def _resolve_grade_letter(grade):
     if letter in ("a", "b", "c", "d"):
         return letter
     return None
+
+
+def _resolve_age_months(device_age_months):
+    """Convert age bracket label to a representative numeric value.
+
+    Accepts either:
+      - Select labels: '0-3 Months', '4-6 Months', '7-11 Months', '12+ Months'
+      - Raw int / string int (for backward compatibility / API)
+    Returns int used by the bucket logic (0-3, 4-6, 7-11, 12+).
+    """
+    if not device_age_months:
+        return 0
+
+    mapping = {
+        "0-3 Months": 2,
+        "4-6 Months": 5,
+        "7-11 Months": 9,
+        "12+ Months": 14,
+    }
+    val = str(device_age_months).strip()
+    if val in mapping:
+        return mapping[val]
+
+    # Backward compat: raw int
+    try:
+        return int(val)
+    except (ValueError, TypeError):
+        return 0
+
+
+def _get_diagnostic_deduction(diagnostic_test, base_price):
+    """Calculate deduction from an automated diagnostic test result.
+
+    Looks up the Question Bank entry by test_code, then finds the
+    matching option for the result (Pass / Fail / Partial).
+    """
+    test_code = diagnostic_test.get("test_code")
+    result = diagnostic_test.get("result")
+
+    if not test_code or not result:
+        return None
+
+    question = frappe.db.get_value(
+        "Buyback Question Bank",
+        {"question_code": test_code, "disabled": 0},
+        "name",
+    )
+    if not question:
+        return None
+
+    option = frappe.db.get_value(
+        "Buyback Question Option",
+        {"parent": question, "option_value": result},
+        ["option_label", "price_impact_percent"],
+        as_dict=True,
+    )
+
+    if not option or not option.price_impact_percent:
+        return None
+
+    deduction_amount = abs(base_price * flt(option.price_impact_percent) / 100)
+
+    return {
+        "label": f"{test_code}: {option.option_label or result}",
+        "amount": deduction_amount,
+        "type": "diagnostic_test",
+        "percent": abs(option.price_impact_percent),
+    }
 
 
 def _get_question_deduction(response, base_price):

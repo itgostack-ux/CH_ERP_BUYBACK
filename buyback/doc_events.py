@@ -5,20 +5,20 @@ Registered in hooks.py doc_events — these fire on standard Frappe
 document lifecycle events for buyback-related doctypes.
 
 Purpose: Update Serial No (IMEI) buyback status and timeline at each
-stage of the buyback flow — Quote → Inspection → Order → Close.
+stage of the buyback flow — Assessment → Inspection → Order → Close.
 """
 
 import frappe
 from buyback.serial_no_utils import update_serial_buyback_status
 
 
-def on_quote_created(doc, method=None):
-    """After a Buyback Quote is inserted, mark the IMEI as 'Quoted'."""
+def on_assessment_created(doc, method=None):
+    """After a Buyback Assessment is inserted, mark the IMEI as 'Assessment Created'."""
     if doc.imei_serial:
         update_serial_buyback_status(
             doc.imei_serial,
             status="Quoted",
-            comment=f"📋 Buyback Quote {doc.name} created — ₹{doc.quoted_price}",
+            comment=f"📱 Self-assessment {doc.name} created via {doc.source} — est. ₹{doc.estimated_price}",
         )
 
 

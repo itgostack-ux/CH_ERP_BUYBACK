@@ -1,0 +1,71 @@
+{
+ "actions": [],
+ "creation": "2026-03-05 10:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "test",
+  "test_code",
+  "test_name",
+  "result",
+  "depreciation_percent"
+ ],
+ "fields": [
+  {
+   "fieldname": "test",
+   "fieldtype": "Link",
+   "label": "Test",
+   "options": "Buyback Question Bank",
+   "reqd": 1,
+   "hidden": 1,
+   "description": "Automated diagnostic test from Question Bank"
+  },
+  {
+   "fieldname": "test_code",
+   "fieldtype": "Data",
+   "label": "Test Code",
+   "fetch_from": "test.question_code",
+   "read_only": 1,
+   "hidden": 1
+  },
+  {
+   "fieldname": "test_name",
+   "fieldtype": "Data",
+   "label": "Test",
+   "fetch_from": "test.question_text",
+   "read_only": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "result",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Result",
+   "options": "\nPass\nFail\nPartial",
+   "reqd": 1,
+   "description": "Automated test result from mobile app"
+  },
+  {
+   "default": "0",
+   "fieldname": "depreciation_percent",
+   "fieldtype": "Percent",
+   "in_list_view": 1,
+   "label": "Depreciation %",
+   "read_only": 1,
+   "description": "Auto-filled from Question Bank option matching the result"
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-03-07 10:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "BuyBack",
+ "name": "Buyback Assessment Diagnostic",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "creation",
+ "sort_order": "ASC",
+ "states": []
+}

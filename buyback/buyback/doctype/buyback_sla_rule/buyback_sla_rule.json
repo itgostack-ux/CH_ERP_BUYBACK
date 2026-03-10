@@ -1,0 +1,38 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "creation": "2026-01-01 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "sla_name",
+  "target_minutes",
+  "column_break_1",
+  "applies_to_doctype",
+  "start_field",
+  "end_field",
+  "is_active"
+ ],
+ "fields": [
+  {"fieldname": "sla_name", "fieldtype": "Data", "in_list_view": 1, "label": "SLA Name", "reqd": 1},
+  {"fieldname": "target_minutes", "fieldtype": "Int", "in_list_view": 1, "label": "Target (Minutes)", "reqd": 1},
+  {"fieldname": "column_break_1", "fieldtype": "Column Break"},
+  {"fieldname": "applies_to_doctype", "fieldtype": "Select", "in_list_view": 1, "label": "Applies To", "options": "Buyback Assessment\nBuyback Inspection\nBuyback Order\nBuyback Exchange Order", "reqd": 1},
+  {"fieldname": "start_field", "fieldtype": "Data", "label": "Start Timestamp Field", "reqd": 1, "description": "DB fieldname that marks the SLA start"},
+  {"fieldname": "end_field", "fieldtype": "Data", "label": "End Timestamp Field", "reqd": 1, "description": "DB fieldname that marks SLA completion"},
+  {"fieldname": "is_active", "fieldtype": "Check", "label": "Active", "default": "1"}
+ ],
+ "idx": 0,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-01-01 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "BuyBack",
+ "name": "Buyback SLA Rule",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "creation",
+ "sort_order": "ASC",
+ "states": [],
+ "track_changes": 0
+}

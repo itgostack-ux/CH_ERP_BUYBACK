@@ -28,18 +28,20 @@
   },
   {
    "fieldname": "check_type",
-   "fieldtype": "Data",
+   "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Check Type",
+   "options": "\nPass/Fail\nGrade (A/B/C/D)\nYes/No\nCondition",
    "read_only": 1
   },
   {
    "fieldname": "result",
-   "fieldtype": "Data",
+   "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Result",
+   "options": "\nPass\nFail\nA\nB\nC\nD\nYes\nNo\nGood\nFair\nPoor\nN/A",
    "reqd": 1,
-   "description": "Pass/Fail, Grade value, numeric score, or text note"
+   "description": "Select from standard options based on check type"
   },
   {
    "fieldname": "notes",

@@ -20,11 +20,11 @@ def _setup_number_cards():
     """Create Number Cards for key buyback KPIs."""
     cards = [
         {
-            "name": "Todays Buyback Quotes",
-            "label": "Today's Quotes",
-            "document_type": "Buyback Quote",
+            "name": "Todays Buyback Assessments",
+            "label": "Today's Assessments",
+            "document_type": "Buyback Assessment",
             "function": "Count",
-            "filters_json": '[["Buyback Quote","creation","Timespan","today"]]',
+            "filters_json": '["Buyback Assessment","creation","Timespan","today"]]',
             "color": "#2490EF",
             "show_percentage_stats": 1,
             "stats_time_interval": "Daily",
@@ -90,14 +90,14 @@ def _setup_workspace():
         ws.is_hidden = 0
 
     # ── Number Card section (top) ──
-    ws.append("number_cards", {"number_card_name": "Todays Buyback Quotes"})
+    ws.append("number_cards", {"number_card_name": "Todays Buyback Assessments"})
     ws.append("number_cards", {"number_card_name": "Pending Inspections"})
     ws.append("number_cards", {"number_card_name": "Awaiting Approval Orders"})
     ws.append("number_cards", {"number_card_name": "Todays Buyback Revenue"})
 
     # ── Shortcuts ──
     for sc in [
-        {"type": "DocType", "link_to": "Buyback Quote", "label": "New Quote"},
+        {"type": "DocType", "link_to": "Buyback Assessment", "label": "Assessments"},
         {"type": "DocType", "link_to": "Buyback Inspection", "label": "Inspections"},
         {"type": "DocType", "link_to": "Buyback Order", "label": "Orders"},
         {"type": "DocType", "link_to": "Buyback Exchange Order", "label": "Exchange"},
@@ -106,13 +106,14 @@ def _setup_workspace():
         ws.append("shortcuts", sc)
 
     # ── Links (sidebar navigation) ──
+
     # --- Transaction Flow ---
     ws.append("links", {
         "type": "Card Break",
         "label": "Transaction Flow",
     })
     for dt in [
-        "Buyback Quote",
+        "Buyback Assessment",
         "Buyback Inspection",
         "Buyback Order",
         "Buyback Exchange Order",
@@ -134,6 +135,7 @@ def _setup_workspace():
         "Buyback Price Master",
         "Grade Master",
         "Buyback Question Bank",
+        "Buyback Item Question Map",
         "Buyback Checklist Template",
         "Buyback Pricing Rule",
     ]:
@@ -149,11 +151,27 @@ def _setup_workspace():
         "type": "Card Break",
         "label": "Shared Masters",
     })
+    for dt_label in [
+        ("Warehouse", "Stores"),
+        ("Mode of Payment", "Payment Methods"),
+        ("CH OTP Log", "OTP Log"),
+    ]:
+        dt, label = dt_label
+        ws.append("links", {
+            "type": "Link",
+            "link_type": "DocType",
+            "link_to": dt,
+            "label": label,
+        })
+
+    # --- Settings ---
+    ws.append("links", {
+        "type": "Card Break",
+        "label": "Settings & Configuration",
+    })
     for dt in [
-        "CH Store",
-        "CH Payment Method",
-        "CH State",
-        "CH OTP Log",
+        "Buyback Settings",
+        "Buyback SLA Settings",
     ]:
         ws.append("links", {
             "type": "Link",
@@ -162,17 +180,60 @@ def _setup_workspace():
             "label": dt,
         })
 
-    # --- Settings ---
-    ws.append("links", {
-        "type": "Card Break",
-        "label": "Settings & Configuration",
-    })
-    ws.append("links", {
-        "type": "Link",
-        "link_type": "DocType",
-        "link_to": "Buyback Settings",
-        "label": "Buyback Settings",
-    })
+    # --- Reports ---
+    report_categories = {
+        "Daily Operations": [
+            "Daily Ops Queue",
+            "Customer Approval Pending",
+            "Pending Confirmations",
+            "Pending Payments",
+            "Pending Settlement",
+        ],
+        "Funnel & Conversion": [
+            "Buyback Funnel",
+            "Source Mix",
+            "Exchange Conversion",
+            "Quote Accuracy",
+        ],
+        "Pricing & Quality": [
+            "Price Variance",
+            "Deduction Breakdown",
+            "Mismatch Analysis",
+            "Grade Distribution",
+        ],
+        "Performance": [
+            "Branch Performance",
+            "Store Scorecard",
+            "Executive Performance",
+            "Inspector Scorecard",
+        ],
+        "Finance & Settlement": [
+            "Settlement Register",
+            "Finance Payout Register",
+            "Model Wise Buyback",
+            "Category Trend",
+        ],
+        "Compliance & Audit": [
+            "SLA Breach Report",
+            "OTP Failure Report",
+            "Manager Overrides Audit",
+            "Duplicate IMEI Attempts",
+        ],
+    }
+
+    for category, reports in report_categories.items():
+        ws.append("links", {
+            "type": "Card Break",
+            "label": category,
+        })
+        for rpt in reports:
+            ws.append("links", {
+                "type": "Link",
+                "link_type": "Report",
+                "link_to": rpt,
+                "label": rpt,
+                "is_query_report": 1,
+            })
 
     # Build visual content blocks
     ws.content = _build_content()
@@ -196,9 +257,9 @@ def _build_content():
             },
         },
         {
-            "id": "nc_quotes",
+            "id": "nc_assessments",
             "type": "number_card",
-            "data": {"number_card_name": "Todays Buyback Quotes", "col": 3},
+            "data": {"number_card_name": "Todays Buyback Assessments", "col": 3},
         },
         {
             "id": "nc_inspections",
@@ -229,24 +290,34 @@ def _build_content():
             },
         },
         {
+            "id": "sc_assessment",
+            "type": "shortcut",
+            "data": {"shortcut_name": "Assessments", "col": 2},
+        },
+        {
             "id": "sc_quote",
             "type": "shortcut",
-            "data": {"shortcut_name": "New Quote", "col": 3},
+            "data": {"shortcut_name": "Quotes", "col": 2},
         },
         {
             "id": "sc_inspection",
             "type": "shortcut",
-            "data": {"shortcut_name": "Inspections", "col": 3},
+            "data": {"shortcut_name": "Inspections", "col": 2},
         },
         {
             "id": "sc_order",
             "type": "shortcut",
-            "data": {"shortcut_name": "Orders", "col": 3},
+            "data": {"shortcut_name": "Orders", "col": 2},
         },
         {
             "id": "sc_exchange",
             "type": "shortcut",
-            "data": {"shortcut_name": "Exchange", "col": 3},
+            "data": {"shortcut_name": "Exchange", "col": 2},
+        },
+        {
+            "id": "sc_settings",
+            "type": "shortcut",
+            "data": {"shortcut_name": "Settings", "col": 2},
         },
         {
             "id": "spacer_2",
@@ -257,7 +328,7 @@ def _build_content():
             "id": "links_header",
             "type": "header",
             "data": {
-                "text": "<span class=\"h4\"><b>Masters &amp; Reports</b></span>",
+                "text": "<span class=\"h4\"><b>Documents</b></span>",
                 "col": 12,
             },
         },
@@ -272,9 +343,62 @@ def _build_content():
             "data": {"card_name": "Masters", "col": 4},
         },
         {
+            "id": "card_settings",
+            "type": "card",
+            "data": {"card_name": "Settings & Configuration", "col": 4},
+        },
+        {
+            "id": "spacer_3",
+            "type": "spacer",
+            "data": {"col": 12},
+        },
+        {
             "id": "card_shared",
             "type": "card",
             "data": {"card_name": "Shared Masters", "col": 4},
+        },
+        {
+            "id": "spacer_reports",
+            "type": "spacer",
+            "data": {"col": 12},
+        },
+        {
+            "id": "reports_header",
+            "type": "header",
+            "data": {
+                "text": "<span class=\"h4\"><b>Reports</b></span>",
+                "col": 12,
+            },
+        },
+        {
+            "id": "card_rpt_daily",
+            "type": "card",
+            "data": {"card_name": "Daily Operations", "col": 4},
+        },
+        {
+            "id": "card_rpt_funnel",
+            "type": "card",
+            "data": {"card_name": "Funnel & Conversion", "col": 4},
+        },
+        {
+            "id": "card_rpt_pricing",
+            "type": "card",
+            "data": {"card_name": "Pricing & Quality", "col": 4},
+        },
+        {
+            "id": "card_rpt_perf",
+            "type": "card",
+            "data": {"card_name": "Performance", "col": 4},
+        },
+        {
+            "id": "card_rpt_finance",
+            "type": "card",
+            "data": {"card_name": "Finance & Settlement", "col": 4},
+        },
+        {
+            "id": "card_rpt_audit",
+            "type": "card",
+            "data": {"card_name": "Compliance & Audit", "col": 4},
         },
     ]
     return json.dumps(blocks)

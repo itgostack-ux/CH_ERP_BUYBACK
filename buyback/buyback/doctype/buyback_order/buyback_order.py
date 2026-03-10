@@ -27,6 +27,9 @@ class BuybackOrder(Document):
 
     def validate(self):
         self._populate_item_hierarchy()
+        self._link_assessment()
+        self._calculate_price_variance()
+        self._calculate_exchange_totals()
         self._calculate_payment_totals()
         self._check_approval_requirement()
         self._validate_kyc_for_otp_stage()
@@ -46,6 +49,51 @@ class BuybackOrder(Document):
                     self.brand = item_data.brand
                 if not self.item_name:
                     self.item_name = item_data.item_name
+
+    def _link_assessment(self):
+        """Auto-link buyback assessment from inspection."""
+        if self.buyback_assessment:
+            return
+        if self.buyback_inspection:
+            assessment = frappe.db.get_value(
+                "Buyback Inspection", self.buyback_inspection, "buyback_assessment"
+            )
+            if assessment:
+                self.buyback_assessment = assessment
+
+    def _calculate_price_variance(self):
+        """Compute price variance between original assessment quote and inspection-revised price."""
+        if self.buyback_inspection:
+            insp = frappe.db.get_value(
+                "Buyback Inspection", self.buyback_inspection,
+                ["quoted_price", "revised_price"], as_dict=True
+            )
+            if insp:
+                self.original_quoted_price = flt(insp.quoted_price)
+                self.revised_inspection_price = flt(insp.revised_price) or flt(insp.quoted_price)
+        elif self.buyback_assessment:
+            self.original_quoted_price = flt(
+                frappe.db.get_value("Buyback Assessment", self.buyback_assessment, "quoted_price")
+            ) or flt(
+                frappe.db.get_value("Buyback Assessment", self.buyback_assessment, "estimated_price")
+            )
+            self.revised_inspection_price = self.original_quoted_price
+
+        if flt(self.original_quoted_price):
+            self.price_variance = flt(self.revised_inspection_price) - flt(self.original_quoted_price)
+            self.price_variance_pct = (
+                self.price_variance / flt(self.original_quoted_price) * 100
+            )
+        else:
+            self.price_variance = 0
+            self.price_variance_pct = 0
+
+    def _calculate_exchange_totals(self):
+        """Calculate exchange discount and balance when settlement_type is Exchange."""
+        if self.settlement_type != "Exchange":
+            return
+        self.exchange_discount = flt(self.final_price)
+        self.balance_to_pay = max(flt(self.new_device_price) - flt(self.exchange_discount), 0)
 
     def on_update_after_submit(self):
         """Handle status transitions triggered by workflow on submitted docs.
@@ -177,6 +225,60 @@ class BuybackOrder(Document):
         self.save()
         log_audit("Order Rejected", "Buyback Order", self.name,
                   new_value={"rejected_by": frappe.session.user, "reason": remarks})
+
+    def customer_approve(self, method="In-Store Signature"):
+        """Customer approves the revised/final price.
+
+        This is required when the inspection price differs from the
+        original quoted price.  The customer must confirm they accept
+        the new offer before proceeding.
+        """
+        allowed = ("Approved", "Awaiting Customer Approval")
+        if self.status not in allowed:
+            frappe.throw(
+                _("Customer approval is only applicable in {0} status.").format(
+                    " or ".join(allowed)
+                ),
+                exc=BuybackStatusError,
+            )
+        self.customer_approved = 1
+        self.customer_approved_at = now_datetime()
+        self.customer_approval_method = method
+        self.status = "Customer Approved"
+        self.save()
+        log_audit("Customer Approved", "Buyback Order", self.name,
+                  new_value={"method": method, "final_price": self.final_price})
+
+    def select_settlement_type(self, settlement_type, new_item=None, new_device_price=None):
+        """Set buyback vs exchange settlement.
+
+        Args:
+            settlement_type: "Buyback" or "Exchange"
+            new_item: Item code for new device (required if Exchange)
+            new_device_price: Price of new device (required if Exchange)
+        """
+        if settlement_type not in ("Buyback", "Exchange"):
+            frappe.throw(_("Invalid settlement type: {0}").format(settlement_type))
+
+        self.settlement_type = settlement_type
+        if settlement_type == "Exchange":
+            if not new_item:
+                frappe.throw(_("New device item is required for exchange."))
+            self.new_item = new_item
+            if new_device_price is not None:
+                self.new_device_price = flt(new_device_price)
+            else:
+                # Fetch standard selling price from Item
+                price = frappe.db.get_value("Item Price", {
+                    "item_code": new_item,
+                    "selling": 1,
+                    "price_list": frappe.db.get_single_value("Selling Settings", "selling_price_list"),
+                }, "price_list_rate")
+                self.new_device_price = flt(price)
+
+        self.save()
+        log_audit("Settlement Type Changed", "Buyback Order", self.name,
+                  new_value={"settlement_type": settlement_type, "new_item": new_item})
 
     def send_otp(self):
         """Send OTP for customer verification."""
@@ -388,7 +490,7 @@ class BuybackOrder(Document):
             }
             if self.store:
                 store_name = frappe.db.get_value(
-                    "CH Store", self.store, "store_name"
+                    "Warehouse", self.store, "warehouse_name"
                 ) or self.store
                 update["ch_last_visit_store"] = store_name
 
@@ -567,10 +669,8 @@ class BuybackOrder(Document):
         """
         settings = frappe.get_single("Buyback Settings")
 
-        # Determine target warehouse: store warehouse > settings default > skip
-        target_warehouse = None
-        if self.store:
-            target_warehouse = frappe.db.get_value("CH Store", self.store, "warehouse")
+        # Determine target warehouse: store IS the warehouse now (no indirection)
+        target_warehouse = self.store if self.store else None
         if not target_warehouse:
             target_warehouse = frappe.db.get_value(
                 "Company", self.company or settings.default_company, "default_warehouse"

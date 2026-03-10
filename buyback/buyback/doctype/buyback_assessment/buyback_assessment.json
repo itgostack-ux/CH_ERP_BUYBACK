@@ -1,0 +1,399 @@
+{
+ "actions": [],
+ "autoname": "naming_series:",
+ "creation": "2026-03-06 10:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "naming_series",
+  "assessment_id",
+  "source",
+  "session_id",
+  "column_break_meta",
+  "status",
+  "customer_section",
+  "customer",
+  "customer_name",
+  "mobile_no",
+  "column_break_cust",
+  "store",
+  "company",
+  "device_section",
+  "item",
+  "item_group",
+  "brand",
+  "item_name",
+  "column_break_device",
+  "imei_serial",
+  "device_age_months",
+  "warranty_status",
+  "price_cards_section",
+  "price_cards_html",
+  "diagnostic_tests_section",
+  "diagnostic_tests",
+  "responses_section",
+  "responses",
+  "pricing_section",
+  "estimated_grade",
+  "column_break_pricing",
+  "estimated_price",
+  "quoted_price",
+  "result_section",
+  "buyback_inspection",
+  "column_break_result",
+  "expires_on",
+  "remarks_section",
+  "remarks"
+ ],
+ "fields": [
+  {
+   "default": "BBA-.YYYY.-.#####",
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "hidden": 1,
+   "label": "Series",
+   "options": "BBA-.YYYY.-.#####",
+   "print_hide": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "assessment_id",
+   "fieldtype": "Int",
+   "label": "Assessment ID",
+   "read_only": 1,
+   "unique": 1,
+   "no_copy": 1,
+   "in_list_view": 1,
+   "description": "Auto-generated sequential ID for mobile/API integration"
+  },
+  {
+   "default": "Store Manual",
+   "fieldname": "source",
+   "fieldtype": "Select",
+   "label": "Source",
+   "options": "Mobile App\nIn-Store Kiosk\nWeb\nStore Manual",
+   "reqd": 1,
+   "in_standard_filter": 1,
+   "in_list_view": 1,
+   "description": "How the customer submitted this self-assessment (Mobile App is set only via API)"
+  },
+  {
+   "fieldname": "session_id",
+   "fieldtype": "Data",
+   "label": "Session ID",
+   "description": "External session reference from mobile app or kiosk",
+   "depends_on": "eval:doc.source !== 'Store Manual'",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_meta",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Draft",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "options": "Draft\nSubmitted\nInspection Created\nExpired\nCancelled",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "customer_section",
+   "fieldtype": "Section Break",
+   "label": "Customer Details"
+  },
+  {
+   "fieldname": "customer",
+   "fieldtype": "Link",
+   "label": "Customer",
+   "options": "Customer",
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "customer_name",
+   "fieldtype": "Data",
+   "label": "Customer Name",
+   "fetch_from": "customer.customer_name",
+   "read_only": 1,
+   "hidden": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "mobile_no",
+   "fieldtype": "Data",
+   "label": "Mobile No",
+   "reqd": 1,
+   "fetch_from": "customer.mobile_no",
+   "fetch_if_empty": 1
+  },
+  {
+   "fieldname": "column_break_cust",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "store",
+   "fieldtype": "Link",
+   "label": "Store",
+   "options": "Warehouse",
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "Company",
+   "options": "Company",
+   "fetch_from": "store.company",
+   "read_only": 1
+  },
+  {
+   "fieldname": "device_section",
+   "fieldtype": "Section Break",
+   "label": "Device Details"
+  },
+  {
+   "fieldname": "item",
+   "fieldtype": "Link",
+   "label": "Item",
+   "options": "Item",
+   "reqd": 1,
+   "description": "The specific device model"
+  },
+  {
+   "fieldname": "item_group",
+   "fieldtype": "Link",
+   "label": "Category",
+   "options": "Item Group",
+   "fetch_from": "item.item_group",
+   "read_only": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "brand",
+   "fieldtype": "Link",
+   "label": "Brand",
+   "options": "Brand",
+   "fetch_from": "item.brand",
+   "read_only": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "item_name",
+   "fieldtype": "Data",
+   "label": "Item Name",
+   "fetch_from": "item.item_name",
+   "read_only": 1,
+   "hidden": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "column_break_device",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "imei_serial",
+   "fieldtype": "Data",
+   "label": "IMEI / Serial No"
+  },
+  {
+   "fieldname": "device_age_months",
+   "fieldtype": "Select",
+   "label": "Device Age",
+   "options": "\n0-3 Months\n4-6 Months\n7-11 Months\n12+ Months",
+   "description": "Age bracket — pricing varies by bracket"
+  },
+  {
+   "fieldname": "warranty_status",
+   "fieldtype": "Select",
+   "label": "Warranty Status",
+   "options": "\nIn Warranty\nOut of Warranty"
+  },
+  {
+   "fieldname": "price_cards_section",
+   "fieldtype": "Section Break",
+   "label": "Reference Prices",
+   "depends_on": "eval:doc.item"
+  },
+  {
+   "fieldname": "price_cards_html",
+   "fieldtype": "HTML",
+   "label": "Price Cards"
+  },
+  {
+   "fieldname": "diagnostic_tests_section",
+   "fieldtype": "Section Break",
+   "label": "Automated Diagnostic Tests",
+   "description": "Results from automated mobile app diagnostics (screen, touch, speaker, etc.)"
+  },
+  {
+   "fieldname": "diagnostic_tests",
+   "fieldtype": "Table",
+   "label": "Diagnostic Tests",
+   "options": "Buyback Assessment Diagnostic",
+   "description": "Automated test results from mobile app — each test produces Pass/Fail/Partial"
+  },
+  {
+   "fieldname": "responses_section",
+   "fieldtype": "Section Break",
+   "label": "Customer Question Responses"
+  },
+  {
+   "fieldname": "responses",
+   "fieldtype": "Table",
+   "label": "Responses",
+   "options": "Buyback Assessment Response",
+   "description": "Customer's answers to multiple-choice diagnostic questions"
+  },
+  {
+   "fieldname": "pricing_section",
+   "fieldtype": "Section Break",
+   "label": "Estimated Pricing"
+  },
+  {
+   "fieldname": "estimated_grade",
+   "fieldtype": "Link",
+   "label": "Estimated Grade",
+   "options": "Grade Master",
+   "description": "Grade used for pricing — defaults to A (best condition)"
+  },
+  {
+   "fieldname": "column_break_pricing",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "estimated_price",
+   "fieldtype": "Currency",
+   "label": "Estimated Price",
+   "read_only": 1,
+   "in_list_view": 1,
+   "bold": 1,
+   "description": "Auto-calculated from pricing engine based on customer responses"
+  },
+  {
+   "default": "0",
+   "fieldname": "quoted_price",
+   "fieldtype": "Currency",
+   "label": "Quoted Price",
+   "description": "Final quoted amount (may differ from estimated after manual override)"
+  },
+  {
+   "fieldname": "result_section",
+   "fieldtype": "Section Break",
+   "label": "Result"
+  },
+  {
+   "fieldname": "buyback_inspection",
+   "fieldtype": "Link",
+   "label": "Inspection",
+   "options": "Buyback Inspection",
+   "read_only": 1,
+   "description": "Inspection created from this assessment"
+  },
+  {
+   "fieldname": "column_break_result",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "expires_on",
+   "fieldtype": "Date",
+   "label": "Expires On",
+   "read_only": 1,
+   "description": "Assessment validity date"
+  },
+  {
+   "fieldname": "remarks_section",
+   "fieldtype": "Section Break",
+   "label": "Remarks",
+   "collapsible": 1
+  },
+  {
+   "fieldname": "remarks",
+   "fieldtype": "Text",
+   "label": "Remarks"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-03-06 10:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "BuyBack",
+ "name": "Buyback Assessment",
+ "naming_rule": "By \"Naming Series\" field",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Buyback Agent",
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Buyback Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Buyback Auditor"
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Buyback Admin",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Buyback Store Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "search_fields": "customer_name,item_name,mobile_no,status,source",
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "customer_name",
+ "show_title_field_in_link": 1,
+ "track_changes": 1
+}

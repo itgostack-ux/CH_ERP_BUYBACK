@@ -1,0 +1,136 @@
+{
+ "actions": [],
+ "autoname": "naming_series:",
+ "creation": "2026-03-10 10:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "naming_series",
+  "map_type",
+  "item_code",
+  "item_name",
+  "column_break_01",
+  "item_group",
+  "disabled",
+  "questions_section",
+  "questions",
+  "tests_section",
+  "tests"
+ ],
+ "fields": [
+  {
+   "default": "BIQM-.#####",
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "hidden": 1,
+   "label": "Series",
+   "options": "BIQM-.#####",
+   "print_hide": 1,
+   "no_copy": 1
+  },
+  {
+   "default": "Subcategory",
+   "fieldname": "map_type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Map Type",
+   "options": "Subcategory\nModel",
+   "reqd": 1,
+   "description": "Step 1: Map questions/tests to a Subcategory (Item Group). Step 2: Optionally override per Model (Item). If a model has no mapping, the subcategory mapping is used."
+  },
+  {
+   "depends_on": "eval:doc.map_type === 'Model'",
+   "fieldname": "item_code",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Model",
+   "mandatory_depends_on": "eval:doc.map_type === 'Model'",
+   "options": "Item"
+  },
+  {
+   "fetch_from": "item_code.item_name",
+   "fieldname": "item_name",
+   "fieldtype": "Data",
+   "label": "Model Name",
+   "read_only": 1,
+   "depends_on": "eval:doc.map_type === 'Model'"
+  },
+  {
+   "fieldname": "column_break_01",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "item_group",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Subcategory",
+   "options": "Item Group",
+   "fetch_from": "item_code.item_group",
+   "mandatory_depends_on": "eval:doc.map_type === 'Subcategory'",
+   "description": "When Map Type = Model, auto-fetched from Item. When Map Type = Subcategory, select the category."
+  },
+  {
+   "default": "0",
+   "fieldname": "disabled",
+   "fieldtype": "Check",
+   "label": "Disabled"
+  },
+  {
+   "fieldname": "questions_section",
+   "fieldtype": "Section Break",
+   "label": "Customer Questions"
+  },
+  {
+   "fieldname": "questions",
+   "fieldtype": "Table",
+   "label": "Questions",
+   "options": "Buyback Item Question Map Detail"
+  },
+  {
+   "fieldname": "tests_section",
+   "fieldtype": "Section Break",
+   "label": "Automated Tests"
+  },
+  {
+   "fieldname": "tests",
+   "fieldtype": "Table",
+   "label": "Tests",
+   "options": "Buyback Item Test Map Detail"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-03-10 10:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "BuyBack",
+ "name": "Buyback Item Question Map",
+ "naming_rule": "By \"Naming Series\" field",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "read": 1,
+   "role": "All"
+  }
+ ],
+ "search_fields": "item_code,item_group,map_type",
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "item_code",
+ "show_title_field_in_link": 1
+}

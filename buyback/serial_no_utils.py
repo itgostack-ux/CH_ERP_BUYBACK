@@ -134,13 +134,13 @@ def get_imei_history(imei: str) -> dict:
             limit=50,
         )
 
-    # Quotes
-    result["quotes"] = frappe.get_all(
-        "Buyback Quote",
+    # Assessments
+    result["assessments"] = frappe.get_all(
+        "Buyback Assessment",
         filters={"imei_serial": imei},
         fields=[
-            "name", "quote_id", "customer", "customer_name", "store",
-            "item", "item_name", "quoted_price", "status", "creation",
+            "name", "assessment_id", "customer", "customer_name", "store",
+            "item", "item_name", "quoted_price", "estimated_price", "status", "creation",
         ],
         order_by="creation desc",
     )

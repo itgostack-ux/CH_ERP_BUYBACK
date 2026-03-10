@@ -7,7 +7,7 @@ def get_dashboard_for_customer(data):
         {
             "label": _("Buyback"),
             "items": [
-                "Buyback Quote",
+                "Buyback Assessment",
                 "Buyback Order",
                 "Buyback Inspection",
                 "Buyback Exchange Order",
@@ -26,7 +26,7 @@ def get_dashboard_for_item(data):
     """
     data["non_standard_fieldnames"].update(
         {
-            "Buyback Quote": "item",
+            "Buyback Assessment": "item",
             "Buyback Order": "item",
             "Buyback Inspection": "item",
             "Buyback Exchange Order": "old_item",
@@ -36,7 +36,7 @@ def get_dashboard_for_item(data):
         {
             "label": _("Buyback"),
             "items": [
-                "Buyback Quote",
+                "Buyback Assessment",
                 "Buyback Order",
                 "Buyback Inspection",
                 "Buyback Exchange Order",
