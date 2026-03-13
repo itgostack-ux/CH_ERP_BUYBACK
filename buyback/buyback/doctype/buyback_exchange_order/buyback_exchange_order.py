@@ -9,16 +9,11 @@ from buyback.utils import log_audit
 
 class BuybackExchangeOrder(Document):
     def before_insert(self):
-        """Auto-assign sequential integer ID using advisory lock."""
-        frappe.db.sql("SELECT GET_LOCK('buyback_exchange_order_id', 10)")
-        try:
-            last = frappe.db.sql(
-                "SELECT MAX(exchange_id) FROM `tabBuyback Exchange Order`"
-            )[0][0] or 0
-            self.exchange_id = last + 1
-        finally:
-            frappe.db.sql("SELECT RELEASE_LOCK('buyback_exchange_order_id')")
-
+        """Auto-assign sequential exchange_id using atomic SQL increment."""
+        result = frappe.db.sql(
+            "SELECT IFNULL(MAX(exchange_id), 0) + 1 FROM `tabBuyback Exchange Order` FOR UPDATE"
+        )
+        self.exchange_id = result[0][0] if result else 1
         self.status = "Draft"
 
     def validate(self):

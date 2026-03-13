@@ -1,6 +1,6 @@
 {
  "charts": [],
- "content": "[{\"id\": \"buyback_header\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Buyback Dashboard</b></span>\", \"col\": 12}}, {\"id\": \"nc_assessments\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"Todays Buyback Assessments\", \"col\": 3}}, {\"id\": \"nc_inspections\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"Pending Inspections\", \"col\": 3}}, {\"id\": \"nc_approvals\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"Awaiting Approval Orders\", \"col\": 3}}, {\"id\": \"nc_revenue\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"Todays Buyback Revenue\", \"col\": 3}}, {\"id\": \"spacer_1\", \"type\": \"spacer\", \"data\": {\"col\": 12}}, {\"id\": \"shortcuts_header\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Quick Actions</b></span>\", \"col\": 12}}, {\"id\": \"sc_assessment\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Assessments\", \"col\": 3}}, {\"id\": \"sc_inspection\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Inspections\", \"col\": 3}}, {\"id\": \"sc_order\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Orders\", \"col\": 3}}, {\"id\": \"sc_exchange\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Exchange\", \"col\": 2}}, {\"id\": \"sc_settings\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Settings\", \"col\": 2}}, {\"id\": \"spacer_2\", \"type\": \"spacer\", \"data\": {\"col\": 12}}, {\"id\": \"links_header\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Documents</b></span>\", \"col\": 12}}, {\"id\": \"card_txn\", \"type\": \"card\", \"data\": {\"card_name\": \"Transaction Flow\", \"col\": 4}}, {\"id\": \"card_masters\", \"type\": \"card\", \"data\": {\"card_name\": \"Masters\", \"col\": 4}}, {\"id\": \"card_settings\", \"type\": \"card\", \"data\": {\"card_name\": \"Settings & Configuration\", \"col\": 4}}, {\"id\": \"spacer_3\", \"type\": \"spacer\", \"data\": {\"col\": 12}}, {\"id\": \"card_shared\", \"type\": \"card\", \"data\": {\"card_name\": \"Shared Masters\", \"col\": 4}}, {\"id\": \"spacer_reports\", \"type\": \"spacer\", \"data\": {\"col\": 12}}, {\"id\": \"reports_header\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Reports</b></span>\", \"col\": 12}}, {\"id\": \"card_rpt_daily\", \"type\": \"card\", \"data\": {\"card_name\": \"Daily Operations\", \"col\": 4}}, {\"id\": \"card_rpt_funnel\", \"type\": \"card\", \"data\": {\"card_name\": \"Funnel & Conversion\", \"col\": 4}}, {\"id\": \"card_rpt_pricing\", \"type\": \"card\", \"data\": {\"card_name\": \"Pricing & Quality\", \"col\": 4}}, {\"id\": \"card_rpt_perf\", \"type\": \"card\", \"data\": {\"card_name\": \"Performance\", \"col\": 4}}, {\"id\": \"card_rpt_finance\", \"type\": \"card\", \"data\": {\"card_name\": \"Finance & Settlement\", \"col\": 4}}, {\"id\": \"card_rpt_audit\", \"type\": \"card\", \"data\": {\"card_name\": \"Compliance & Audit\", \"col\": 4}}]",
+ "content": "[{\"id\": \"buyback_header\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Buyback Dashboard</b></span>\", \"col\": 12}}, {\"id\": \"nc_assessments\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"Todays Buyback Assessments\", \"col\": 3}}, {\"id\": \"nc_inspections\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"Pending Inspections\", \"col\": 3}}, {\"id\": \"nc_approvals\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"Awaiting Approval Orders\", \"col\": 3}}, {\"id\": \"nc_revenue\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"Todays Buyback Revenue\", \"col\": 3}}, {\"id\": \"spacer_1\", \"type\": \"spacer\", \"data\": {\"col\": 12}}, {\"id\": \"shortcuts_header\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Quick Actions</b></span>\", \"col\": 12}}, {\"id\": \"sc_assessment\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Assessments\", \"col\": 2}}, {\"id\": \"sc_quote\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Quotes\", \"col\": 2}}, {\"id\": \"sc_inspection\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Inspections\", \"col\": 2}}, {\"id\": \"sc_order\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Orders\", \"col\": 2}}, {\"id\": \"sc_exchange\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Exchange\", \"col\": 2}}, {\"id\": \"sc_settings\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Settings\", \"col\": 2}}, {\"id\": \"spacer_2\", \"type\": \"spacer\", \"data\": {\"col\": 12}}, {\"id\": \"links_header\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Documents</b></span>\", \"col\": 12}}, {\"id\": \"card_txn\", \"type\": \"card\", \"data\": {\"card_name\": \"Transaction Flow\", \"col\": 4}}, {\"id\": \"card_masters\", \"type\": \"card\", \"data\": {\"card_name\": \"Masters\", \"col\": 4}}, {\"id\": \"card_settings\", \"type\": \"card\", \"data\": {\"card_name\": \"Settings & Configuration\", \"col\": 4}}, {\"id\": \"spacer_3\", \"type\": \"spacer\", \"data\": {\"col\": 12}}, {\"id\": \"card_shared\", \"type\": \"card\", \"data\": {\"card_name\": \"Shared Masters\", \"col\": 4}}, {\"id\": \"spacer_reports\", \"type\": \"spacer\", \"data\": {\"col\": 12}}, {\"id\": \"reports_header\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Reports</b></span>\", \"col\": 12}}, {\"id\": \"card_rpt_daily\", \"type\": \"card\", \"data\": {\"card_name\": \"Daily Operations\", \"col\": 4}}, {\"id\": \"card_rpt_funnel\", \"type\": \"card\", \"data\": {\"card_name\": \"Funnel & Conversion\", \"col\": 4}}, {\"id\": \"card_rpt_pricing\", \"type\": \"card\", \"data\": {\"card_name\": \"Pricing & Quality\", \"col\": 4}}, {\"id\": \"card_rpt_perf\", \"type\": \"card\", \"data\": {\"card_name\": \"Performance\", \"col\": 4}}, {\"id\": \"card_rpt_finance\", \"type\": \"card\", \"data\": {\"card_name\": \"Finance & Settlement\", \"col\": 4}}, {\"id\": \"card_rpt_audit\", \"type\": \"card\", \"data\": {\"card_name\": \"Compliance & Audit\", \"col\": 4}}]",
  "creation": "2026-03-07 11:50:46.936819",
  "custom_blocks": [],
  "docstatus": 0,
@@ -106,6 +106,16 @@
    "label": "Buyback Question Bank",
    "link_count": 0,
    "link_to": "Buyback Question Bank",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Buyback Item Question Map",
+   "link_count": 0,
+   "link_to": "Buyback Item Question Map",
    "link_type": "DocType",
    "onboard": 0,
    "type": "Link"
@@ -501,9 +511,29 @@
    "link_type": "Report",
    "onboard": 0,
    "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Buyback QA Test Run",
+   "link_count": 0,
+   "link_to": "Buyback QA Test Run",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Buyback SLA Log",
+   "link_count": 0,
+   "link_to": "Buyback SLA Log",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
   }
  ],
- "modified": "2026-03-07 11:51:26.659629",
+ "modified": "2026-03-13 00:11:11.220495",
  "modified_by": "Administrator",
  "module": "BuyBack",
  "name": "BuyBack",

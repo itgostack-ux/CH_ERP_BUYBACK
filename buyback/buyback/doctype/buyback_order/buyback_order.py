@@ -26,6 +26,7 @@ class BuybackOrder(Document):
             self.approval_token = frappe.generate_hash(length=32)
 
     def validate(self):
+        self._check_imei_blacklist()
         self._populate_item_hierarchy()
         self._link_assessment()
         self._calculate_price_variance()
@@ -33,6 +34,12 @@ class BuybackOrder(Document):
         self._calculate_payment_totals()
         self._check_approval_requirement()
         self._validate_kyc_for_otp_stage()
+        self._check_exchange_value_override()
+
+    def _check_imei_blacklist(self):
+        if self.imei_serial:
+            from buyback.buyback.doctype.buyback_imei_blacklist.buyback_imei_blacklist import check_imei_and_block
+            check_imei_and_block(self.imei_serial)
 
     def _populate_item_hierarchy(self):
         """Auto-fill brand, item_name from Item if not set."""
@@ -110,6 +117,8 @@ class BuybackOrder(Document):
             self._create_accounting_entries()
 
         if status == "Closed":
+            # ── Hard block: no replacement dispatch without finance (#13) ──
+            self._block_close_without_finance()
             # Award loyalty points (once)
             if not self.loyalty_points_earned:
                 self._award_loyalty_points()
@@ -192,6 +201,41 @@ class BuybackOrder(Document):
         ) or 0
         if flt(self.final_price) > flt(threshold):
             self.requires_approval = 1
+
+    def _check_exchange_value_override(self):
+        """Log exception when buyback value is overridden from original assessment (#2).
+
+        Detects when final_price differs from the original quoted price by more
+        than 10% and creates an Exchange Value Override exception for audit.
+        """
+        if not flt(self.original_quoted_price) or not flt(self.final_price):
+            return
+        variance_pct = abs(flt(self.price_variance_pct))
+        if variance_pct <= 10:
+            return  # Within acceptable tolerance
+
+        try:
+            if not frappe.db.exists("CH Exception Type", "Exchange Value Override"):
+                return
+            from ch_item_master.ch_item_master.exception_api import raise_exception
+            raise_exception(
+                exception_type="Exchange Value Override",
+                company=self.company,
+                reason=(
+                    f"Buyback value overridden from ₹{self.original_quoted_price} "
+                    f"to ₹{self.final_price} ({self.price_variance_pct:+.1f}%)"
+                ),
+                requested_value=abs(flt(self.price_variance)),
+                original_value=flt(self.original_quoted_price),
+                reference_doctype="Buyback Order",
+                reference_name=self.name,
+                item_code=self.item,
+                serial_no=self.imei_serial,
+                store_warehouse=self.store,
+                customer=self.customer,
+            )
+        except Exception:
+            frappe.log_error("Exchange Value Override exception creation failed")
 
     def approve(self, remarks=None):
         """Manager approves the order."""
@@ -360,6 +404,52 @@ class BuybackOrder(Document):
         self.status = "Closed"
         self.save()
         log_audit("Order Closed", "Buyback Order", self.name)
+
+    def _block_close_without_finance(self):
+        """Hard block: cannot close/dispatch without JE + SE created (#13).
+
+        For exchange orders the replacement device dispatch happens at close,
+        so accounting entries MUST exist before that point.
+        """
+        missing = []
+        if not self.journal_entry:
+            missing.append(_("Journal Entry"))
+        if not self.stock_entry:
+            missing.append(_("Stock Entry"))
+
+        if not missing:
+            return
+
+        # Create exception request for audit trail
+        try:
+            if frappe.db.exists("CH Exception Type", "Replacement Without Finance"):
+                from ch_item_master.ch_item_master.exception_api import raise_exception
+                raise_exception(
+                    exception_type="Replacement Without Finance",
+                    company=self.company,
+                    reason=f"Closing order {self.name} without {', '.join(missing)}",
+                    requested_value=flt(self.final_price),
+                    original_value=0,
+                    reference_doctype="Buyback Order",
+                    reference_name=self.name,
+                    item_code=self.item,
+                    serial_no=self.imei_serial,
+                    store_warehouse=self.store,
+                    customer=self.customer,
+                )
+        except Exception:
+            frappe.log_error("Replacement Without Finance exception creation failed")
+
+        frappe.throw(
+            _("Cannot close Buyback Order {0} — missing: {1}.<br><br>"
+              "Finance entries must be created before closing/dispatching "
+              "the replacement device.").format(
+                frappe.bold(self.name),
+                ", ".join(missing),
+            ),
+            title=_("Finance Closure Required"),
+            exc=BuybackStatusError,
+        )
 
     def _validate_kyc_for_otp_stage(self):
         """Ensure mandatory KYC fields and device photos are filled before OTP stage.

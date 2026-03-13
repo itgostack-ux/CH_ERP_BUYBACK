@@ -40,8 +40,10 @@
   "quoted_price",
   "result_section",
   "buyback_inspection",
+  "linked_pos_invoice",
   "column_break_result",
   "expires_on",
+  "exchange_amount",
   "remarks_section",
   "remarks"
  ],
@@ -292,6 +294,14 @@
    "description": "Inspection created from this assessment"
   },
   {
+   "fieldname": "linked_pos_invoice",
+   "fieldtype": "Link",
+   "label": "POS Invoice",
+   "options": "POS Invoice",
+   "read_only": 1,
+   "description": "POS Invoice where this assessment was used as exchange credit"
+  },
+  {
    "fieldname": "column_break_result",
    "fieldtype": "Column Break"
   },
@@ -301,6 +311,14 @@
    "label": "Expires On",
    "read_only": 1,
    "description": "Assessment validity date"
+  },
+  {
+   "default": "0",
+   "fieldname": "exchange_amount",
+   "fieldtype": "Currency",
+   "label": "Exchange Amount",
+   "read_only": 1,
+   "description": "Amount credited as exchange on the linked POS Invoice"
   },
   {
    "fieldname": "remarks_section",
@@ -316,7 +334,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-03-06 10:00:00.000000",
+ "modified": "2026-03-12 10:00:00.000000",
  "modified_by": "Administrator",
  "module": "BuyBack",
  "name": "Buyback Assessment",

@@ -134,6 +134,7 @@ def _setup_workspace():
     for dt in [
         "Buyback Price Master",
         "Grade Master",
+        "Buyback IMEI Blacklist",
         "Buyback Question Bank",
         "Buyback Item Question Map",
         "Buyback Checklist Template",

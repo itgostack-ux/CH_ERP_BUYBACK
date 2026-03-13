@@ -9,11 +9,22 @@ from frappe.utils import nowdate, add_months, flt
 
 def _dc(from_date, to_date, col="creation"):
     """Build date condition."""
-    return f"{col} BETWEEN '{from_date}' AND '{to_date} 23:59:59'"
+    return f"{col} BETWEEN %(from_date)s AND %(to_date_end)s"
+
+
+def _date_params(from_date, to_date):
+    """Return standard date parameters for queries."""
+    return {"from_date": from_date, "to_date_end": f"{to_date} 23:59:59"}
 
 
 def _esc_cond(field, value):
     return f"AND {field} = {frappe.db.escape(value)}" if value else ""
+
+
+def _check_dashboard_access():
+    """Ensure caller has at least read access to Buyback Order."""
+    if not frappe.has_permission("Buyback Order", "read"):
+        frappe.throw(_("You do not have permission to view buyback dashboards"), frappe.PermissionError)
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -23,6 +34,7 @@ def _esc_cond(field, value):
 @frappe.whitelist()
 def get_ceo_dashboard(from_date=None, to_date=None, company=None):
     """CEO-level KPIs: volume, revenue, conversion, source mix, SLA, settlement mix."""
+    _check_dashboard_access()
     from_date = from_date or add_months(nowdate(), -1)
     to_date = to_date or nowdate()
     cc = _esc_cond("company", company)
@@ -158,6 +170,7 @@ def get_ceo_dashboard(from_date=None, to_date=None, company=None):
 @frappe.whitelist()
 def get_store_dashboard(store=None, from_date=None, to_date=None):
     """Store Manager — Branch-level performance with pending action counts."""
+    _check_dashboard_access()
     from_date = from_date or nowdate()
     to_date = to_date or nowdate()
     if not store:
@@ -237,6 +250,7 @@ def get_store_dashboard(store=None, from_date=None, to_date=None):
 @frappe.whitelist()
 def get_category_dashboard(from_date=None, to_date=None, brand=None, item_group=None):
     """Category Manager — Model/brand performance & mismatch hotspots."""
+    _check_dashboard_access()
     from_date = from_date or add_months(nowdate(), -1)
     to_date = to_date or nowdate()
     bc = _esc_cond("brand", brand)
@@ -318,6 +332,7 @@ def get_category_dashboard(from_date=None, to_date=None, brand=None, item_group=
 @frappe.whitelist()
 def get_finance_dashboard(from_date=None, to_date=None, company=None):
     """Finance — Payouts, pending settlements, exchange adjustments."""
+    _check_dashboard_access()
     from_date = from_date or add_months(nowdate(), -1)
     to_date = to_date or nowdate()
     cc = _esc_cond("company", company)
@@ -409,6 +424,7 @@ def get_finance_dashboard(from_date=None, to_date=None, company=None):
 @frappe.whitelist()
 def get_compliance_dashboard(from_date=None, to_date=None, company=None):
     """Compliance — Anomalies, OTP failures, mismatches, overrides."""
+    _check_dashboard_access()
     from_date = from_date or add_months(nowdate(), -1)
     to_date = to_date or nowdate()
     cc = _esc_cond("company", company)
@@ -507,6 +523,7 @@ def get_compliance_dashboard(from_date=None, to_date=None, company=None):
 @frappe.whitelist()
 def get_operations_dashboard(from_date=None, to_date=None, store=None):
     """Operations — Real-time pipeline counts and SLA status."""
+    _check_dashboard_access()
     from_date = from_date or nowdate()
     to_date = to_date or nowdate()
     sc = _esc_cond("store", store)

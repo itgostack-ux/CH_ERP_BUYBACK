@@ -28,6 +28,7 @@ class BuybackAssessment(Document):
             self.expires_on = add_days(nowdate(), validity_days)
 
     def validate(self):
+        self._check_imei_blacklist()
         self._resolve_customer_from_mobile()
         self._auto_fill_item_details()
         if self.diagnostic_tests:
@@ -36,6 +37,11 @@ class BuybackAssessment(Document):
             self._fill_response_impacts()
         if self.diagnostic_tests or self.responses:
             self._calculate_estimate()
+
+    def _check_imei_blacklist(self):
+        if self.imei_serial:
+            from buyback.buyback.doctype.buyback_imei_blacklist.buyback_imei_blacklist import check_imei_and_block
+            check_imei_and_block(self.imei_serial)
 
     # ------------------------------------------------------------------
     # Business helpers
