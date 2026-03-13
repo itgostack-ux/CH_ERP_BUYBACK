@@ -38,6 +38,24 @@ class BuybackAssessment(Document):
         if self.diagnostic_tests or self.responses:
             self._calculate_estimate()
 
+    def before_save(self):
+        if self.is_new():
+            return
+        old = self.get_doc_before_save()
+        if old and round(float(old.quoted_price or 0), 2) != round(float(self.quoted_price or 0), 2):
+            try:
+                from ch_pos.audit import log_business_event
+                log_business_event(
+                    event_type="Buyback Value Edit",
+                    ref_doctype="Buyback Assessment", ref_name=self.name,
+                    before=f"₹{old.quoted_price}",
+                    after=f"₹{self.quoted_price}",
+                    remarks=f"Quoted price changed on assessment {self.name}",
+                    company=self.get("company", ""),
+                )
+            except Exception:
+                frappe.log_error(frappe.get_traceback(), f"Audit log failed for buyback {self.name}")
+
     def _check_imei_blacklist(self):
         if self.imei_serial:
             from buyback.buyback.doctype.buyback_imei_blacklist.buyback_imei_blacklist import check_imei_and_block
