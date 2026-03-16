@@ -135,7 +135,12 @@ class BuybackOrder(Document):
         The workflow sets self.status = "Paid" BEFORE submit, so we check here.
         """
         if self.status == "Draft":
-            self.status = "Awaiting Approval" if self.requires_approval else "Approved"
+            new_status = "Awaiting Approval" if self.requires_approval else "Approved"
+            self.status = new_status
+            # db_set is required: Frappe saves the doc before firing on_submit,
+            # so in-memory changes to self.status are not persisted automatically.
+            self.db_set("status", new_status, notify=True)
+
         log_audit("Order Created", "Buyback Order", self.name,
                   new_value={"final_price": self.final_price, "status": self.status})
 

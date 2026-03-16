@@ -1,5 +1,56 @@
 frappe.ui.form.on("Buyback Assessment", {
 	refresh(frm) {
+		// Auto-fill store from POS session and make it read-only
+		if (frm.is_new() && frappe.route_options && frappe.route_options._from_pos) {
+			const pos_store = frappe.route_options.store;
+			if (pos_store && !frm.doc.store) {
+				frm.set_value("store", pos_store);
+			}
+		}
+		// Lock store field if opened from POS (or if already saved with a store)
+		const from_pos = frappe.route_options && frappe.route_options._from_pos;
+		if (from_pos || (!frm.is_new() && frm.doc.store)) {
+			frm.set_df_property("store", "read_only", 1);
+		}
+
+		// "New Customer" quick-entry button (always visible in Draft / unsaved)
+		if (!frm.doc.docstatus && (!frm.doc.status || frm.doc.status === "Draft")) {
+			frm.add_custom_button(__("New Customer"), () => {
+				frappe.prompt([
+					{ fieldname: "customer_name", fieldtype: "Data", label: __("Customer Name"), reqd: 1 },
+					{ fieldname: "mobile_no", fieldtype: "Data", label: __("Mobile No"), reqd: 1 },
+					{ fieldname: "email_id", fieldtype: "Data", label: __("Email (optional)") },
+				], (values) => {
+					frappe.call({
+						method: "frappe.client.insert",
+						args: {
+							doc: {
+								doctype: "Customer",
+								customer_name: values.customer_name,
+								customer_type: "Individual",
+								customer_group: "Individual",
+								territory: "India",
+								mobile_no: values.mobile_no,
+								email_id: values.email_id || "",
+							},
+						},
+						callback(r) {
+							if (r.message) {
+								frm.set_value("customer", r.message.name);
+								if (!frm.doc.mobile_no) {
+									frm.set_value("mobile_no", values.mobile_no);
+								}
+								frappe.show_alert({
+									message: __("Customer {0} created", [r.message.customer_name]),
+									indicator: "green",
+								});
+							}
+						},
+					});
+				}, __("Create New Customer"), __("Create"));
+			});
+		}
+
 		// Hide "Mobile App" from Source dropdown — only settable via API
 		if (frm.doc.source !== "Mobile App") {
 			frm.set_df_property("source", "options",
