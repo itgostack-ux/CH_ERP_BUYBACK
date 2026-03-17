@@ -4,7 +4,7 @@ from frappe.model.document import Document
 from frappe.utils import now_datetime, flt, nowdate, add_days, cint
 
 from buyback.exceptions import BuybackStatusError
-from buyback.utils import log_audit
+from buyback.utils import log_audit, validate_indian_phone
 
 
 class BuybackOrder(Document):
@@ -26,6 +26,8 @@ class BuybackOrder(Document):
             self.approval_token = frappe.generate_hash(length=32)
 
     def validate(self):
+        if self.mobile_no:
+            self.mobile_no = validate_indian_phone(self.mobile_no, "Mobile No")
         self._check_imei_blacklist()
         self._populate_item_hierarchy()
         self._link_assessment()

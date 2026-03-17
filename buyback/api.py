@@ -24,6 +24,7 @@ from buyback.exceptions import (
     BuybackStatusError,
     BuybackValidationError,
 )
+from buyback.utils import validate_indian_phone
 
 
 # ── Step 1: Get Estimate ─────────────────────────────────────────
@@ -216,6 +217,7 @@ def create_order(
 ) -> dict:
     """Create a Buyback Order (submittable)."""
     frappe.has_permission("Buyback Order", ptype="create", throw=True)
+    mobile_no = validate_indian_phone(mobile_no, "Mobile No")
 
     doc = frappe.get_doc(
         {
@@ -443,6 +445,7 @@ def create_exchange(
         stacklevel=2,
     )
     frappe.has_permission("Buyback Exchange Order", ptype="create", throw=True)
+    mobile_no = validate_indian_phone(mobile_no, "Mobile No")
 
     doc = frappe.get_doc(
         {
@@ -538,6 +541,7 @@ def submit_mobile_diagnostic(
         dict with inspection name, inspection_id, status
     """
     frappe.has_permission("Buyback Inspection", ptype="create", throw=True)
+    mobile_no = validate_indian_phone(mobile_no, "Mobile No")
 
     diag_list = json.loads(diagnostic_results) if isinstance(diagnostic_results, str) else diagnostic_results
 
@@ -633,6 +637,7 @@ def get_inspections_by_phone(mobile_no: str) -> list[dict]:
     Used by store agents to find pending mobile diagnostics that need
     physical inspection.
     """
+    mobile_no = validate_indian_phone(mobile_no, "Mobile No")
     return frappe.get_all(
         "Buyback Inspection",
         filters={"mobile_no": mobile_no},
@@ -827,6 +832,7 @@ def search_items(
 @frappe.whitelist()
 def get_assessments_by_phone(mobile_no: str) -> list[dict]:
     """Look up all Buyback Assessments for a given mobile number."""
+    mobile_no = validate_indian_phone(mobile_no, "Mobile No")
     return frappe.get_all(
         "Buyback Assessment",
         filters={"mobile_no": mobile_no},
@@ -845,6 +851,7 @@ def get_orders_by_phone(mobile_no: str) -> list[dict]:
 
     Used by store agents to find existing orders for a customer.
     """
+    mobile_no = validate_indian_phone(mobile_no, "Mobile No")
     return frappe.get_all(
         "Buyback Order",
         filters={"mobile_no": mobile_no},

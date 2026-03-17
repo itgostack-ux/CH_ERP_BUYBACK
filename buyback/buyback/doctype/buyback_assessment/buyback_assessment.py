@@ -4,7 +4,7 @@ from frappe.model.document import Document
 from frappe.utils import nowdate, add_days, getdate
 
 from buyback.exceptions import BuybackStatusError
-from buyback.utils import log_audit
+from buyback.utils import log_audit, validate_indian_phone
 
 
 class BuybackAssessment(Document):
@@ -28,6 +28,8 @@ class BuybackAssessment(Document):
             self.expires_on = add_days(nowdate(), validity_days)
 
     def validate(self):
+        if self.mobile_no:
+            self.mobile_no = validate_indian_phone(self.mobile_no, "Mobile No")
         self._check_imei_blacklist()
         self._resolve_customer_from_mobile()
         self._auto_fill_item_details()

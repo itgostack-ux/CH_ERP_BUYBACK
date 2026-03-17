@@ -3,6 +3,8 @@ from frappe import _
 from frappe.model.document import Document
 from frappe.utils import now_datetime, flt
 
+from buyback.utils import validate_indian_phone
+
 from buyback.exceptions import BuybackStatusError
 from buyback.utils import log_audit
 
@@ -17,6 +19,8 @@ class BuybackExchangeOrder(Document):
         self.status = "Draft"
 
     def validate(self):
+        if self.mobile_no:
+            self.mobile_no = validate_indian_phone(self.mobile_no, "Mobile No")
         self._calculate_amount_to_pay()
 
     def on_submit(self):
