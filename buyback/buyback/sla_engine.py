@@ -42,7 +42,7 @@ def get_sla_settings():
                     "end_field": rule.end_field,
                 }
         return settings, rules
-    except Exception:
+    except frappe.DoesNotExistError:
         return None, {}
 
 
@@ -230,7 +230,7 @@ def _fire_sla_alert(doctype, name, sla_type, minutes_taken):
     try:
         _log_sla_breach(doctype, name, sla_type, minutes_taken)
     except Exception:
-        pass
+        frappe.log_error(title="SLA breach logging failed")
 
     # Set cache to prevent re-alert for 1 hour
     frappe.cache.set_value(alert_key, 1, expires_in_sec=3600)
@@ -270,7 +270,7 @@ def _create_sla_log(doctype, name, sla_type, actual_minutes, breached=False,
         doc = frappe.get_doc(doctype, name)
         store = getattr(doc, "store", None)
         company = getattr(doc, "company", None)
-    except Exception:
+    except frappe.DoesNotExistError:
         store = None
         company = None
 

@@ -55,8 +55,8 @@ class BuybackAssessment(Document):
                     remarks=f"Quoted price changed on assessment {self.name}",
                     company=self.get("company", ""),
                 )
-            except Exception:
-                frappe.log_error(frappe.get_traceback(), f"Audit log failed for buyback {self.name}")
+            except (ImportError, frappe.ValidationError):
+                frappe.log_error(title=f"Audit log failed for buyback {self.name}")
 
     def _check_imei_blacklist(self):
         if self.imei_serial:
@@ -190,7 +190,7 @@ class BuybackAssessment(Document):
             )
 
             self.estimated_price = result.get("estimated_price", 0)
-        except Exception:
+        except (ValueError, KeyError, frappe.ValidationError, frappe.DoesNotExistError):
             frappe.log_error(title=f"Assessment pricing failed: {self.name}")
 
     # ------------------------------------------------------------------

@@ -194,10 +194,9 @@ class BuybackInspection(Document):
             elif new_price:
                 self.revised_price = new_price
 
-        except Exception:
+        except (ValueError, KeyError, frappe.ValidationError, frappe.DoesNotExistError):
             frappe.log_error(
                 title=f"Inspection price recalc failed for {self.name}",
-                message=frappe.get_traceback(),
             )
 
     def reject_device(self, reason=None):

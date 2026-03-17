@@ -74,7 +74,7 @@ def _send_whatsapp(subject, message):
             timeout=10,
         )
     except Exception:
-        frappe.log_error("WhatsApp alert failed")
+        frappe.log_error(title="WhatsApp alert failed")
 
 
 # ─── Specific Alert Functions ────────────────────────────────────────
@@ -167,19 +167,19 @@ def _check_cash_limits():
     try:
         settings = frappe.get_single("Buyback SLA Settings")
         daily_limit = flt(settings.daily_cash_limit_per_branch) or 200000
-    except Exception:
+    except frappe.DoesNotExistError:
         daily_limit = 200000
 
     today = nowdate()
-    branches = frappe.db.sql(f"""
+    branches = frappe.db.sql("""
         SELECT o.store, SUM(p.amount) as cash_total
         FROM `tabBuyback Order Payment` p
         JOIN `tabBuyback Order` o ON o.name = p.parent
         WHERE p.payment_method LIKE '%%Cash%%'
-            AND DATE(p.payment_date) = '{today}'
+            AND DATE(p.payment_date) = %(today)s
         GROUP BY o.store
-        HAVING cash_total > {daily_limit * 0.8}
-    """, as_dict=1)
+        HAVING cash_total > %(threshold)s
+    """, {"today": today, "threshold": daily_limit * 0.8}, as_dict=1)
 
     for b in branches:
         cache_key = f"cash_alert_{b.store}_{today}"
@@ -193,22 +193,22 @@ def _check_conversion_rates():
     try:
         settings = frappe.get_single("Buyback SLA Settings")
         threshold = flt(settings.conversion_alert_threshold_pct) or 40
-    except Exception:
+    except frappe.DoesNotExistError:
         threshold = 40
 
     today = nowdate()
     week_ago = add_days(today, -7)
 
-    stores = frappe.db.sql(f"""
+    stores = frappe.db.sql("""
         SELECT store,
             (SELECT COUNT(*) FROM `tabBuyback Assessment`
-             WHERE store = o.store AND creation BETWEEN '{week_ago}' AND '{today} 23:59:59') as assessments,
+             WHERE store = o.store AND creation BETWEEN %(week_ago)s AND CONCAT(%(today)s, ' 23:59:59')) as assessments,
             COUNT(*) as orders
         FROM `tabBuyback Order` o
         WHERE docstatus < 2
-            AND creation BETWEEN '{week_ago}' AND '{today} 23:59:59'
+            AND creation BETWEEN %(week_ago)s AND CONCAT(%(today)s, ' 23:59:59')
         GROUP BY store
-    """, as_dict=1)
+    """, {"week_ago": week_ago, "today": today}, as_dict=1)
 
     for s in stores:
         if s.assessments and s.assessments > 5:
@@ -225,7 +225,7 @@ def _check_inspection_backlogs():
     try:
         settings = frappe.get_single("Buyback SLA Settings")
         backlog_threshold = cint(settings.inspection_backlog_alert) or 5
-    except Exception:
+    except frappe.DoesNotExistError:
         backlog_threshold = 5
 
     backlogs = frappe.db.sql("""
@@ -256,18 +256,15 @@ def _get_alert_recipients(doctype=None, docname=None, roles=None):
             owner = frappe.db.get_value(doctype, docname, "owner")
             if owner:
                 users.add(owner)
-        except Exception:
+        except frappe.DoesNotExistError:
             pass
 
     # Role-based
     for role in (roles or []):
-        try:
-            role_users = frappe.get_all("Has Role", filters={"role": role, "parenttype": "User"},
-                                         fields=["parent"], limit=20)
-            for u in role_users:
-                if u.parent and u.parent != "Administrator" and "@" in u.parent:
-                    users.add(u.parent)
-        except Exception:
-            pass
+        role_users = frappe.get_all("Has Role", filters={"role": role, "parenttype": "User"},
+                                     fields=["parent"], limit=20)
+        for u in role_users:
+            if u.parent and u.parent != "Administrator" and "@" in u.parent:
+                users.add(u.parent)
 
     return list(users)[:10]  # Cap at 10 recipients

@@ -602,10 +602,9 @@ def submit_mobile_diagnostic(
             item_group=item_group,
         )
         estimated_price = pricing.get("estimated_price", 0)
-    except Exception:
+    except (ValueError, KeyError, frappe.ValidationError, frappe.DoesNotExistError):
         frappe.log_error(
             title=f"Mobile diagnostic pricing failed for {doc.name}",
-            message=frappe.get_traceback(),
         )
 
     # Update Serial No status to "Quoted" if IMEI provided

@@ -183,10 +183,9 @@ class BuybackOrder(Document):
             doc = frappe.get_doc(doctype, name)
             if doc.docstatus == 1:
                 doc.cancel()
-        except Exception:
+        except (frappe.DoesNotExistError, frappe.ValidationError, frappe.LinkExistsError):
             frappe.log_error(
-                f"Failed to cancel {doctype} {name} for {self.name}",
-                "Buyback Order Cancel",
+                title=_("{0} {1} cancellation failed for {2}").format(doctype, name, self.name),
             )
 
     def _calculate_payment_totals(self):
@@ -241,8 +240,8 @@ class BuybackOrder(Document):
                 store_warehouse=self.store,
                 customer=self.customer,
             )
-        except Exception:
-            frappe.log_error("Exchange Value Override exception creation failed")
+        except (ImportError, frappe.ValidationError):
+            frappe.log_error(title="Exchange Value Override exception creation failed")
 
     def approve(self, remarks=None):
         """Manager approves the order."""
@@ -444,8 +443,8 @@ class BuybackOrder(Document):
                     store_warehouse=self.store,
                     customer=self.customer,
                 )
-        except Exception:
-            frappe.log_error("Replacement Without Finance exception creation failed")
+        except (ImportError, frappe.ValidationError):
+            frappe.log_error(title="Replacement Without Finance exception creation failed")
 
         frappe.throw(
             _("Cannot close Buyback Order {0} — missing: {1}.<br><br>"
@@ -550,10 +549,9 @@ class BuybackOrder(Document):
             update["ch_total_kyc_verifications"] = cur_count + 1
 
             frappe.db.set_value("Customer", self.customer, update, update_modified=False)
-        except Exception:
+        except (frappe.DoesNotExistError, frappe.ValidationError):
             frappe.log_error(
                 title=f"KYC Sync Error: {self.name} → {self.customer}",
-                message=frappe.get_traceback(),
             )
 
     def _update_customer_activity(self):
@@ -618,12 +616,11 @@ class BuybackOrder(Document):
                     store=self.store,
                     staff=frappe.session.user,
                 )
-            except (ImportError, Exception):
-                pass  # ch_item_master not installed or error — non-critical
-        except Exception:
+            except (ImportError, AttributeError):
+                pass  # ch_item_master not installed or hook missing — non-critical
+        except (frappe.DoesNotExistError, frappe.ValidationError):
             frappe.log_error(
                 title=f"Customer Activity Update Error: {self.name}",
-                message=frappe.get_traceback(),
             )
 
     def _create_accounting_entries(self):

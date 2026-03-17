@@ -18,7 +18,7 @@ def _check_high_value_alert(doc):
     """Alert if order exceeds large payout threshold."""
     try:
         threshold = frappe.db.get_single_value("Buyback SLA Settings", "large_payout_threshold") or 25000
-    except Exception:
+    except frappe.DoesNotExistError:
         threshold = 25000
 
     if flt(doc.final_price) > flt(threshold):
