@@ -526,6 +526,6 @@ def _clear_demo_data():
     """Remove all demo data (use with caution!)."""
     print("Clearing demo data...")
     for dt in ["Buyback Exchange Order", "Buyback Order", "Buyback Inspection", "Buyback Assessment"]:
-        frappe.db.sql(f"DELETE FROM `tab{dt}` WHERE owner LIKE 'exec%%@example.com'")
+        frappe.db.sql("DELETE FROM `tab{}` WHERE owner LIKE %s".format(dt), ('exec%@example.com',))
     frappe.db.commit()
     print("Demo data cleared.")

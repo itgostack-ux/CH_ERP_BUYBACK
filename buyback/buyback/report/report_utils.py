@@ -24,7 +24,10 @@ def date_condition(field="creation", filters=None, alias=""):
     if not from_date or not to_date:
         return "1=1"
     col = f"{alias}{field}" if alias and not field.startswith(alias) else field
-    return f"{col} BETWEEN '{getdate(from_date)}' AND '{getdate(to_date)} 23:59:59'"
+    # getdate() validates and normalises to datetime.date; str() always yields YYYY-MM-DD
+    from_str = str(getdate(from_date))
+    to_str = str(getdate(to_date))
+    return f"{col} BETWEEN '{from_str}' AND '{to_str} 23:59:59'"
 
 
 def standard_conditions(filters=None, alias="", field_map=None):

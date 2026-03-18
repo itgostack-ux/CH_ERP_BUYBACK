@@ -1035,7 +1035,7 @@ def _cleanup_transactions():
         "tabBuyback Exchange Order Item",
     ):
         try:
-            frappe.db.sql(f"DELETE FROM `{child_table}`")
+            frappe.db.sql("DELETE FROM `{}`".format(child_table))
         except Exception:
             pass
 
@@ -1049,7 +1049,7 @@ def _cleanup_transactions():
         "tabBuyback QA Test Run",
     ):
         try:
-            frappe.db.sql(f"DELETE FROM `{parent_table}`")
+            frappe.db.sql("DELETE FROM `{}`".format(parent_table))
         except Exception:
             pass
 
@@ -1088,8 +1088,9 @@ def _cleanup_transactions():
     )
 
     # OTP Logs for QA mobiles
-    qa_mobiles = ",".join(f"'{c['mobile_no']}'" for c in CUSTOMERS)
-    frappe.db.sql(f"DELETE FROM `tabCH OTP Log` WHERE mobile_no IN ({qa_mobiles})")
+    qa_mobiles = [c['mobile_no'] for c in CUSTOMERS]
+    placeholders = ", ".join(["%s"] * len(qa_mobiles))
+    frappe.db.sql("DELETE FROM `tabCH OTP Log` WHERE mobile_no IN ({})".format(placeholders), qa_mobiles)
 
     # Loyalty Point Entries for buyback
     frappe.db.sql("DELETE FROM `tabLoyalty Point Entry` WHERE invoice_type='Buyback Order'")
