@@ -56,6 +56,66 @@
             You have already approved this buyback.
           </div>
         {% elif order.status in ('Approved', 'Awaiting OTP') %}
+          <!-- Payout Preference -->
+          <div class="border rounded p-3 mb-4">
+            <h6 class="mb-3">Preferred Payout Method</h6>
+
+            <div class="form-group mb-3">
+              <label for="payout-mode" class="form-label">Select payout mode</label>
+              <select id="payout-mode" class="form-control">
+                <option value="">Select...</option>
+                <option value="Cash" {% if order.customer_payout_mode == 'Cash' %}selected{% endif %}>Cash</option>
+                <option value="UPI" {% if order.customer_payout_mode == 'UPI' %}selected{% endif %}>UPI</option>
+                <option value="Bank Transfer" {% if order.customer_payout_mode == 'Bank Transfer' %}selected{% endif %}>Bank Transfer</option>
+              </select>
+            </div>
+
+            <div id="cash-fields" style="display:none;">
+              <div class="form-group mb-3">
+                <label for="cash-receiver-name" class="form-label">Receiver Name</label>
+                <input id="cash-receiver-name" type="text" class="form-control" value="{{ order.customer_cash_receiver_name or '' }}" placeholder="Name as per ID">
+              </div>
+            </div>
+
+            <div id="upi-fields" style="display:none;">
+              <div class="form-group mb-3">
+                <label for="upi-id" class="form-label">UPI ID</label>
+                <input id="upi-id" type="text" class="form-control" value="{{ order.customer_upi_id or '' }}" placeholder="example@upi">
+              </div>
+            </div>
+
+            <div id="bank-fields" style="display:none;">
+              <div class="form-group mb-3">
+                <label for="bank-account-holder" class="form-label">Account Holder Name</label>
+                <input id="bank-account-holder" type="text" class="form-control" value="{{ order.customer_bank_account_holder or '' }}">
+              </div>
+              <div class="form-group mb-3">
+                <label for="bank-account-number" class="form-label">Account Number</label>
+                <input id="bank-account-number" type="text" class="form-control" value="{{ order.customer_bank_account_number or '' }}">
+              </div>
+              <div class="form-group mb-3">
+                <label for="bank-ifsc" class="form-label">IFSC</label>
+                <input id="bank-ifsc" type="text" class="form-control" value="{{ order.customer_bank_ifsc or '' }}" style="text-transform:uppercase;">
+              </div>
+              <div class="form-group mb-3">
+                <label for="bank-name" class="form-label">Bank Name</label>
+                <input id="bank-name" type="text" class="form-control" value="{{ order.customer_bank_name or '' }}">
+              </div>
+            </div>
+
+            <div class="form-group mb-3">
+              <label for="payout-notes" class="form-label">Notes (optional)</label>
+              <textarea id="payout-notes" class="form-control" rows="2" placeholder="Any additional payout instruction">{{ order.customer_payout_notes or '' }}</textarea>
+            </div>
+
+            <div class="d-grid">
+              <button id="btn-save-payout" class="btn btn-outline-primary" onclick="savePayoutPreference(false)">
+                Save Payout Details
+              </button>
+            </div>
+            <div id="payout-message" class="mt-2"></div>
+          </div>
+
           <!-- OTP Section -->
           <div id="otp-section">
             <p class="text-center text-muted">
@@ -104,8 +164,91 @@
 <script>
   const ORDER_NAME = "{{ order.name if order else '' }}";
   const TOKEN = "{{ token or '' }}";
+  let payoutSaved = {{ 'true' if order and order.customer_payout_mode else 'false' }};
 
-  function sendOTP() {
+  function togglePayoutFields() {
+    const mode = document.getElementById('payout-mode')?.value;
+    const cash = document.getElementById('cash-fields');
+    const upi = document.getElementById('upi-fields');
+    const bank = document.getElementById('bank-fields');
+    if (!cash || !upi || !bank) return;
+
+    cash.style.display = mode === 'Cash' ? 'block' : 'none';
+    upi.style.display = mode === 'UPI' ? 'block' : 'none';
+    bank.style.display = mode === 'Bank Transfer' ? 'block' : 'none';
+  }
+
+  function callApi(method, args) {
+    return new Promise((resolve, reject) => {
+      frappe.call({
+        method,
+        args,
+        callback: (r) => resolve(r),
+        error: (e) => reject(e)
+      });
+    });
+  }
+
+  async function savePayoutPreference(silent) {
+    const modeEl = document.getElementById('payout-mode');
+    const msg = document.getElementById('payout-message');
+    const btn = document.getElementById('btn-save-payout');
+
+    if (!modeEl || !msg || !btn) {
+      return true;
+    }
+
+    const mode = modeEl.value;
+    if (!mode) {
+      if (!silent) {
+        msg.innerHTML = '<span class="text-danger">Please select payout mode.</span>';
+      }
+      return false;
+    }
+
+    const args = {
+      token: TOKEN,
+      payout_mode: mode,
+      cash_receiver_name: (document.getElementById('cash-receiver-name')?.value || '').trim(),
+      upi_id: (document.getElementById('upi-id')?.value || '').trim(),
+      bank_account_holder: (document.getElementById('bank-account-holder')?.value || '').trim(),
+      bank_account_number: (document.getElementById('bank-account-number')?.value || '').trim(),
+      bank_ifsc: (document.getElementById('bank-ifsc')?.value || '').trim(),
+      bank_name: (document.getElementById('bank-name')?.value || '').trim(),
+      payout_notes: (document.getElementById('payout-notes')?.value || '').trim(),
+    };
+
+    btn.disabled = true;
+    btn.textContent = 'Saving...';
+    if (!silent) {
+      msg.innerHTML = '';
+    }
+
+    try {
+      await callApi('buyback.api.save_customer_payout_preference', args);
+      payoutSaved = true;
+      msg.innerHTML = '<span class="text-success">Payout details saved.</span>';
+      return true;
+    } catch (e) {
+      payoutSaved = false;
+      msg.innerHTML = '<span class="text-danger">Failed to save payout details. Please check fields and try again.</span>';
+      return false;
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Save Payout Details';
+    }
+  }
+
+  async function sendOTP() {
+    const saved = payoutSaved ? true : await savePayoutPreference(true);
+    if (!saved) {
+      const msg = document.getElementById('otp-message');
+      if (msg) {
+        msg.innerHTML = '<span class="text-danger">Please save payout details before sending OTP.</span>';
+      }
+      return;
+    }
+
     const btn = document.getElementById('btn-send-otp');
     const msg = document.getElementById('otp-message');
     btn.disabled = true;
@@ -162,5 +305,16 @@
       }
     });
   }
+
+  document.addEventListener('DOMContentLoaded', function () {
+    const mode = document.getElementById('payout-mode');
+    if (mode) {
+      mode.addEventListener('change', function () {
+        payoutSaved = false;
+        togglePayoutFields();
+      });
+      togglePayoutFields();
+    }
+  });
 </script>
 {% endblock %}

@@ -50,6 +50,18 @@
   "customer_approved_at",
   "column_break_cust_approval",
   "customer_approval_method",
+    "customer_payout_section",
+    "customer_payout_mode",
+    "customer_cash_receiver_name",
+    "column_break_payout",
+    "customer_upi_id",
+    "customer_bank_account_holder",
+    "customer_bank_account_number",
+    "customer_bank_ifsc",
+    "customer_bank_name",
+    "customer_payout_notes",
+    "customer_payout_updated_at",
+    "customer_payout_updated_by",
   "otp_section",
   "otp_verified",
   "otp_verified_at",
@@ -405,6 +417,87 @@
    "read_only": 1,
    "allow_on_submit": 1
   },
+    {
+     "fieldname": "customer_payout_section",
+     "fieldtype": "Section Break",
+     "label": "Customer Payout Preference",
+     "description": "Captured from customer approval page for accounts processing",
+     "collapsible": 1
+    },
+    {
+     "fieldname": "customer_payout_mode",
+     "fieldtype": "Select",
+     "label": "Preferred Payout Mode",
+     "options": "\nCash\nUPI\nBank Transfer",
+     "allow_on_submit": 1
+    },
+    {
+     "fieldname": "customer_cash_receiver_name",
+     "fieldtype": "Data",
+     "label": "Cash Receiver Name",
+     "depends_on": "eval:doc.customer_payout_mode == 'Cash'",
+     "allow_on_submit": 1
+    },
+    {
+     "fieldname": "column_break_payout",
+     "fieldtype": "Column Break"
+    },
+    {
+     "fieldname": "customer_upi_id",
+     "fieldtype": "Data",
+     "label": "UPI ID",
+     "depends_on": "eval:doc.customer_payout_mode == 'UPI'",
+     "allow_on_submit": 1
+    },
+    {
+     "fieldname": "customer_bank_account_holder",
+     "fieldtype": "Data",
+     "label": "Bank Account Holder",
+     "depends_on": "eval:doc.customer_payout_mode == 'Bank Transfer'",
+     "allow_on_submit": 1
+    },
+    {
+     "fieldname": "customer_bank_account_number",
+     "fieldtype": "Data",
+     "label": "Bank Account Number",
+     "depends_on": "eval:doc.customer_payout_mode == 'Bank Transfer'",
+     "allow_on_submit": 1
+    },
+    {
+     "fieldname": "customer_bank_ifsc",
+     "fieldtype": "Data",
+     "label": "Bank IFSC",
+     "depends_on": "eval:doc.customer_payout_mode == 'Bank Transfer'",
+     "allow_on_submit": 1
+    },
+    {
+     "fieldname": "customer_bank_name",
+     "fieldtype": "Data",
+     "label": "Bank Name",
+     "depends_on": "eval:doc.customer_payout_mode == 'Bank Transfer'",
+     "allow_on_submit": 1
+    },
+    {
+     "fieldname": "customer_payout_notes",
+     "fieldtype": "Small Text",
+     "label": "Payout Notes",
+     "allow_on_submit": 1
+    },
+    {
+     "fieldname": "customer_payout_updated_at",
+     "fieldtype": "Datetime",
+     "label": "Payout Details Updated At",
+     "read_only": 1,
+     "allow_on_submit": 1
+    },
+    {
+     "fieldname": "customer_payout_updated_by",
+     "fieldtype": "Link",
+     "label": "Payout Details Updated By",
+     "options": "User",
+     "read_only": 1,
+     "allow_on_submit": 1
+    },
   {
    "fieldname": "otp_section",
    "fieldtype": "Section Break",

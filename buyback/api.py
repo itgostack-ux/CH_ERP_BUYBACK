@@ -18,7 +18,7 @@ import json
 
 import frappe
 from frappe import _
-from frappe.utils import flt
+from frappe.utils import flt, now_datetime
 
 from buyback.exceptions import (
     BuybackStatusError,
@@ -312,6 +312,122 @@ def customer_approve_via_token(token: str, method: str = "SMS Link") -> dict:
         "name": doc.name,
         "status": doc.status,
         "customer_approved": doc.customer_approved,
+    }
+
+
+def _validate_customer_payout_inputs(
+    payout_mode: str,
+    cash_receiver_name: str | None = None,
+    upi_id: str | None = None,
+    bank_account_holder: str | None = None,
+    bank_account_number: str | None = None,
+    bank_ifsc: str | None = None,
+    bank_name: str | None = None,
+    payout_notes: str | None = None,
+) -> dict:
+    """Validate and normalize customer payout preference input."""
+    mode = (payout_mode or "").strip()
+    allowed_modes = {"Cash", "UPI", "Bank Transfer"}
+    if mode not in allowed_modes:
+        frappe.throw(
+            _("Invalid payout mode. Allowed values: Cash, UPI, Bank Transfer."),
+            exc=BuybackValidationError,
+        )
+
+    data = {
+        "customer_payout_mode": mode,
+        "customer_cash_receiver_name": (cash_receiver_name or "").strip(),
+        "customer_upi_id": (upi_id or "").strip(),
+        "customer_bank_account_holder": (bank_account_holder or "").strip(),
+        "customer_bank_account_number": (bank_account_number or "").strip(),
+        "customer_bank_ifsc": (bank_ifsc or "").strip().upper(),
+        "customer_bank_name": (bank_name or "").strip(),
+        "customer_payout_notes": (payout_notes or "").strip(),
+    }
+
+    if mode == "Cash" and not data["customer_cash_receiver_name"]:
+        frappe.throw(
+            _("Receiver name is required for Cash payout."),
+            exc=BuybackValidationError,
+        )
+
+    if mode == "UPI" and not data["customer_upi_id"]:
+        frappe.throw(
+            _("UPI ID is required for UPI payout."),
+            exc=BuybackValidationError,
+        )
+
+    if mode == "Bank Transfer":
+        missing = []
+        if not data["customer_bank_account_holder"]:
+            missing.append(_("Account Holder Name"))
+        if not data["customer_bank_account_number"]:
+            missing.append(_("Account Number"))
+        if not data["customer_bank_ifsc"]:
+            missing.append(_("IFSC Code"))
+        if missing:
+            frappe.throw(
+                _("Missing required bank details: {0}").format(", ".join(missing)),
+                exc=BuybackValidationError,
+            )
+
+    return data
+
+
+@frappe.whitelist(allow_guest=True)
+def save_customer_payout_preference(
+    token: str,
+    payout_mode: str,
+    cash_receiver_name: str | None = None,
+    upi_id: str | None = None,
+    bank_account_holder: str | None = None,
+    bank_account_number: str | None = None,
+    bank_ifsc: str | None = None,
+    bank_name: str | None = None,
+    payout_notes: str | None = None,
+) -> dict:
+    """Save customer-selected payout mode/details from approval link.
+
+    This captures customer payout preference for the accounts team before
+    payment processing.
+    """
+    order_name = frappe.db.get_value(
+        "Buyback Order", {"approval_token": token, "docstatus": ["!=", 2]}, "name"
+    )
+    if not order_name:
+        frappe.throw(_("Invalid or expired approval link."), exc=frappe.DoesNotExistError)
+
+    doc = frappe.get_doc("Buyback Order", order_name)
+    allowed_status = {"Approved", "Awaiting Customer Approval", "Awaiting OTP", "OTP Verified"}
+    if doc.status not in allowed_status:
+        frappe.throw(
+            _("Payout details can be updated only when order is in approval stage."),
+            exc=BuybackStatusError,
+        )
+
+    data = _validate_customer_payout_inputs(
+        payout_mode=payout_mode,
+        cash_receiver_name=cash_receiver_name,
+        upi_id=upi_id,
+        bank_account_holder=bank_account_holder,
+        bank_account_number=bank_account_number,
+        bank_ifsc=bank_ifsc,
+        bank_name=bank_name,
+        payout_notes=payout_notes,
+    )
+
+    doc.flags.ignore_permissions = True
+    for key, value in data.items():
+        setattr(doc, key, value)
+    doc.customer_payout_updated_at = now_datetime()
+    doc.customer_payout_updated_by = frappe.session.user
+    doc.save(ignore_permissions=True)
+
+    return {
+        "name": doc.name,
+        "status": doc.status,
+        "customer_payout_mode": doc.customer_payout_mode,
+        "customer_payout_updated_at": str(doc.customer_payout_updated_at),
     }
 
 
@@ -917,6 +1033,15 @@ def get_buyback_approval_details(token: str) -> dict:
         "device_photo_back": order.device_photo_back,
         "otp_verified": order.otp_verified,
         "warranty_status": order.warranty_status,
+        "customer_payout_mode": order.customer_payout_mode,
+        "customer_cash_receiver_name": order.customer_cash_receiver_name,
+        "customer_upi_id": order.customer_upi_id,
+        "customer_bank_account_holder": order.customer_bank_account_holder,
+        "customer_bank_account_number": order.customer_bank_account_number,
+        "customer_bank_ifsc": order.customer_bank_ifsc,
+        "customer_bank_name": order.customer_bank_name,
+        "customer_payout_notes": order.customer_payout_notes,
+        "customer_payout_updated_at": str(order.customer_payout_updated_at) if order.customer_payout_updated_at else "",
     }
 
 
