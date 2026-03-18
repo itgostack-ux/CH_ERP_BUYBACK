@@ -531,6 +531,16 @@
    "link_type": "DocType",
    "onboard": 0,
    "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Buyback IMEI Blacklist",
+   "link_count": 0,
+   "link_to": "Buyback IMEI Blacklist",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
   }
  ],
  "modified": "2026-03-13 00:11:11.220495",
