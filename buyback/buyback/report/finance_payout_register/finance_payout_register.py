@@ -17,6 +17,8 @@ def execute(filters=None):
 def get_columns():
     return [
         {"fieldname": "order_name", "label": _("Order"), "fieldtype": "Link", "options": "Buyback Order", "width": 150},
+        {"fieldname": "journal_entry", "label": _("Journal Entry"), "fieldtype": "Link", "options": "Journal Entry", "width": 150},
+        {"fieldname": "stock_entry", "label": _("Stock Entry"), "fieldtype": "Link", "options": "Stock Entry", "width": 150},
         {"fieldname": "store", "label": _("Branch"), "fieldtype": "Link", "options": "Warehouse", "width": 150},
         {"fieldname": "customer_name", "label": _("Customer"), "fieldtype": "Data", "width": 150},
         {"fieldname": "settlement_type", "label": _("Settlement"), "fieldtype": "Data", "width": 100},
@@ -36,7 +38,7 @@ def get_data(filters):
 
     rows = frappe.db.sql(f"""
         SELECT
-            o.name as order_name, o.store, o.customer_name,
+            o.name as order_name, o.journal_entry, o.stock_entry, o.store, o.customer_name,
             IFNULL(o.settlement_type, 'Buyback') as settlement_type,
             o.final_price, o.total_paid,
             p.payment_method as payment_mode,
