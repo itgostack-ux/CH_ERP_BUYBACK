@@ -111,7 +111,7 @@ def _full_assessment_flow(
     store_code: str = "QA-ANN",
     source: str = "Mobile App",
     warranty: str = "In Warranty",
-    age_months: int = 3,
+    age_months: str = "0-3 Months",
     responses: list | None = None,
 ) -> Any:
     """Create and submit a Buyback Assessment. Returns assessment doc."""
@@ -487,7 +487,7 @@ def s03_high_value_approval(ctx: dict) -> tuple[bool, str]:
     """High-value device triggers manager approval."""
     assessment = _full_assessment_flow(
         ctx, item_code=get_item("MacBook Pro M3"), customer_name="Ajay",
-        source="Store Manual", warranty="Out of Warranty", age_months=8,
+        source="Store Manual", warranty="Out of Warranty", age_months="7-11 Months",
     )
     insp = _create_inspection_from_assessment(ctx, assessment, grade_letter="A", checklist_name=get_checklist("Laptop Full"))
     order = _full_order_flow(ctx, assessment, insp)
@@ -805,7 +805,7 @@ def s12_accessories_deduction(ctx: dict) -> tuple[bool, str]:
     from buyback.buyback.pricing.engine import calculate_estimated_price
     full_price = calculate_estimated_price(
         item_code=get_item("iPhone 15"), grade=None,
-        warranty_status="In Warranty", device_age_months=3,
+        warranty_status="In Warranty", device_age_months="0-3 Months",
         responses=DEFAULT_RESPONSES,
         brand="Apple", item_group="Smartphones",
     )
@@ -850,7 +850,7 @@ def s13_duplicate_imei(ctx: dict) -> tuple[bool, str]:
                 "item_group": "Smartphones",
                 "imei_serial": imei,
                 "warranty_status": "In Warranty",
-                "device_age_months": 3,
+                "device_age_months": "0-3 Months",
                 "source": "Store Manual",
                 "responses": _build_response_rows(DEFAULT_RESPONSES),
             })
@@ -872,7 +872,7 @@ def s14_unknown_model(ctx: dict) -> tuple[bool, str]:
         item_code="QA-UNKNOWN-MODEL-XYZ",
         grade=None,
         warranty_status="Out of Warranty",
-        device_age_months=24,
+        device_age_months="12+ Months",
     )
     assert pricing["base_price"] == 0, "Unknown model should have zero base price"
     assert pricing["estimated_price"] == 0, "Unknown model should have zero estimated price"
@@ -898,7 +898,7 @@ def s15_negative_price(ctx: dict) -> tuple[bool, str]:
         item_code=get_item("Samsung A34"),
         grade=None,
         warranty_status="Out of Warranty",
-        device_age_months=36,
+        device_age_months="12+ Months",
         responses=horrible_responses,
         brand="Samsung",
         item_group="Smartphones",
@@ -1113,7 +1113,7 @@ def s23_phone_lookup(ctx: dict) -> tuple[bool, str]:
         item_code=get_item("iPhone 15"),
         grade=get_grade("A"),
         warranty_status="In Warranty",
-        device_age_months=3,
+        device_age_months="0-3 Months",
     )
     assert result["base_price"] > 0, "Price estimate should return base price"
     assert result["estimated_price"] > 0, "Estimated price should be positive"
@@ -1237,6 +1237,284 @@ def s27_approval_token(ctx: dict) -> tuple[bool, str]:
     return True, (
         f"Approval token verified: {order.name}, "
         f"token={order.approval_token[:8]}..."
+    )
+
+
+# ── S28: Inspection Child Table Population ────────────────────────
+
+@_register("S28", "Inspection Child Tables Populated from Assessment")
+def s28_inspection_child_tables(ctx: dict) -> tuple[bool, str]:
+    """Verifies assessment responses are copied into inspection_responses child table."""
+    customer_responses = [
+        {"question_code": "QA-SCR-COND", "answer_value": "minor_scratch"},
+        {"question_code": "QA-BODY-COND", "answer_value": "dents"},
+        {"question_code": "QA-BATT-HEALTH", "answer_value": "no"},
+        {"question_code": "QA-ICLOUD-LOCK", "answer_value": "no"},
+        {"question_code": "QA-COSMETIC-OVERALL", "answer_value": "average"},
+    ]
+    assessment = _full_assessment_flow(
+        ctx, item_code=get_item("iPhone 15"), customer_name="Ravi",
+        source="Mobile App", responses=customer_responses,
+    )
+
+    with _as_user(_AGENT):
+        assessment.reload()
+        insp = assessment.create_inspection(
+            checklist_template=get_checklist("Smartphone Full"),
+        )
+
+    insp.reload()
+
+    # Verify inspection_responses populated with assessment data
+    assert len(insp.inspection_responses) == len(customer_responses), \
+        f"Expected {len(customer_responses)} inspection_responses, got {len(insp.inspection_responses)}"
+
+    for r in insp.inspection_responses:
+        assert r.question_code, "question_code should be set"
+        assert r.assessment_answer, f"assessment_answer should be set for {r.question_code}"
+        assert r.assessment_impact is not None, f"assessment_impact should be set for {r.question_code}"
+        # For non-POS, inspector columns should be empty
+        assert not r.inspector_answer, \
+            f"inspector_answer should be empty for Mobile App source, got {r.inspector_answer}"
+
+    # Verify metadata fields copied
+    assert insp.source == "Mobile App", f"source should be Mobile App, got {insp.source}"
+    assert insp.brand, "brand should be copied"
+    assert insp.item_group, "item_group should be copied"
+    assert insp.device_age_months, "device_age_months should be copied"
+    assert insp.warranty_status, "warranty_status should be copied"
+
+    _track(ctx, "Buyback Inspection", insp.name,
+           f"responses={len(insp.inspection_responses)}")
+
+    return True, (
+        f"Child tables populated: {insp.name}, "
+        f"responses={len(insp.inspection_responses)}, "
+        f"source={insp.source}"
+    )
+
+
+# ── S29: POS Auto-Fill Inspector Columns ──────────────────────────
+
+@_register("S29", "POS Auto-Fill: Inspector Columns Pre-Filled")
+def s29_pos_auto_fill(ctx: dict) -> tuple[bool, str]:
+    """When assessment source is Store Manual, inspector columns should be pre-filled."""
+    customer_responses = [
+        {"question_code": "QA-SCR-COND", "answer_value": "flawless"},
+        {"question_code": "QA-BODY-COND", "answer_value": "pristine"},
+        {"question_code": "QA-BATT-HEALTH", "answer_value": "yes"},
+        {"question_code": "QA-ICLOUD-LOCK", "answer_value": "no"},
+        {"question_code": "QA-COSMETIC-OVERALL", "answer_value": "like_new"},
+    ]
+    assessment = _full_assessment_flow(
+        ctx, item_code=get_item("Samsung S24"), customer_name="Priya",
+        source="Store Manual", responses=customer_responses,
+    )
+
+    with _as_user(_AGENT):
+        assessment.reload()
+        insp = assessment.create_inspection(
+            checklist_template=get_checklist("Smartphone Full"),
+        )
+
+    insp.reload()
+
+    # For POS (Store Manual), inspector responses should mirror assessment
+    for r in insp.inspection_responses:
+        assert r.inspector_answer == r.assessment_answer, \
+            f"POS: inspector_answer '{r.inspector_answer}' should match assessment_answer '{r.assessment_answer}' for {r.question_code}"
+        assert flt(r.inspector_impact) == flt(r.assessment_impact), \
+            f"POS: inspector_impact should match assessment_impact for {r.question_code}"
+
+    # Post-inspection grade should be pre-filled for POS
+    assert insp.post_inspection_grade, "POS: post_inspection_grade should be pre-filled"
+    assert insp.revised_price, "POS: revised_price should be pre-filled"
+    assert insp.source == "Store Manual", f"source should be Store Manual, got {insp.source}"
+
+    _track(ctx, "Buyback Inspection", insp.name,
+           f"POS auto-fill verified, grade={insp.post_inspection_grade}")
+
+    return True, (
+        f"POS auto-fill: {insp.name}, grade={insp.post_inspection_grade}, "
+        f"price={insp.revised_price}, responses={len(insp.inspection_responses)}"
+    )
+
+
+# ── S30: Inspector Re-Test → Price Recalculation ─────────────────
+
+@_register("S30", "Inspector Re-Test: Price Recalculated")
+def s30_inspector_retest_price(ctx: dict) -> tuple[bool, str]:
+    """Inspector disagrees with customer, answers differ → revised price differs."""
+    # Customer claims perfect condition
+    customer_responses = [
+        {"question_code": "QA-SCR-COND", "answer_value": "flawless"},
+        {"question_code": "QA-BODY-COND", "answer_value": "pristine"},
+        {"question_code": "QA-BATT-HEALTH", "answer_value": "yes"},
+        {"question_code": "QA-ICLOUD-LOCK", "answer_value": "no"},
+        {"question_code": "QA-COSMETIC-OVERALL", "answer_value": "like_new"},
+    ]
+    assessment = _full_assessment_flow(
+        ctx, item_code=get_item("iPhone 15"), customer_name="Ajay",
+        source="Mobile App", responses=customer_responses,
+    )
+    assessment.reload()
+    original_price = assessment.quoted_price or assessment.estimated_price
+
+    with _as_user(_AGENT):
+        assessment.reload()
+        insp = assessment.create_inspection(
+            checklist_template=get_checklist("Smartphone Full"),
+        )
+        insp.reload()
+
+        # Inspector finds worse condition: scratched screen, poor cosmetics
+        for r in insp.inspection_responses:
+            code = (r.question_code or "").upper()
+            if code == "QA-SCR-COND":
+                r.inspector_answer = "cracked"  # -25%
+            elif code == "QA-BODY-COND":
+                r.inspector_answer = "dents"  # -10%
+            elif code == "QA-COSMETIC-OVERALL":
+                r.inspector_answer = "below_avg"  # -15%
+            else:
+                r.inspector_answer = r.assessment_answer  # same as customer
+
+        # Fill checklist results
+        if insp.checklist_template and not insp.results:
+            insp.populate_checklist()
+        for row in insp.results:
+            if row.check_type in ("Pass/Fail",):
+                row.result = "Pass"
+            elif "Grade" in (row.check_type or ""):
+                row.result = "C"
+            else:
+                row.result = "OK"
+        insp.save()
+
+        insp.start_inspection()
+        grade_c = get_grade("C")
+        insp.post_inspection_grade = grade_c
+        insp.condition_grade = grade_c
+        insp.complete_inspection()
+
+    insp.reload()
+
+    # Verify comparison shows mismatches
+    assert insp.total_mismatches > 0, \
+        f"Should have mismatches, got {insp.total_mismatches}"
+
+    # Verify price was recalculated (should be lower due to deductions)
+    assert insp.revised_price, "revised_price should be set after re-test"
+    assert flt(insp.revised_price) < flt(original_price), \
+        f"Revised price {insp.revised_price} should be less than original {original_price}"
+
+    _track(ctx, "Buyback Inspection", insp.name,
+           f"original={original_price}, revised={insp.revised_price}, mismatches={insp.total_mismatches}")
+
+    return True, (
+        f"Re-test price: original={original_price}, revised={insp.revised_price}, "
+        f"mismatches={insp.total_mismatches}, "
+        f"variance={insp.price_variance_from_comparison}%"
+    )
+
+
+# ── S31: Inspector Impact Auto-Fill ──────────────────────────────
+
+@_register("S31", "Inspector Impact Auto-Fill from Question Bank")
+def s31_inspector_impact_autofill(ctx: dict) -> tuple[bool, str]:
+    """When inspector fills answers, price_impact is auto-looked up from Question Bank."""
+    assessment = _full_assessment_flow(
+        ctx, item_code=get_item("Samsung S24"), customer_name="Deepa",
+        source="Mobile App",
+    )
+
+    with _as_user(_AGENT):
+        assessment.reload()
+        insp = assessment.create_inspection(
+            checklist_template=get_checklist("Smartphone Full"),
+        )
+        insp.reload()
+
+        # Set inspector answers with known impacts
+        for r in insp.inspection_responses:
+            code = (r.question_code or "").upper()
+            if code == "QA-SCR-COND":
+                r.inspector_answer = "cracked"  # -25%
+            elif code == "QA-ICLOUD-LOCK":
+                r.inspector_answer = "yes"  # -100%
+            else:
+                r.inspector_answer = r.assessment_answer
+
+        # Fill checklist results to avoid mandatory validation
+        if insp.checklist_template and not insp.results:
+            insp.populate_checklist()
+        for row in insp.results:
+            if row.check_type in ("Pass/Fail",):
+                row.result = "Pass"
+            elif "Grade" in (row.check_type or ""):
+                row.result = "A"
+            else:
+                row.result = "OK"
+
+        insp.save()  # triggers validate → _fill_inspector_response_impacts
+
+    insp.reload()
+
+    # Verify impacts were auto-filled
+    for r in insp.inspection_responses:
+        code = (r.question_code or "").upper()
+        if code == "QA-SCR-COND":
+            assert flt(r.inspector_impact) == -25.0, \
+                f"QA-SCR-COND inspector_impact should be -25, got {r.inspector_impact}"
+        elif code == "QA-ICLOUD-LOCK":
+            assert flt(r.inspector_impact) == -100.0, \
+                f"QA-ICLOUD-LOCK inspector_impact should be -100, got {r.inspector_impact}"
+
+    _track(ctx, "Buyback Inspection", insp.name, "Impact auto-fill verified")
+
+    return True, f"Impact auto-fill OK: {insp.name}"
+
+
+# ── S32: Full POS E2E: Assessment → Inspection → Order → Close ──
+
+@_register("S32", "Full POS E2E: Assessment through Order Close")
+def s32_pos_e2e_flow(ctx: dict) -> tuple[bool, str]:
+    """Complete POS flow: Store Manual assessment → auto-filled inspection → order → close."""
+    assessment = _full_assessment_flow(
+        ctx, item_code=get_item("iPhone 15"), customer_name="Ravi",
+        source="Store Manual",
+    )
+    assessment.reload()
+
+    # Create inspection — POS should auto-fill
+    insp = _create_inspection_from_assessment(ctx, assessment, grade_letter="A")
+    insp.reload()
+
+    # Verify POS fields carried through
+    assert insp.source == "Store Manual", f"source={insp.source}"
+    assert insp.brand, "brand should be set"
+    assert insp.item_group, "item_group should be set"
+
+    # Verify inspection_responses have matching assessment + inspector values
+    for r in insp.inspection_responses:
+        assert r.inspector_answer == r.assessment_answer, \
+            f"After POS completion: inspector_answer should match assessment_answer for {r.question_code}"
+
+    # Create order and advance through full workflow
+    order = _full_order_flow(ctx, assessment, insp, final_price=insp.revised_price)
+    order = _ensure_ready_for_otp(ctx, order)
+    order, _ = _otp_flow(ctx, order)
+    order = _select_settlement(ctx, order)
+    order = _payment_flow(ctx, order, method_type="Cash")
+    order = _close_order(ctx, order)
+    order.reload()
+
+    assert order.status == "Closed", f"Order should be Closed, got {order.status}"
+    assert order.final_price > 0, f"Final price should be positive, got {order.final_price}"
+
+    return True, (
+        f"POS E2E: assessment={assessment.name}, inspection={insp.name}, "
+        f"order={order.name}, status={order.status}, price={order.final_price}"
     )
 
 

@@ -93,3 +93,48 @@ class TestBuybackQAScenarios(FrappeTestCase):
 
     def test_s17_reporting_sanity(self):
         self._run_scenario("S17")
+
+    def test_s18_comparison_mismatch(self):
+        self._run_scenario("S18")
+
+    def test_s19_kyc_mandatory(self):
+        self._run_scenario("S19")
+
+    def test_s20_loyalty_points(self):
+        self._run_scenario("S20")
+
+    def test_s21_kyc_customer_sync(self):
+        self._run_scenario("S21")
+
+    def test_s22_imei_history(self):
+        self._run_scenario("S22")
+
+    def test_s23_phone_lookup(self):
+        self._run_scenario("S23")
+
+    def test_s24_item_search(self):
+        self._run_scenario("S24")
+
+    def test_s25_je_se_created(self):
+        self._run_scenario("S25")
+
+    def test_s26_pricing_consistency(self):
+        self._run_scenario("S26")
+
+    def test_s27_approval_token(self):
+        self._run_scenario("S27")
+
+    def test_s28_inspection_child_tables(self):
+        self._run_scenario("S28")
+
+    def test_s29_pos_auto_fill(self):
+        self._run_scenario("S29")
+
+    def test_s30_inspector_retest_price(self):
+        self._run_scenario("S30")
+
+    def test_s31_inspector_impact_autofill(self):
+        self._run_scenario("S31")
+
+    def test_s32_pos_e2e_flow(self):
+        self._run_scenario("S32")

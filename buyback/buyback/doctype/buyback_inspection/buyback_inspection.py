@@ -334,7 +334,7 @@ class BuybackInspection(Document):
             new_price = pricing.get("estimated_price", 0)
             if new_price and new_price != flt(assessed_price):
                 self.revised_price = new_price
-                self.price_variance_pct = round(
+                self.price_variance_from_comparison = round(
                     (new_price - flt(assessed_price)) / max(flt(assessed_price), 1) * 100, 2
                 )
             elif new_price:

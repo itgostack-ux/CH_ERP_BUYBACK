@@ -54,7 +54,7 @@ def get_estimate(
         item_code=item_code,
         grade=grade,
         warranty_status=warranty_status,
-        device_age_months=int(device_age_months) if device_age_months else None,
+        device_age_months=device_age_months,
         responses=resp_list,
         brand=brand,
         item_group=item_group,

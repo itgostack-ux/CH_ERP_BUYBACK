@@ -304,7 +304,9 @@ class BuybackAssessment(Document):
 
         if checklist_template:
             inspection.populate_checklist()
-            inspection.save()
+            inspection.flags.ignore_mandatory = True
+            inspection.save(ignore_permissions=True)
+            inspection.flags.ignore_mandatory = False
 
         # Update self
         self.buyback_inspection = inspection.name
