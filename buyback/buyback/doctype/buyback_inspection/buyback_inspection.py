@@ -26,14 +26,79 @@ class BuybackInspection(Document):
     def validate(self):
         if self.mobile_no:
             self.mobile_no = validate_indian_phone(self.mobile_no, "Mobile No")
+        self._fill_inspector_diagnostic_impacts()
+        self._fill_inspector_response_impacts()
         self._set_condition_grade()
 
     def _set_condition_grade(self):
-        """Set final condition grade to post-inspection grade if available."""
+        """Set final condition grade from inspector diagnostics or post-inspection grade."""
         if self.post_inspection_grade:
             self.condition_grade = self.post_inspection_grade
-        elif self.pre_inspection_grade:
+            return
+
+        # Auto-determine grade from inspector's diagnostic results
+        if self.inspection_diagnostics:
+            diagnostic_data = []
+            for d in self.inspection_diagnostics:
+                result = d.inspector_result or d.assessment_result
+                if result and d.test_code:
+                    diagnostic_data.append({
+                        "test_code": d.test_code,
+                        "result": result,
+                    })
+            if diagnostic_data:
+                try:
+                    from buyback.api import _auto_determine_grade
+                    grade = _auto_determine_grade(diagnostic_data)
+                    if grade:
+                        self.post_inspection_grade = grade
+                        self.condition_grade = grade
+                        return
+                except Exception:
+                    pass
+
+        if self.pre_inspection_grade:
             self.condition_grade = self.pre_inspection_grade
+
+    def _fill_inspector_diagnostic_impacts(self):
+        """Look up depreciation_percent for inspector's re-test results."""
+        for d in (self.inspection_diagnostics or []):
+            if not d.inspector_result or not d.test_code:
+                continue
+            qname = frappe.db.get_value(
+                "Buyback Question Bank",
+                {"question_code": d.test_code, "disabled": 0},
+                "name",
+            )
+            if not qname:
+                continue
+            impact = frappe.db.get_value(
+                "Buyback Question Option",
+                {"parent": qname, "option_value": d.inspector_result},
+                "price_impact_percent",
+            )
+            if impact is not None:
+                d.inspector_depreciation = abs(impact)
+
+    def _fill_inspector_response_impacts(self):
+        """Look up price_impact_percent for inspector's re-assessment answers."""
+        for r in (self.inspection_responses or []):
+            if not r.inspector_answer or not r.question_code:
+                continue
+            qname = frappe.db.get_value(
+                "Buyback Question Bank",
+                {"question_code": r.question_code, "disabled": 0},
+                "name",
+            )
+            if not qname:
+                continue
+            impact = frappe.db.get_value(
+                "Buyback Question Option",
+                {"parent": qname, "option_value": r.inspector_answer},
+                "price_impact_percent",
+            )
+            if impact is not None:
+                r.inspector_impact = impact
 
     def start_inspection(self):
         """Begin the inspection process."""
@@ -61,12 +126,75 @@ class BuybackInspection(Document):
 
     # ── Comparison Logic ───────────────────────────────────────────
     def _build_comparison(self):
-        """Compare inspector results against customer self-assessment responses.
-
-        If a linked Buyback Assessment exists (via quote), builds a row-by-row
-        comparison of customer answers vs inspector answers and computes summary
-        metrics.
+        """Build comparison from the side-by-side inspection_diagnostics
+        and inspection_responses tables.  Falls back to the old
+        assessment-vs-checklist comparison if the new tables are empty.
         """
+        self.comparison_results = []
+        total = 0
+        mismatches = 0
+        total_price_diff = 0
+
+        # Compare diagnostic tests
+        for d in (self.inspection_diagnostics or []):
+            if not d.assessment_result and not d.inspector_result:
+                continue
+            total += 1
+            assess = (d.assessment_result or "").strip().lower()
+            insp = (d.inspector_result or "").strip().lower()
+            match = assess == insp
+
+            if not match:
+                mismatches += 1
+
+            price_diff = flt(d.inspector_depreciation or 0) - flt(d.assessment_depreciation or 0)
+            total_price_diff += price_diff
+
+            self.append("comparison_results", {
+                "question": d.test,
+                "question_code": d.test_code,
+                "customer_answer": d.assessment_result or "",
+                "inspector_answer": d.inspector_result or "",
+                "match_status": "Match" if match else "Mismatch",
+                "price_impact_difference": price_diff,
+            })
+
+        # Compare question responses
+        for r in (self.inspection_responses or []):
+            if not r.assessment_answer and not r.inspector_answer:
+                continue
+            total += 1
+            assess = (r.assessment_answer or "").strip().lower()
+            insp = (r.inspector_answer or "").strip().lower()
+            match = assess == insp
+
+            if not match:
+                mismatches += 1
+
+            price_diff = flt(r.inspector_impact or 0) - flt(r.assessment_impact or 0)
+            total_price_diff += price_diff
+
+            self.append("comparison_results", {
+                "question": r.question,
+                "question_code": r.question_code,
+                "customer_answer": r.assessment_answer or "",
+                "inspector_answer": r.inspector_answer or "",
+                "match_status": "Match" if match else "Mismatch",
+                "price_impact_difference": price_diff,
+            })
+
+        # If no data in new tables, fall back to old method
+        if total == 0:
+            self._build_comparison_legacy()
+            return
+
+        self.total_questions_compared = total
+        self.total_mismatches = mismatches
+        self.mismatch_percentage = (mismatches / total * 100) if total else 0
+        self.price_variance_from_comparison = total_price_diff
+
+    def _build_comparison_legacy(self):
+        """Legacy comparison: assessment responses vs inspector checklist results."""
         if not self.buyback_assessment:
             return
 
@@ -74,26 +202,22 @@ class BuybackInspection(Document):
         if not assessment.responses:
             return
 
-        # Build lookup: question_code → customer answer row
         customer_map = {}
         for r in assessment.responses:
             customer_map[r.question_code or r.question] = r
 
-        # Build lookup: check_code → inspector result row
         inspector_map = {}
         for r in self.results:
             inspector_map[r.check_code or r.checklist_item] = r
 
-        self.comparison_results = []
         total = 0
         mismatches = 0
         total_price_diff = 0
 
-        # Walk through customer answers and find matching inspector answers
         for key, cust_row in customer_map.items():
             insp_row = inspector_map.get(key)
             if not insp_row:
-                continue  # no matching inspector question
+                continue
 
             total += 1
             cust_answer = (cust_row.answer_value or "").strip()
@@ -122,16 +246,13 @@ class BuybackInspection(Document):
 
     # ── Price Recalculation ────────────────────────────────────────
     def _recalculate_price(self):
-        """Recalculate price using inspector's grade and the pricing engine.
+        """Recalculate revised price using inspector's re-test data.
 
-        If the inspection has a linked assessment, uses the assessment's item and
-        warranty info with the inspector's condition_grade to get the
-        revised price from the pricing engine.  The inspector's checklist
-        results are mapped back to question-style responses so the engine
-        can apply the correct deductions.
+        Uses the inspector's answers from inspection_diagnostics and
+        inspection_responses tables with the inspector's grade to get
+        the revised price from the pricing engine.
         """
         if self.revised_price:
-            # Inspector already set a manual revised price — keep it
             return
 
         if not self.buyback_assessment:
@@ -142,46 +263,71 @@ class BuybackInspection(Document):
 
             assessment = frappe.get_doc("Buyback Assessment", self.buyback_assessment)
 
-            # Map inspector results → question-style responses for pricing
+            # Build inspector diagnostic data from new table
+            diagnostic_data = []
+            for d in (self.inspection_diagnostics or []):
+                result = d.inspector_result or d.assessment_result
+                if result:
+                    diagnostic_data.append({
+                        "test": d.test,
+                        "test_code": d.test_code,
+                        "result": result,
+                        "depreciation_percent": d.inspector_depreciation if d.inspector_result else d.assessment_depreciation,
+                    })
+
+            # Fall back to assessment diagnostics if new table is empty
+            if not diagnostic_data:
+                diagnostic_data = [
+                    {"test_code": d.test_code, "result": d.result}
+                    for d in (assessment.diagnostic_tests or [])
+                ]
+
+            # Build inspector response data from new table
             inspector_responses = []
-            for row in (self.results or []):
-                code = row.check_code
-                if not code:
-                    continue
-                # Check if there's a matching question in Question Bank
-                q_name = frappe.db.get_value(
-                    "Buyback Question Bank", {"question_code": code}, "name"
-                )
-                if q_name:
-                    # Map Pass → yes, Fail → no for pricing
-                    answer = (row.result or "").strip()
-                    if answer.lower() in ("pass", "yes"):
-                        answer = "yes"
-                    elif answer.lower() in ("fail", "no"):
-                        answer = "no"
+            for r in (self.inspection_responses or []):
+                answer = r.inspector_answer or r.assessment_answer
+                if answer and r.question_code:
                     inspector_responses.append({
-                        "question_code": code,
+                        "question_code": r.question_code,
                         "answer_value": answer,
                     })
 
-            # Build diagnostic test data from assessment
-            diagnostic_data = [
-                {"test_code": d.test_code, "result": d.result}
-                for d in (assessment.diagnostic_tests or [])
-            ]
+            # Fall back to checklist results → question mapping if new table empty
+            if not inspector_responses:
+                for row in (self.results or []):
+                    code = row.check_code
+                    if not code:
+                        continue
+                    q_name = frappe.db.get_value(
+                        "Buyback Question Bank", {"question_code": code}, "name"
+                    )
+                    if q_name:
+                        answer = (row.result or "").strip()
+                        if answer.lower() in ("pass", "yes"):
+                            answer = "yes"
+                        elif answer.lower() in ("fail", "no"):
+                            answer = "no"
+                        inspector_responses.append({
+                            "question_code": code,
+                            "answer_value": answer,
+                        })
+
+            # Final fallback: use assessment responses as-is
+            if not inspector_responses:
+                inspector_responses = [
+                    {"question_code": r.question_code, "answer_value": r.answer_value}
+                    for r in (assessment.responses or [])
+                ]
 
             pricing = calculate_estimated_price(
                 item_code=assessment.item,
                 grade=self.condition_grade,
-                warranty_status=assessment.warranty_status,
-                device_age_months=assessment.device_age_months,
-                responses=inspector_responses or [
-                    {"question_code": r.question_code, "answer_value": r.answer_value}
-                    for r in (assessment.responses or [])
-                ],
+                warranty_status=self.warranty_status or assessment.warranty_status,
+                device_age_months=self.device_age_months or assessment.device_age_months,
+                responses=inspector_responses,
                 diagnostic_tests=diagnostic_data,
-                brand=assessment.brand,
-                item_group=assessment.item_group,
+                brand=self.brand or assessment.brand,
+                item_group=self.item_group or assessment.item_group,
             )
 
             assessed_price = assessment.quoted_price or assessment.estimated_price

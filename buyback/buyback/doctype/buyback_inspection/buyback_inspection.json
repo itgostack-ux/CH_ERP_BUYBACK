@@ -8,6 +8,7 @@
   "naming_series",
   "inspection_id",
   "buyback_assessment",
+  "source",
   "diagnostic_source",
   "mobile_diagnostic_id",
   "customer",
@@ -21,8 +22,12 @@
   "device_section",
   "item",
   "item_name",
+  "item_group",
+  "brand",
   "imei_serial",
   "column_break_device",
+  "device_age_months",
+  "warranty_status",
   "condition_grade",
   "checklist_template",
   "grading_section",
@@ -30,6 +35,10 @@
   "column_break_grade",
   "post_inspection_grade",
   "grade_changed_reason",
+  "inspection_diagnostics_section",
+  "inspection_diagnostics",
+  "inspection_responses_section",
+  "inspection_responses",
   "results_section",
   "results",
   "comparison_section",
@@ -43,6 +52,9 @@
   "photos_section",
   "device_photos",
   "pricing_section",
+  "estimated_grade",
+  "estimated_price",
+  "column_break_est_pricing",
   "quoted_price",
   "column_break_pricing",
   "revised_price",
@@ -84,6 +96,16 @@
    "options": "Buyback Assessment",
    "in_standard_filter": 1,
    "description": "Linked customer assessment"
+  },
+  {
+   "fieldname": "source",
+   "fieldtype": "Select",
+   "label": "Source",
+   "options": "Mobile App\nIn-Store Kiosk\nWeb\nStore Manual",
+   "read_only": 1,
+   "in_standard_filter": 1,
+   "fetch_from": "buyback_assessment.source",
+   "description": "Original assessment source"
   },
   {
    "default": "In-Store",
@@ -185,6 +207,24 @@
    "read_only": 1
   },
   {
+   "fieldname": "item_group",
+   "fieldtype": "Link",
+   "label": "Category",
+   "options": "Item Group",
+   "fetch_from": "buyback_assessment.item_group",
+   "read_only": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "brand",
+   "fieldtype": "Link",
+   "label": "Brand",
+   "options": "Brand",
+   "fetch_from": "buyback_assessment.brand",
+   "read_only": 1,
+   "in_standard_filter": 1
+  },
+  {
    "fieldname": "imei_serial",
    "fieldtype": "Data",
    "label": "IMEI / Serial No",
@@ -193,6 +233,22 @@
   {
    "fieldname": "column_break_device",
    "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "device_age_months",
+   "fieldtype": "Select",
+   "label": "Device Age",
+   "options": "\n0-3 Months\n4-6 Months\n7-11 Months\n12+ Months",
+   "fetch_from": "buyback_assessment.device_age_months",
+   "read_only": 1
+  },
+  {
+   "fieldname": "warranty_status",
+   "fieldtype": "Select",
+   "label": "Warranty Status",
+   "options": "\nIn Warranty\nOut of Warranty",
+   "fetch_from": "buyback_assessment.warranty_status",
+   "read_only": 1
   },
   {
    "fieldname": "condition_grade",
@@ -236,6 +292,30 @@
    "label": "Grade Change Reason",
    "depends_on": "eval:doc.pre_inspection_grade !== doc.post_inspection_grade",
    "mandatory_depends_on": "eval:doc.pre_inspection_grade && doc.post_inspection_grade && doc.pre_inspection_grade !== doc.post_inspection_grade"
+  },
+  {
+   "fieldname": "inspection_diagnostics_section",
+   "fieldtype": "Section Break",
+   "label": "Diagnostic Tests (Assessment vs Inspector)"
+  },
+  {
+   "fieldname": "inspection_diagnostics",
+   "fieldtype": "Table",
+   "label": "Diagnostic Tests",
+   "options": "Buyback Inspection Diagnostic",
+   "description": "Side-by-side: original assessment diagnostic results and inspector re-test results"
+  },
+  {
+   "fieldname": "inspection_responses_section",
+   "fieldtype": "Section Break",
+   "label": "Question Responses (Assessment vs Inspector)"
+  },
+  {
+   "fieldname": "inspection_responses",
+   "fieldtype": "Table",
+   "label": "Question Responses",
+   "options": "Buyback Inspection Response",
+   "description": "Side-by-side: original customer answers and inspector re-assessment answers"
   },
   {
    "fieldname": "results_section",
@@ -315,7 +395,29 @@
   {
    "fieldname": "pricing_section",
    "fieldtype": "Section Break",
-   "label": "Pricing Impact"
+   "label": "Pricing"
+  },
+  {
+   "fieldname": "estimated_grade",
+   "fieldtype": "Link",
+   "label": "Assessment Grade",
+   "options": "Grade Master",
+   "fetch_from": "buyback_assessment.estimated_grade",
+   "read_only": 1,
+   "description": "Grade from customer self-assessment"
+  },
+  {
+   "default": "0",
+   "fieldname": "estimated_price",
+   "fieldtype": "Currency",
+   "label": "Assessment Estimated Price",
+   "fetch_from": "buyback_assessment.estimated_price",
+   "read_only": 1,
+   "description": "Auto-calculated price from assessment"
+  },
+  {
+   "fieldname": "column_break_est_pricing",
+   "fieldtype": "Column Break"
   },
   {
    "default": "0",

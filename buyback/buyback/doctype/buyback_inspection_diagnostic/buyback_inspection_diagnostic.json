@@ -1,0 +1,100 @@
+{
+ "actions": [],
+ "creation": "2026-03-18 10:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "test",
+  "test_code",
+  "test_name",
+  "column_break_diag1",
+  "assessment_result",
+  "assessment_depreciation",
+  "column_break_diag2",
+  "inspector_result",
+  "inspector_depreciation"
+ ],
+ "fields": [
+  {
+   "fieldname": "test",
+   "fieldtype": "Link",
+   "label": "Test",
+   "options": "Buyback Question Bank",
+   "reqd": 1,
+   "hidden": 1
+  },
+  {
+   "fieldname": "test_code",
+   "fieldtype": "Data",
+   "label": "Test Code",
+   "fetch_from": "test.question_code",
+   "read_only": 1,
+   "hidden": 1
+  },
+  {
+   "fieldname": "test_name",
+   "fieldtype": "Data",
+   "label": "Test",
+   "fetch_from": "test.question_text",
+   "read_only": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "column_break_diag1",
+   "fieldtype": "Column Break",
+   "label": "Assessment"
+  },
+  {
+   "fieldname": "assessment_result",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Assessment Result",
+   "options": "\nPass\nFail\nPartial",
+   "read_only": 1,
+   "description": "Original result from customer assessment"
+  },
+  {
+   "default": "0",
+   "fieldname": "assessment_depreciation",
+   "fieldtype": "Percent",
+   "in_list_view": 1,
+   "label": "Assessment Depr %",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_diag2",
+   "fieldtype": "Column Break",
+   "label": "Inspector"
+  },
+  {
+   "fieldname": "inspector_result",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Inspector Result",
+   "options": "\nPass\nFail\nPartial",
+   "description": "Inspector's re-test result"
+  },
+  {
+   "default": "0",
+   "fieldname": "inspector_depreciation",
+   "fieldtype": "Percent",
+   "in_list_view": 1,
+   "label": "Inspector Depr %",
+   "read_only": 1,
+   "description": "Auto-filled from Question Bank when inspector result is set"
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-03-18 10:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "BuyBack",
+ "name": "Buyback Inspection Diagnostic",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "creation",
+ "sort_order": "ASC",
+ "states": []
+}

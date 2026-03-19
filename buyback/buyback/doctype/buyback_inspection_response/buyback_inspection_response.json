@@ -1,0 +1,113 @@
+{
+ "actions": [],
+ "creation": "2026-03-18 10:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "question",
+  "question_code",
+  "question_text",
+  "column_break_resp1",
+  "assessment_answer",
+  "assessment_answer_label",
+  "assessment_impact",
+  "column_break_resp2",
+  "inspector_answer",
+  "inspector_answer_label",
+  "inspector_impact"
+ ],
+ "fields": [
+  {
+   "fieldname": "question",
+   "fieldtype": "Link",
+   "label": "Question",
+   "options": "Buyback Question Bank",
+   "hidden": 1
+  },
+  {
+   "fieldname": "question_code",
+   "fieldtype": "Data",
+   "label": "Question Code",
+   "fetch_from": "question.question_code",
+   "read_only": 1,
+   "hidden": 1
+  },
+  {
+   "fieldname": "question_text",
+   "fieldtype": "Data",
+   "label": "Question",
+   "fetch_from": "question.question_text",
+   "read_only": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "column_break_resp1",
+   "fieldtype": "Column Break",
+   "label": "Assessment"
+  },
+  {
+   "fieldname": "assessment_answer",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Assessment Answer",
+   "read_only": 1,
+   "description": "Original answer from customer assessment"
+  },
+  {
+   "fieldname": "assessment_answer_label",
+   "fieldtype": "Data",
+   "label": "Assessment Label",
+   "read_only": 1,
+   "hidden": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "assessment_impact",
+   "fieldtype": "Percent",
+   "in_list_view": 1,
+   "label": "Assessment Impact %",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_resp2",
+   "fieldtype": "Column Break",
+   "label": "Inspector"
+  },
+  {
+   "fieldname": "inspector_answer",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Inspector Answer",
+   "description": "Inspector's re-assessment answer"
+  },
+  {
+   "fieldname": "inspector_answer_label",
+   "fieldtype": "Data",
+   "label": "Inspector Label",
+   "read_only": 1,
+   "hidden": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "inspector_impact",
+   "fieldtype": "Percent",
+   "in_list_view": 1,
+   "label": "Inspector Impact %",
+   "read_only": 1,
+   "description": "Auto-filled from Question Bank when inspector answer is set"
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-03-18 10:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "BuyBack",
+ "name": "Buyback Inspection Response",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "creation",
+ "sort_order": "ASC",
+ "states": []
+}

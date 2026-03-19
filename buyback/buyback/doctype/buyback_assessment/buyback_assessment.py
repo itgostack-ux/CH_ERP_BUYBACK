@@ -219,6 +219,11 @@ class BuybackAssessment(Document):
     def create_inspection(self, checklist_template=None):
         """Create a Buyback Inspection directly from this assessment.
 
+        Copies diagnostic tests and question responses into the new
+        side-by-side inspection tables.  When source is "Store Manual"
+        (POS in-store), the inspector columns are pre-filled with the
+        same data so the store person doesn't have to re-enter answers.
+
         Returns the new Buyback Inspection doc.
         """
         if self.status != "Submitted":
@@ -233,16 +238,25 @@ class BuybackAssessment(Document):
                 exc=BuybackStatusError,
             )
 
+        is_pos = self.source == "Store Manual"
+
         inspection = frappe.new_doc("Buyback Inspection")
         inspection.buyback_assessment = self.name
+        inspection.source = self.source
         inspection.customer = self.customer
         inspection.mobile_no = self.mobile_no
         inspection.store = self.store
         inspection.company = self.company
         inspection.item = self.item
         inspection.item_name = self.item_name
+        inspection.item_group = self.item_group
+        inspection.brand = self.brand
         inspection.imei_serial = self.imei_serial
+        inspection.device_age_months = self.device_age_months
+        inspection.warranty_status = self.warranty_status
         inspection.quoted_price = self.quoted_price or self.estimated_price
+        inspection.estimated_grade = self.estimated_grade
+        inspection.estimated_price = self.estimated_price
         inspection.pre_inspection_grade = self.estimated_grade
         inspection.checklist_template = checklist_template
 
@@ -250,6 +264,41 @@ class BuybackAssessment(Document):
             inspection.diagnostic_source = "Mobile App"
         else:
             inspection.diagnostic_source = "In-Store"
+
+        # Copy diagnostic tests → inspection_diagnostics
+        for d in (self.diagnostic_tests or []):
+            row = {
+                "test": d.test,
+                "test_code": d.test_code,
+                "test_name": d.test_name,
+                "assessment_result": d.result,
+                "assessment_depreciation": d.depreciation_percent,
+            }
+            if is_pos:
+                row["inspector_result"] = d.result
+                row["inspector_depreciation"] = d.depreciation_percent
+            inspection.append("inspection_diagnostics", row)
+
+        # Copy responses → inspection_responses
+        for r in (self.responses or []):
+            row = {
+                "question": r.question,
+                "question_code": r.question_code,
+                "question_text": r.question_text,
+                "assessment_answer": r.answer_value,
+                "assessment_answer_label": r.answer_label,
+                "assessment_impact": r.price_impact_percent,
+            }
+            if is_pos:
+                row["inspector_answer"] = r.answer_value
+                row["inspector_answer_label"] = r.answer_label
+                row["inspector_impact"] = r.price_impact_percent
+            inspection.append("inspection_responses", row)
+
+        # For POS, also pre-fill the post-inspection grade
+        if is_pos:
+            inspection.post_inspection_grade = self.estimated_grade
+            inspection.revised_price = self.quoted_price or self.estimated_price
 
         inspection.insert(ignore_permissions=True)
 
