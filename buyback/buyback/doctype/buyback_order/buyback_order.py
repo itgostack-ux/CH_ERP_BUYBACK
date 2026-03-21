@@ -34,6 +34,8 @@ class BuybackOrder(Document):
         self._calculate_price_variance()
         self._calculate_exchange_totals()
         self._calculate_payment_totals()
+        self._validate_payment_rows()
+        self._validate_paid_status_consistency()
         self._check_approval_requirement()
         self._validate_kyc_for_otp_stage()
         self._check_exchange_value_override()
@@ -199,6 +201,40 @@ class BuybackOrder(Document):
             self.payment_status = "Paid"
         else:
             self.payment_status = "Overpaid"
+
+    def _validate_payment_rows(self):
+        for row in self.payments or []:
+            amount = flt(row.amount)
+            if amount <= 0:
+                frappe.throw(_("Payment row #{0}: amount must be greater than zero.").format(row.idx))
+            if not row.payment_method:
+                frappe.throw(_("Payment row #{0}: payment method is required.").format(row.idx))
+            if not row.payment_date:
+                frappe.throw(_("Payment row #{0}: payment date is required.").format(row.idx))
+
+            mode_type = (frappe.db.get_value("Mode of Payment", row.payment_method, "type") or "").strip()
+            requires_reference = mode_type != "Cash"
+            if requires_reference and not (row.transaction_reference or "").strip():
+                frappe.throw(
+                    _("Payment row #{0}: transaction reference is required for {1}.").format(
+                        row.idx, frappe.bold(row.payment_method)
+                    )
+                )
+
+    def _validate_paid_status_consistency(self):
+        if self.payment_status == "Overpaid":
+            frappe.throw(
+                _("Total payments cannot exceed final price. Final price: ₹{0}, paid: ₹{1}.").format(
+                    flt(self.final_price), flt(self.total_paid)
+                )
+            )
+
+        if self.status in ("Paid", "Closed") and self.payment_status != "Paid":
+            frappe.throw(
+                _("Order cannot be {0} while payment status is {1}.").format(
+                    frappe.bold(self.status), frappe.bold(self.payment_status)
+                )
+            )
 
     def _check_approval_requirement(self):
         """Set requires_approval flag based on settings."""

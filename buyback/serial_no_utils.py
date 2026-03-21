@@ -74,6 +74,115 @@ def update_serial_buyback_status(
     if comment:
         add_serial_timeline_comment(imei, comment)
 
+    # Sync lifecycle when buyback completes
+    if status == "Bought Back":
+        sync_buyback_to_lifecycle(
+            imei, order_name=order_name, price=price, grade=grade, customer=customer,
+        )
+
+
+def sync_buyback_to_lifecycle(
+    imei: str,
+    *,
+    order_name: str | None = None,
+    price: float | None = None,
+    grade: str | None = None,
+    customer: str | None = None,
+):
+    """Update CH Serial Lifecycle to 'Buyback' status when a buyback completes.
+
+    Auto-creates the lifecycle row if it does not exist, mirroring the
+    POS sale auto-create behaviour so that every serial gets tracked.
+    """
+    if not imei:
+        return
+
+    _ensure_buyback_lifecycle_exists(imei)
+
+    if not frappe.db.exists("CH Serial Lifecycle", imei):
+        return  # still no lifecycle row (e.g. no Serial No either)
+
+    try:
+        from ch_item_master.ch_item_master.doctype.ch_serial_lifecycle.ch_serial_lifecycle import (
+            update_lifecycle_status,
+        )
+        kwargs = {}
+        if order_name:
+            kwargs["buyback_document"] = order_name
+        if price is not None:
+            kwargs["buyback_value"] = flt(price)
+        if grade:
+            kwargs["buyback_grade"] = grade
+        update_lifecycle_status(
+            serial_no=imei,
+            new_status="Buyback",
+            remarks=f"Bought back via {order_name or 'Buyback Order'}",
+            **kwargs,
+        )
+    except Exception:
+        frappe.log_error(frappe.get_traceback(), "Buyback lifecycle sync failed")
+
+
+def sync_exchange_to_lifecycle(
+    imei: str,
+    *,
+    exchange_name: str | None = None,
+    buyback_amount: float | None = None,
+    customer: str | None = None,
+):
+    """Update CH Serial Lifecycle to 'Buyback' for exchanged-in devices."""
+    if not imei:
+        return
+
+    _ensure_buyback_lifecycle_exists(imei)
+
+    if not frappe.db.exists("CH Serial Lifecycle", imei):
+        return
+
+    try:
+        from ch_item_master.ch_item_master.doctype.ch_serial_lifecycle.ch_serial_lifecycle import (
+            update_lifecycle_status,
+        )
+        kwargs = {}
+        if exchange_name:
+            kwargs["buyback_document"] = exchange_name
+        if buyback_amount is not None:
+            kwargs["buyback_value"] = flt(buyback_amount)
+        update_lifecycle_status(
+            serial_no=imei,
+            new_status="Buyback",
+            remarks=f"Exchanged via {exchange_name or 'Exchange Order'}",
+            **kwargs,
+        )
+    except Exception:
+        frappe.log_error(frappe.get_traceback(), "Exchange lifecycle sync failed")
+
+
+def _ensure_buyback_lifecycle_exists(imei: str):
+    """Auto-create CH Serial Lifecycle if missing for a buyback/exchange serial."""
+    if frappe.db.exists("CH Serial Lifecycle", imei):
+        return
+
+    item_code = frappe.db.get_value("Serial No", imei, "item_code") if frappe.db.exists("Serial No", imei) else None
+    if not item_code:
+        return
+
+    from frappe.utils import now_datetime as _now
+    lc = frappe.new_doc("CH Serial Lifecycle")
+    lc.serial_no = imei
+    lc.item_code = item_code
+    lc.lifecycle_status = "In Stock"
+    lc.append("lifecycle_log", {
+        "log_timestamp": _now(),
+        "from_status": "",
+        "to_status": "In Stock",
+        "changed_by": frappe.session.user,
+        "remarks": "Auto-created on buyback — Serial No existed without lifecycle record",
+    })
+    lc.flags.ignore_permissions = True
+    lc.flags.ignore_validate = True
+    lc.insert()
+
 
 def add_serial_timeline_comment(imei: str, message: str):
     """Add a timeline comment on a Serial No document.

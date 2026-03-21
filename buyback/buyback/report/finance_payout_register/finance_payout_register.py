@@ -24,7 +24,9 @@ def get_columns():
         {"fieldname": "settlement_type", "label": _("Settlement"), "fieldtype": "Data", "width": 100},
         {"fieldname": "final_price", "label": _("Final Price ₹"), "fieldtype": "Currency", "width": 120},
         {"fieldname": "total_paid", "label": _("Paid ₹"), "fieldtype": "Currency", "width": 110},
+        {"fieldname": "payment_amount", "label": _("Payout Row ₹"), "fieldtype": "Currency", "width": 110},
         {"fieldname": "payment_mode", "label": _("Mode"), "fieldtype": "Data", "width": 100},
+        {"fieldname": "transaction_reference", "label": _("Reference"), "fieldtype": "Data", "width": 140},
         {"fieldname": "payment_date", "label": _("Payment Date"), "fieldtype": "Datetime", "width": 150},
         {"fieldname": "exchange_discount", "label": _("Exchange Adj ₹"), "fieldtype": "Currency", "width": 120},
         {"fieldname": "balance_to_pay", "label": _("Balance Due ₹"), "fieldtype": "Currency", "width": 120},
@@ -41,7 +43,9 @@ def get_data(filters):
             o.name as order_name, o.journal_entry, o.stock_entry, o.store, o.customer_name,
             IFNULL(o.settlement_type, 'Buyback') as settlement_type,
             o.final_price, o.total_paid,
+            p.amount as payment_amount,
             p.payment_method as payment_mode,
+            p.transaction_reference,
             p.payment_date,
             IFNULL(o.exchange_discount, 0) as exchange_discount,
             IFNULL(o.balance_to_pay, 0) as balance_to_pay,
@@ -60,10 +64,12 @@ def get_data(filters):
 def get_summary(data):
     if not data:
         return []
-    total_paid = sum(d.get("total_paid",0) or 0 for d in data)
+    total_paid = sum(d.get("payment_amount", 0) or 0 for d in data)
     total_exchange = sum(d.get("exchange_discount",0) or 0 for d in data)
+    order_count = len({d.get("order_name") for d in data if d.get("order_name")})
     return [
         {"value": total_paid, "label": _("Total Paid"), "datatype": "Currency", "indicator": "green"},
         {"value": total_exchange, "label": _("Exchange Adjustments"), "datatype": "Currency", "indicator": "blue"},
-        {"value": len(data), "label": _("Records"), "datatype": "Int"},
+        {"value": order_count, "label": _("Orders"), "datatype": "Int"},
+        {"value": len(data), "label": _("Payment Rows"), "datatype": "Int"},
     ]

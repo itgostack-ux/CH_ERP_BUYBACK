@@ -31,6 +31,16 @@ class BuybackExchangeOrder(Document):
                              "new_device_price": self.new_device_price,
                              "amount_to_pay": self.amount_to_pay})
 
+        # Sync old device lifecycle to Buyback
+        if self.old_imei_serial:
+            from buyback.serial_no_utils import sync_exchange_to_lifecycle
+            sync_exchange_to_lifecycle(
+                self.old_imei_serial,
+                exchange_name=self.name,
+                buyback_amount=flt(self.buyback_amount),
+                customer=self.customer,
+            )
+
     def on_cancel(self):
         self.status = "Cancelled"
 
