@@ -40,6 +40,10 @@ class BuybackOrder(Document):
         self._validate_kyc_for_otp_stage()
         self._check_exchange_value_override()
 
+    def before_update_after_submit(self):
+        self._calculate_payment_totals()
+        self._validate_payment_rows()
+
     def _check_imei_blacklist(self):
         if self.imei_serial:
             from buyback.buyback.doctype.buyback_imei_blacklist.buyback_imei_blacklist import check_imei_and_block
