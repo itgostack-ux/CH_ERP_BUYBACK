@@ -70,6 +70,9 @@ frappe.ui.form.on("Buyback Inspection", {
         // ── Load dropdown options for inspector diagnostic & response rows ──
         _load_inspection_diagnostic_options(frm);
         _load_inspection_response_options(frm);
+
+        // ── Per-row result options for legacy Results table ──
+        _setup_result_row_options(frm);
     },
 });
 
@@ -241,17 +244,25 @@ frappe.ui.form.on("Buyback Inspection Response", {
     },
 });
 
-// Dynamic result dropdown based on check_type
+// Dynamic result dropdown based on check_type — per-row via click handler
 frappe.ui.form.on("Buyback Inspection Result", {
-    check_type(frm, cdt, cdn) {
-        const row = frappe.get_doc(cdt, cdn);
-        _set_result_options(frm, row);
-    },
     results_add(frm, cdt, cdn) {
         const row = frappe.get_doc(cdt, cdn);
         _set_result_options(frm, row);
     },
 });
+
+function _setup_result_row_options(frm) {
+    if (!frm.fields_dict.results) return;
+    const grid = frm.fields_dict.results.grid;
+    grid.wrapper.off("click.result_opts");
+    grid.wrapper.on("click.result_opts", "[data-idx]", function () {
+        const idx = $(this).attr("data-idx") || $(this).closest("[data-idx]").attr("data-idx");
+        if (!idx) return;
+        const row = frm.doc.results[parseInt(idx) - 1];
+        if (row) _set_result_options(frm, row);
+    });
+}
 
 function _set_result_options(frm, row) {
     if (!row.check_type) return;
@@ -261,7 +272,6 @@ function _set_result_options(frm, row) {
         frm.fields_dict.results.grid.update_docfield_property(
             "result", "options", options_str
         );
-        frm.fields_dict.results.grid.refresh();
     }
 }
 

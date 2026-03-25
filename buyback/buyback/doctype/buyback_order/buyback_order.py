@@ -9,15 +9,15 @@ from buyback.utils import log_audit, validate_indian_phone
 
 class BuybackOrder(Document):
     def before_insert(self):
-        """Auto-assign sequential integer ID using advisory lock."""
-        frappe.db.sql("SELECT GET_LOCK('buyback_order_id', 10)")
-        try:
-            last = frappe.db.sql(
-                "SELECT MAX(order_id) FROM `tabBuyback Order`"
-            )[0][0] or 0
-            self.order_id = last + 1
-        finally:
-            frappe.db.sql("SELECT RELEASE_LOCK('buyback_order_id')")
+        """Auto-assign sequential integer ID.
+
+        Uses MAX+1.  The unique DB constraint on order_id is the safety
+        net; callers catch UniqueValidationError and retry/return existing.
+        """
+        last = frappe.db.sql(
+            "SELECT MAX(order_id) FROM `tabBuyback Order`"
+        )[0][0] or 0
+        self.order_id = last + 1
 
         self.status = "Draft"
 

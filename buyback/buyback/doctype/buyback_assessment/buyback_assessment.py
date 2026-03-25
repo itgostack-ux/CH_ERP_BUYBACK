@@ -9,15 +9,11 @@ from buyback.utils import log_audit, validate_indian_phone
 
 class BuybackAssessment(Document):
     def before_insert(self):
-        """Auto-assign sequential integer ID using advisory lock."""
-        frappe.db.sql("SELECT GET_LOCK('buyback_assessment_id', 10)")
-        try:
-            last = frappe.db.sql(
-                "SELECT MAX(assessment_id) FROM `tabBuyback Assessment`"
-            )[0][0] or 0
-            self.assessment_id = last + 1
-        finally:
-            frappe.db.sql("SELECT RELEASE_LOCK('buyback_assessment_id')")
+        """Auto-assign sequential integer ID."""
+        last = frappe.db.sql(
+            "SELECT MAX(assessment_id) FROM `tabBuyback Assessment`"
+        )[0][0] or 0
+        self.assessment_id = last + 1
 
         self.status = "Draft"
 
@@ -26,6 +22,11 @@ class BuybackAssessment(Document):
                 frappe.db.get_single_value("Buyback Settings", "quote_validity_days") or 7
             )
             self.expires_on = add_days(nowdate(), validity_days)
+
+    def before_submit(self):
+        """Ensure status is Submitted when Frappe's standard submit is used."""
+        if self.status == "Draft":
+            self.status = "Submitted"
 
     def validate(self):
         if self.mobile_no:

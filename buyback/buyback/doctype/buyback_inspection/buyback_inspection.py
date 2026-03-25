@@ -252,9 +252,6 @@ class BuybackInspection(Document):
         inspection_responses tables with the inspector's grade to get
         the revised price from the pricing engine.
         """
-        if self.revised_price:
-            return
-
         if not self.buyback_assessment:
             return
 
