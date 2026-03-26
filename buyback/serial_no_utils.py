@@ -113,6 +113,11 @@ def sync_buyback_to_lifecycle(
             kwargs["buyback_value"] = flt(price)
         if grade:
             kwargs["buyback_grade"] = grade
+            # Map buyback grade to stock condition
+            grade_to_condition = {"A": "Refurbished", "B": "Refurbished", "C": "Customer Return", "D": "Customer Return"}
+            kwargs["stock_condition"] = grade_to_condition.get(grade.upper(), "Customer Return") if isinstance(grade, str) else "Customer Return"
+        else:
+            kwargs["stock_condition"] = "Customer Return"
         update_lifecycle_status(
             serial_no=imei,
             new_status="Buyback",
@@ -148,6 +153,7 @@ def sync_exchange_to_lifecycle(
             kwargs["buyback_document"] = exchange_name
         if buyback_amount is not None:
             kwargs["buyback_value"] = flt(buyback_amount)
+        kwargs["stock_condition"] = "Customer Return"
         update_lifecycle_status(
             serial_no=imei,
             new_status="Buyback",
@@ -172,6 +178,7 @@ def _ensure_buyback_lifecycle_exists(imei: str):
     lc.serial_no = imei
     lc.item_code = item_code
     lc.lifecycle_status = "In Stock"
+    lc.stock_condition = "Customer Return"
     lc.append("lifecycle_log", {
         "log_timestamp": _now(),
         "from_status": "",
