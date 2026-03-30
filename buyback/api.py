@@ -18,6 +18,7 @@ import json
 
 import frappe
 from frappe import _
+from frappe.rate_limiter import rate_limit
 from frappe.utils import flt, now_datetime
 
 from buyback.exceptions import (
@@ -294,6 +295,7 @@ def customer_approve_offer(
 
 
 @frappe.whitelist(allow_guest=True)
+@rate_limit(limit=20, seconds=60, methods=["POST"], ip_based=True)
 def customer_approve_via_token(token: str, method: str = "SMS Link") -> dict:
     """Customer approves offer via the token-based approval link (no login).
 
@@ -375,6 +377,7 @@ def _validate_customer_payout_inputs(
 
 
 @frappe.whitelist(allow_guest=True)
+@rate_limit(limit=20, seconds=60, methods=["POST"], ip_based=True)
 def save_customer_payout_preference(
     token: str,
     payout_mode: str,
@@ -999,6 +1002,7 @@ def get_imei_history(imei: str) -> dict:
 
 
 @frappe.whitelist(allow_guest=True)
+@rate_limit(limit=60, seconds=60, methods=["GET", "POST"], ip_based=True)
 def get_buyback_approval_details(token: str) -> dict:
     """Get buyback order details for the customer-facing approval page.
 
