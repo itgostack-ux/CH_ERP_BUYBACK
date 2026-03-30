@@ -149,7 +149,10 @@ doc_events = {
         "on_update": "buyback.doc_events.on_inspection_update",
     },
     "Buyback Order": {
-        "on_update": "buyback.buyback.doc_event_hooks.on_buyback_order_update",
+        "on_update": [
+            "buyback.buyback.doc_event_hooks.on_buyback_order_update",
+            "buyback.buyback.whatsapp_notifications.on_buyback_order_whatsapp",
+        ],
     },
 }
 

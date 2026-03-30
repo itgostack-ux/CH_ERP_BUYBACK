@@ -389,6 +389,14 @@ class BuybackOrder(Document):
         self.status = "Awaiting OTP"
         self.save()
         log_audit("OTP Sent", "Buyback Order", self.name)
+
+        # Deliver OTP via WhatsApp
+        try:
+            from buyback.buyback.whatsapp_notifications import send_otp_whatsapp
+            send_otp_whatsapp(self.mobile_no, otp_code, self.name)
+        except Exception:
+            frappe.log_error(title="OTP WhatsApp delivery failed")
+
         return otp_code
 
     def verify_otp(self, otp_code):
