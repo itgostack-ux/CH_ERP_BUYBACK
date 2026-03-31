@@ -153,4 +153,4 @@ CUSTOM_FIELDS = {
 def setup_custom_fields():
     """Create all custom fields. Safe to call multiple times (idempotent)."""
     from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
-    create_custom_fields(CUSTOM_FIELDS, update=True)
+    create_custom_fields(CUSTOM_FIELDS, update=False)
