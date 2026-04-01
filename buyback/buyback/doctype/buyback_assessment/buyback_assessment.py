@@ -27,6 +27,8 @@ class BuybackAssessment(Document):
         """Ensure status is Submitted when Frappe's standard submit is used."""
         if self.status == "Draft":
             self.status = "Submitted"
+        if not self.quoted_price:
+            self.quoted_price = self.estimated_price
 
     def validate(self):
         if self.mobile_no:
@@ -227,9 +229,9 @@ class BuybackAssessment(Document):
 
         Returns the new Buyback Inspection doc.
         """
-        if self.status != "Submitted":
+        if self.status not in ("Draft", "Submitted"):
             frappe.throw(
-                _("Can only create inspection from a Submitted assessment."),
+                _("Can only create inspection from a Draft or Submitted assessment."),
                 exc=BuybackStatusError,
             )
 

@@ -288,6 +288,7 @@
    "label": "Result"
   },
   {
+   "allow_on_submit": 1,
    "description": "Inspection created from this assessment",
    "fieldname": "buyback_inspection",
    "fieldtype": "Link",
@@ -296,6 +297,7 @@
    "read_only": 1
   },
   {
+   "allow_on_submit": 1,
    "description": "POS Invoice where this assessment was used as exchange credit",
    "fieldname": "linked_pos_invoice",
    "fieldtype": "Link",
@@ -315,6 +317,7 @@
    "read_only": 1
   },
   {
+   "allow_on_submit": 1,
    "default": "0",
    "description": "Amount credited as exchange on the linked POS Invoice",
    "fieldname": "exchange_amount",

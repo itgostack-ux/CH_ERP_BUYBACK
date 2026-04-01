@@ -124,6 +124,10 @@ class BuybackOrder(Document):
         if status == "Paid" and not self.journal_entry and not self.stock_entry:
             self._create_accounting_entries()
 
+        # Update serial lifecycle on Paid (don't wait for Closed)
+        if status == "Paid":
+            self._update_serial_no_bought_back()
+
         if status == "Closed":
             # ── Hard block: no replacement dispatch without finance (#13) ──
             self._block_close_without_finance()
@@ -808,7 +812,16 @@ class BuybackOrder(Document):
         """
         Create a Stock Entry (Material Receipt) for the received buyback device.
         The device enters the buyback warehouse as used inventory.
+        Skips gracefully if the item is not a stock item.
         """
+        # Guard: only create stock entry for stock items
+        is_stock_item = frappe.db.get_value("Item", self.item, "is_stock_item")
+        if not is_stock_item:
+            frappe.logger("buyback").info(
+                f"Item {self.item} is not a stock item — skipping Stock Entry for {self.name}"
+            )
+            return
+
         settings = frappe.get_single("Buyback Settings")
 
         # Determine target warehouse: store IS the warehouse now (no indirection)

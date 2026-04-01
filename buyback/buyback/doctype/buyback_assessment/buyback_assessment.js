@@ -1,16 +1,41 @@
 frappe.ui.form.on("Buyback Assessment", {
 	refresh(frm) {
+		// Detect POS origin — either from route_options or stored flag
+		const from_pos = (frappe.route_options && frappe.route_options._from_pos)
+			|| frm.doc.__from_pos;
+		if (from_pos) {
+			frm.doc.__from_pos = true; // persist across refresh
+		}
+
 		// Auto-fill store from POS session and make it read-only
-		if (frm.is_new() && frappe.route_options && frappe.route_options._from_pos) {
-			const pos_store = frappe.route_options.store;
+		if (frm.is_new() && from_pos) {
+			const pos_store = frappe.route_options && frappe.route_options.store;
 			if (pos_store && !frm.doc.store) {
 				frm.set_value("store", pos_store);
 			}
 		}
 		// Lock store field if opened from POS (or if already saved with a store)
-		const from_pos = frappe.route_options && frappe.route_options._from_pos;
 		if (from_pos || (!frm.is_new() && frm.doc.store)) {
 			frm.set_df_property("store", "read_only", 1);
+		}
+
+		// ── Hide standard Submit / Amend buttons for submitted docs ──
+		// We use our own custom workflow buttons instead
+		if (frm.doc.docstatus === 1) {
+			frm.page.clear_primary_action();
+			frm.page.clear_secondary_action();
+			// Hide the standard "Amend" button that Frappe auto-adds
+			setTimeout(() => {
+				frm.page.btn_secondary && frm.page.btn_secondary.addClass("hide");
+				frm.page.actions_btn_group && frm.page.actions_btn_group.addClass("hide");
+			}, 100);
+		}
+
+		// ── "Back to POS" button (only when opened from POS) ──
+		if (from_pos && !frm.is_new()) {
+			frm.add_custom_button(__("Back to POS"), () => {
+				window.history.back();
+			}).addClass("btn-default");
 		}
 
 		// "New Customer" quick-entry button (always visible in Draft / unsaved)
