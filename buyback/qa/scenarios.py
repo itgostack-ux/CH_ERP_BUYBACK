@@ -521,7 +521,7 @@ def s04_store_manual_no_assessment(ctx: dict) -> tuple[bool, str]:
 
     insp = _create_inspection_from_assessment(ctx, assessment, grade_letter="B")
     order = _full_order_flow(ctx, assessment, insp)
-    order.reload()
+    order = _ensure_ready_for_otp(ctx, order)
     order, _ = _otp_flow(ctx, order)
     order = _payment_flow(ctx, order, method_type="Cash")
     order = _close_order(ctx, order)

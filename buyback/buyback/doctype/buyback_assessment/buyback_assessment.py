@@ -34,6 +34,7 @@ class BuybackAssessment(Document):
         if self.mobile_no:
             self.mobile_no = validate_indian_phone(self.mobile_no, "Mobile No")
         self._check_imei_blacklist()
+        self._check_duplicate_active_assessment()
         self._resolve_customer_from_mobile()
         self._auto_fill_item_details()
         if self.diagnostic_tests:
@@ -65,6 +66,29 @@ class BuybackAssessment(Document):
         if self.imei_serial:
             from buyback.buyback.doctype.buyback_imei_blacklist.buyback_imei_blacklist import check_imei_and_block
             check_imei_and_block(self.imei_serial)
+
+    def _check_duplicate_active_assessment(self):
+        """BB-1 fix: Prevent duplicate active buyback assessments for the same IMEI/serial."""
+        if not self.imei_serial:
+            return
+        active_statuses = ("Draft", "Submitted", "In Progress", "Inspected", "Quoted")
+        existing = frappe.db.get_value(
+            "Buyback Assessment",
+            {
+                "imei_serial": self.imei_serial,
+                "status": ("in", active_statuses),
+                "name": ("!=", self.name or ""),
+            },
+            ["name", "status"],
+            as_dict=True,
+        )
+        if existing:
+            frappe.throw(
+                _("An active buyback assessment ({0}, status: {1}) already exists for "
+                  "IMEI/Serial {2}. Please complete or cancel it before creating a new one."
+                ).format(existing.name, existing.status, self.imei_serial),
+                title=_("Duplicate Assessment"),
+            )
 
     # ------------------------------------------------------------------
     # Business helpers

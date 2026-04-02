@@ -26,9 +26,44 @@ class BuybackInspection(Document):
     def validate(self):
         if self.mobile_no:
             self.mobile_no = validate_indian_phone(self.mobile_no, "Mobile No")
+        self._validate_diagnostic_ranges()
         self._fill_inspector_diagnostic_impacts()
         self._fill_inspector_response_impacts()
         self._set_condition_grade()
+
+    def _validate_diagnostic_ranges(self):
+        """BB-2 fix: Validate numeric diagnostic results fall within acceptable ranges."""
+        for d in (self.inspection_diagnostics or []):
+            result = d.inspector_result or d.assessment_result
+            if not result or not d.test_code:
+                continue
+            # Look up min/max from the question bank
+            qdata = frappe.db.get_value(
+                "Buyback Question Bank",
+                {"question_code": d.test_code, "disabled": 0},
+                ["min_value", "max_value", "question_text"],
+                as_dict=True,
+            )
+            if not qdata:
+                continue
+            # Only validate if min/max bounds are configured
+            if qdata.min_value is not None or qdata.max_value is not None:
+                try:
+                    num_result = flt(result)
+                    if qdata.min_value is not None and num_result < flt(qdata.min_value):
+                        frappe.throw(
+                            _("Diagnostic '{0}': result {1} is below minimum ({2})").format(
+                                qdata.question_text or d.test_code, result, qdata.min_value),
+                            title=_("Diagnostic Range Error"),
+                        )
+                    if qdata.max_value is not None and num_result > flt(qdata.max_value):
+                        frappe.throw(
+                            _("Diagnostic '{0}': result {1} exceeds maximum ({2})").format(
+                                qdata.question_text or d.test_code, result, qdata.max_value),
+                            title=_("Diagnostic Range Error"),
+                        )
+                except (ValueError, TypeError):
+                    pass  # Non-numeric result — skip range check
 
     def _set_condition_grade(self):
         """Set final condition grade from inspector diagnostics or post-inspection grade."""
