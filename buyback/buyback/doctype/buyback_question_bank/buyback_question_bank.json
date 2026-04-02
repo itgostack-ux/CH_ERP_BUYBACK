@@ -17,7 +17,10 @@
   "is_mandatory",
   "disabled",
   "options_section",
-  "options"
+  "options",
+  "validation_section",
+  "min_value",
+  "max_value"
  ],
  "fields": [
   {
@@ -118,6 +121,25 @@
    "label": "Options",
    "options": "Buyback Question Option",
    "reqd": 0
+  },
+  {
+   "fieldname": "validation_section",
+   "fieldtype": "Section Break",
+   "label": "Numeric Validation",
+   "depends_on": "eval:doc.question_type === 'Numeric'",
+   "collapsible": 1
+  },
+  {
+   "fieldname": "min_value",
+   "fieldtype": "Float",
+   "label": "Minimum Value",
+   "description": "Minimum acceptable value for numeric diagnostic results. Leave blank to skip."
+  },
+  {
+   "fieldname": "max_value",
+   "fieldtype": "Float",
+   "label": "Maximum Value",
+   "description": "Maximum acceptable value for numeric diagnostic results. Leave blank to skip."
   }
  ],
  "index_web_pages_for_search": 1,
