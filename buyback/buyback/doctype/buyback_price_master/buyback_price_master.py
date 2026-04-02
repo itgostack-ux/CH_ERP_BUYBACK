@@ -1,6 +1,7 @@
 import frappe
 from frappe import _
 from frappe.model.document import Document
+from frappe.utils import flt
 
 
 # Fields that can only be written via the CH Price Upload Batch (maker/checker)
@@ -51,3 +52,24 @@ class BuybackPriceMaster(Document):
                               "(maker/checker approval). Direct edits are not allowed."),
                             title=_("Price Edit Not Allowed"),
                         )
+
+    def on_update(self):
+        """BB-5 fix: Log price revision audit trail when prices change."""
+        doc_before = self.get_doc_before_save()
+        if not doc_before:
+            return
+
+        changes = []
+        for f in _PRICE_FIELDS:
+            old_val = flt(doc_before.get(f))
+            new_val = flt(self.get(f))
+            if old_val != new_val:
+                changes.append(f"<b>{f}</b>: {old_val} → {new_val}")
+
+        if changes:
+            source = "Ready Reckoner" if self.flags.from_ready_reckoner else "Price Batch"
+            comment = (
+                f"<b>Price Revision</b> via {source} by {frappe.session.user}<br>"
+                + "<br>".join(changes)
+            )
+            self.add_comment("Info", comment)
