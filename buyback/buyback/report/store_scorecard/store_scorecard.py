@@ -34,40 +34,40 @@ def get_data(filters):
     sc = standard_conditions(filters)
 
     assessment_map = {}
-    for r in frappe.db.sql(f"""
+    for r in frappe.db.sql("""
         SELECT store, COUNT(*) as cnt,
                SUM(CASE WHEN source='App Diagnosis' THEN 1 ELSE 0 END) as app_cnt
         FROM `tabBuyback Assessment` WHERE {dc} {sc} AND store IS NOT NULL GROUP BY store
-    """, as_dict=1):
+    """.format(dc=dc, sc=sc), as_dict=1):  # noqa: UP032
         assessment_map[r.store] = r
 
     order_map = {}
     odc = dc.replace("creation", "o.creation")
     osc = standard_conditions(filters, alias="o.")
-    for r in frappe.db.sql(f"""
+    for r in frappe.db.sql("""
         SELECT o.store,
                SUM(CASE WHEN o.status IN ('Paid','Closed') THEN 1 ELSE 0 END) as settled,
                COALESCE(SUM(CASE WHEN o.status IN ('Paid','Closed') THEN o.total_paid ELSE 0 END),0) as value
         FROM `tabBuyback Order` o
         WHERE o.docstatus<2 AND {odc} {osc} AND o.store IS NOT NULL GROUP BY o.store
-    """, as_dict=1):
+    """.format(odc=odc, osc=osc), as_dict=1):  # noqa: UP032
         order_map[r.store] = r
 
     insp_map = {}
-    for r in frappe.db.sql(f"""
+    for r in frappe.db.sql("""
         SELECT store, ROUND(AVG(IFNULL(mismatch_percentage,0)),1) as avg_mm
         FROM `tabBuyback Inspection` WHERE status='Completed' AND {dc} AND store IS NOT NULL
         GROUP BY store
-    """, as_dict=1):
+    """.format(dc=dc), as_dict=1):  # noqa: UP032
         insp_map[r.store] = r.avg_mm
 
     sla_map = {}
-    for r in frappe.db.sql(f"""
+    for r in frappe.db.sql("""
         SELECT store,
                SUM(CASE WHEN breached=1 THEN 1 ELSE 0 END) as breached,
                COUNT(*) as total
         FROM `tabBuyback SLA Log` WHERE {dc} AND store IS NOT NULL GROUP BY store
-    """, as_dict=1):
+    """.format(dc=dc), as_dict=1):  # noqa: UP032
         sla_map[r.store] = round((1 - r.breached / r.total) * 100, 1) if r.total else 100
 
     all_stores = set(list(assessment_map.keys()) + list(order_map.keys()))

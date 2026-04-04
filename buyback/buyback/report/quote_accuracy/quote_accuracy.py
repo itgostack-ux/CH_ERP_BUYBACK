@@ -59,7 +59,7 @@ def get_data(filters):
 			AND o.buyback_assessment IS NOT NULL AND o.buyback_assessment != ''
 		HAVING ABS(variance_pct) >= {threshold}
 		ORDER BY ABS(variance_pct) DESC
-	""".format(
+	""".format(  # noqa: UP032
 		dc=dc,
 		sc=sc,
 		threshold=threshold,

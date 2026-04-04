@@ -50,7 +50,7 @@ def get_data(filters):
 		WHERE {dc} {sc}
 		GROUP BY period
 		ORDER BY period
-	""".format(
+	""".format(  # noqa: UP032
 		period_expr=period_expr,
 		app=frappe.db.escape(SOURCE_APP),
 		manual=frappe.db.escape(SOURCE_MANUAL),

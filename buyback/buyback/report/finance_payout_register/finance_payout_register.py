@@ -38,7 +38,7 @@ def get_data(filters):
     dc = date_condition("o.creation", filters)
     sc = standard_conditions(filters, alias="o.")
 
-    rows = frappe.db.sql(f"""
+    rows = frappe.db.sql("""
         SELECT
             o.name as order_name, o.journal_entry, o.stock_entry, o.store, o.customer_name,
             IFNULL(o.settlement_type, 'Buyback') as settlement_type,
@@ -57,7 +57,7 @@ def get_data(filters):
             AND o.status IN ('Paid','Closed','Awaiting OTP','Customer Approved')
             AND {dc} {sc}
         ORDER BY p.payment_date DESC, o.creation DESC
-    """, as_dict=1)
+    """.format(dc=dc, sc=sc), as_dict=1)  # noqa: UP032
     return rows
 
 

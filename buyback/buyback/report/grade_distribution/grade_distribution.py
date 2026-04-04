@@ -30,7 +30,7 @@ def get_columns():
 def get_data(filters):
     dc = date_condition("o.creation", filters)
     sc = standard_conditions(filters, alias="o.")
-    rows = frappe.db.sql(f"""
+    rows = frappe.db.sql("""
         SELECT
             o.store, o.item, i.inspector,
             a.estimated_grade,
@@ -45,7 +45,7 @@ def get_data(filters):
         LEFT JOIN `tabBuyback Inspection` i ON i.name = o.buyback_inspection
         WHERE o.docstatus < 2 AND {dc} {sc}
         ORDER BY grade_changed DESC, ABS(COALESCE(o.final_price,0) - COALESCE(a.estimated_price,0)) DESC
-    """, as_dict=1)
+    """.format(dc=dc, sc=sc), as_dict=1)  # noqa: UP032
     return rows
 
 

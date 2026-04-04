@@ -48,7 +48,7 @@ def get_data(filters):
 		WHERE {dc} {sc}
 		GROUP BY ic.question_code, ic.question
 		ORDER BY mismatch_pct DESC
-	""".format(dc=dc, sc=sc), as_dict=True)
+	""".format(dc=dc, sc=sc), as_dict=True)  # noqa: UP032
 
 	# ── Top customer/inspector answers per question (sub-query) ──
 	if rows:
@@ -64,7 +64,7 @@ def get_data(filters):
 					AND question_code IN ({codes})
 				GROUP BY question_code, customer_answer
 				ORDER BY question_code, cnt DESC
-			""".format(codes=escaped_codes), as_dict=True)
+			""".format(codes=escaped_codes), as_dict=True)  # noqa: UP032
 
 			# Top inspector answer per question_code
 			insp_answers = frappe.db.sql("""
@@ -74,7 +74,7 @@ def get_data(filters):
 					AND question_code IN ({codes})
 				GROUP BY question_code, inspector_answer
 				ORDER BY question_code, cnt DESC
-			""".format(codes=escaped_codes), as_dict=True)
+			""".format(codes=escaped_codes), as_dict=True)  # noqa: UP032
 
 			# Build lookup: first occurrence per question_code is top answer
 			cust_top = {}

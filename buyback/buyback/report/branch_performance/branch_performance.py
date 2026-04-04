@@ -37,19 +37,19 @@ def get_data(filters):
 
     # Assessments per store
     assessment_map = {}
-    for r in frappe.db.sql(f"""
+    for r in frappe.db.sql("""
         SELECT store, COUNT(*) as cnt,
                SUM(CASE WHEN source='App Diagnosis' THEN 1 ELSE 0 END) as app_cnt
         FROM `tabBuyback Assessment` WHERE {dc} {sc} AND store IS NOT NULL
         GROUP BY store
-    """, as_dict=1):
+    """.format(dc=dc, sc=sc), as_dict=1):  # noqa: UP032
         assessment_map[r.store] = r
 
     # Orders per store
     odc = dc.replace("creation", "o.creation")
     osc = standard_conditions(filters, alias="o.")
     order_map = {}
-    for r in frappe.db.sql(f"""
+    for r in frappe.db.sql("""
         SELECT o.store,
                COUNT(*) as total,
                SUM(CASE WHEN o.customer_approved=1 THEN 1 ELSE 0 END) as approved,
@@ -59,29 +59,29 @@ def get_data(filters):
         FROM `tabBuyback Order` o
         WHERE o.docstatus<2 AND {odc} {osc} AND o.store IS NOT NULL
         GROUP BY o.store
-    """, as_dict=1):
+    """.format(odc=odc, osc=osc), as_dict=1):  # noqa: UP032
         order_map[r.store] = r
 
     # Inspections per store
     idc = dc.replace("creation", "i.creation")
     insp_map = {}
-    for r in frappe.db.sql(f"""
+    for r in frappe.db.sql("""
         SELECT i.store, COUNT(*) as cnt,
                ROUND(AVG(i.mismatch_percentage),1) as avg_mm
         FROM `tabBuyback Inspection` i
         WHERE i.status='Completed' AND {idc} AND i.store IS NOT NULL
         GROUP BY i.store
-    """, as_dict=1):
+    """.format(idc=idc), as_dict=1):  # noqa: UP032
         insp_map[r.store] = r
 
     # SLA breaches per store
     sla_map = {}
-    for r in frappe.db.sql(f"""
+    for r in frappe.db.sql("""
         SELECT store, COUNT(*) as breaches
         FROM `tabBuyback SLA Log`
         WHERE breached=1 AND {dc} {sc} AND store IS NOT NULL
         GROUP BY store
-    """, as_dict=1):
+    """.format(dc=dc, sc=sc), as_dict=1):  # noqa: UP032
         sla_map[r.store] = r.breaches
 
     all_stores = set(list(assessment_map.keys()) + list(order_map.keys()))

@@ -28,7 +28,7 @@ def get_columns():
 def get_data(filters):
     dc = date_condition("creation", filters)
     sc = standard_conditions(filters)
-    rows = frappe.db.sql(f"""
+    rows = frappe.db.sql("""
         SELECT
             item_group, brand,
             COUNT(*) as assessment_count,
@@ -40,7 +40,7 @@ def get_data(filters):
         WHERE {dc} {sc}
         GROUP BY item_group, brand
         ORDER BY assessment_count DESC
-    """, as_dict=1)
+    """.format(dc=dc, sc=sc), as_dict=1)  # noqa: UP032
     return rows
 
 

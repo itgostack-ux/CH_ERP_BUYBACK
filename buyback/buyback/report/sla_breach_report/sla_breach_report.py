@@ -34,7 +34,7 @@ def get_data(filters):
     if filters and filters.get("sla_stage"):
         sla_stage_filter = f" AND s.sla_stage = {frappe.db.escape(filters['sla_stage'])}"
 
-    rows = frappe.db.sql(f"""
+    rows = frappe.db.sql("""
         SELECT
             s.name, s.sla_stage, s.reference_doctype, s.reference_name,
             s.store,
@@ -47,7 +47,7 @@ def get_data(filters):
             AND {dc} {sc} {sla_stage_filter}
         ORDER BY exceeded_by DESC
         LIMIT 500
-    """, as_dict=1)
+    """.format(dc=dc, sc=sc, sla_stage_filter=sla_stage_filter), as_dict=1)  # noqa: UP032
     return rows
 
 

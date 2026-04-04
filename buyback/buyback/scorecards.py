@@ -46,7 +46,7 @@ def get_store_scorecards(from_date=None, to_date=None, company=None):
     to_date = to_date or nowdate()
     company_cond = f"AND company = {frappe.db.escape(company)}" if company else ""
 
-    stores = frappe.db.sql(f"""
+    stores = frappe.db.sql("""
         SELECT store,
             COUNT(*) as total_orders,
             SUM(CASE WHEN status IN ('Paid','Closed') THEN 1 ELSE 0 END) as paid_orders,
@@ -57,7 +57,7 @@ def get_store_scorecards(from_date=None, to_date=None, company=None):
             AND creation BETWEEN '{from_date}' AND '{to_date} 23:59:59'
             {company_cond}
         GROUP BY store
-    """, as_dict=1)
+    """.format(company_cond=company_cond, from_date=from_date, to_date=to_date), as_dict=1)  # noqa: UP032
 
     if not stores:
         return []
@@ -78,12 +78,12 @@ def get_store_scorecards(from_date=None, to_date=None, company=None):
         rejection_pct = s.rejected / max(s.total_orders, 1) * 100
 
         # SLA compliance
-        sla_orders = frappe.db.sql(f"""
+        sla_orders = frappe.db.sql("""
             SELECT creation, approval_date
             FROM `tabBuyback Order`
             WHERE docstatus < 2 AND store = {frappe.db.escape(s.store)}
                 AND creation BETWEEN '{from_date}' AND '{to_date} 23:59:59'
-        """, as_dict=1)
+        """.format(from_date=from_date, to_date=to_date), as_dict=1)  # noqa: UP032
 
         sla_ok = sum(
             1 for o in sla_orders
@@ -133,7 +133,7 @@ def get_inspector_scorecards(from_date=None, to_date=None, store=None):
     to_date = to_date or nowdate()
     store_cond = f"AND store = {frappe.db.escape(store)}" if store else ""
 
-    inspectors = frappe.db.sql(f"""
+    inspectors = frappe.db.sql("""
         SELECT
             inspector,
             COUNT(*) as total_inspections,
@@ -149,7 +149,7 @@ def get_inspector_scorecards(from_date=None, to_date=None, store=None):
         WHERE creation BETWEEN '{from_date}' AND '{to_date} 23:59:59'
             {store_cond}
         GROUP BY inspector
-    """, as_dict=1)
+    """.format(from_date=from_date, store_cond=store_cond, to_date=to_date), as_dict=1)  # noqa: UP032
 
     results = []
     for insp in inspectors:
@@ -160,7 +160,7 @@ def get_inspector_scorecards(from_date=None, to_date=None, store=None):
         grade_a_pct = insp.grade_a_count / max(insp.total_inspections, 1) * 100
 
         # Linked order conversion — how many inspections led to paid orders
-        linked_paid = frappe.db.sql(f"""
+        linked_paid = frappe.db.sql("""
             SELECT COUNT(*) as cnt
             FROM `tabBuyback Order`
             WHERE buyback_inspection IN (
@@ -169,7 +169,7 @@ def get_inspector_scorecards(from_date=None, to_date=None, store=None):
                     AND creation BETWEEN '{from_date}' AND '{to_date} 23:59:59'
             )
             AND status IN ('Paid', 'Closed')
-        """, as_dict=1)[0].cnt
+        """.format(from_date=from_date, to_date=to_date), as_dict=1)[0].cnt  # noqa: UP032
 
         order_conversion = linked_paid / max(insp.completed, 1) * 100
 
@@ -214,7 +214,7 @@ def get_executive_scorecards(from_date=None, to_date=None, store=None):
     to_date = to_date or nowdate()
     store_cond = f"AND store = {frappe.db.escape(store)}" if store else ""
 
-    executives = frappe.db.sql(f"""
+    executives = frappe.db.sql("""
         SELECT
             owner as executive,
             COUNT(*) as total_orders,
@@ -226,7 +226,7 @@ def get_executive_scorecards(from_date=None, to_date=None, store=None):
             AND creation BETWEEN '{from_date}' AND '{to_date} 23:59:59'
             {store_cond}
         GROUP BY owner
-    """, as_dict=1)
+    """.format(from_date=from_date, store_cond=store_cond, to_date=to_date), as_dict=1)  # noqa: UP032
 
     results = []
     for ex in executives:
@@ -243,12 +243,12 @@ def get_executive_scorecards(from_date=None, to_date=None, store=None):
         rejection_pct = ex.rejected / max(ex.total_orders, 1) * 100
 
         # SLA compliance
-        sla_orders = frappe.db.sql(f"""
+        sla_orders = frappe.db.sql("""
             SELECT creation, approval_date
             FROM `tabBuyback Order`
             WHERE docstatus < 2 AND owner = {frappe.db.escape(ex.executive)}
                 AND creation BETWEEN '{from_date}' AND '{to_date} 23:59:59'
-        """, as_dict=1)
+        """.format(from_date=from_date, to_date=to_date), as_dict=1)  # noqa: UP032
 
         sla_ok = sum(
             1 for o in sla_orders

@@ -59,7 +59,7 @@ def get_data(filters):
 		WHERE {dc} {sc}
 			AND {paid_in}
 		ORDER BY p.payment_date DESC, o.name
-	""".format(dc=dc, sc=sc, paid_in=paid_in), as_dict=True)
+	""".format(dc=dc, sc=sc, paid_in=paid_in), as_dict=True)  # noqa: UP032
 
 	# ── Exchange-only orders (no payment rows) ──
 	exchange_rows = frappe.db.sql("""
@@ -84,7 +84,7 @@ def get_data(filters):
 				SELECT 1 FROM `tabBuyback Order Payment` p WHERE p.parent = o.name
 			)
 		ORDER BY settlement_date DESC
-	""".format(dc=dc, sc=sc, paid_in=paid_in), as_dict=True)
+	""".format(dc=dc, sc=sc, paid_in=paid_in), as_dict=True)  # noqa: UP032
 
 	data = payment_rows + exchange_rows
 	data.sort(key=lambda r: r.get("settlement_date") or "", reverse=True)

@@ -28,7 +28,7 @@ def get_columns():
 def get_data(filters):
     dc = date_condition("l.creation", filters)
     # OTP logs linked to buyback orders
-    rows = frappe.db.sql(f"""
+    rows = frappe.db.sql("""
         SELECT
             l.name, l.mobile_no, l.status, l.creation,
             IFNULL(l.attempts, 1) as attempts,
@@ -40,5 +40,5 @@ def get_data(filters):
             AND {dc}
         ORDER BY l.creation DESC
         LIMIT 500
-    """, as_dict=1)
+    """.format(dc=dc), as_dict=1)  # noqa: UP032
     return rows

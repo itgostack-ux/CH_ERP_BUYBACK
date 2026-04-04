@@ -57,7 +57,7 @@ def get_data(filters):
 		FROM `tabBuyback Order` o
 		WHERE {dc} {sc}
 		GROUP BY o.owner
-	""".format(
+	""".format(  # noqa: UP032
 		paid_in=paid_in,
 		tat=sla_minutes("o.creation", "o.approval_date"),
 		dc=dc_o,
@@ -77,7 +77,7 @@ def get_data(filters):
 		FROM `tabBuyback Assessment` q
 		WHERE {dc} {sc}
 		GROUP BY q.owner
-	""".format(dc=dc_q, sc=sc_q, app=frappe.db.escape(SOURCE_APP)), as_dict=True):
+	""".format(dc=dc_q, sc=sc_q, app=frappe.db.escape(SOURCE_APP)), as_dict=True):  # noqa: UP032
 		s = user_map.setdefault(r.owner, {"executive": r.owner})
 		s["quotes_handled"] = r.cnt
 		s["_app_quotes"] = r.app_count
@@ -88,7 +88,7 @@ def get_data(filters):
 		FROM `tabBuyback Assessment` a
 		WHERE {dc} {sc}
 		GROUP BY a.owner
-	""".format(dc=dc_a, sc=sc_a), as_dict=True):
+	""".format(dc=dc_a, sc=sc_a), as_dict=True):  # noqa: UP032
 		user_map.setdefault(r.owner, {"executive": r.owner})["assessments_handled"] = r.cnt
 
 	# ── Build result ──

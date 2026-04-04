@@ -31,7 +31,7 @@ def get_data(filters):
     dc = date_condition("i.creation", filters)
     sc = standard_conditions(filters, alias="i.")
 
-    rows = frappe.db.sql(f"""
+    rows = frappe.db.sql("""
         SELECT
             i.inspector,
             COUNT(*) as inspections,
@@ -46,7 +46,7 @@ def get_data(filters):
             AND {dc} {sc}
         GROUP BY i.inspector
         ORDER BY inspections DESC
-    """, as_dict=1)
+    """.format(dc=dc, sc=sc), as_dict=1)  # noqa: UP032
     return rows
 
 

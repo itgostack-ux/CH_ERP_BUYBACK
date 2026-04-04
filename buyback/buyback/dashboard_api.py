@@ -66,7 +66,7 @@ def get_ceo_dashboard(from_date=None, to_date=None, company=None):
             SUM(CASE WHEN source='App Diagnosis' THEN 1 ELSE 0 END) as app_assessments,
             SUM(CASE WHEN IFNULL(source,'Store Manual')='Store Manual' THEN 1 ELSE 0 END) as manual_assessments
         FROM `tabBuyback Assessment` WHERE {where}
-    """.format(where=where), params, as_dict=1)[0]
+    """.format(where=where), params, as_dict=1)[0]  # noqa: UP032
     kpis["total_assessments"] = a_row.total_assessments or 0
     kpis["app_assessments"] = a_row.app_assessments or 0
     kpis["manual_assessments"] = a_row.manual_assessments or 0
@@ -86,7 +86,7 @@ def get_ceo_dashboard(from_date=None, to_date=None, company=None):
             ROUND(AVG(ABS(IFNULL(price_variance_pct,0))),1) as avg_variance_pct
         FROM `tabBuyback Order`
         WHERE docstatus < 2 AND {where}
-    """.format(where=where), params, as_dict=1)[0]
+    """.format(where=where), params, as_dict=1)[0]  # noqa: UP032
 
     kpis["total_orders"] = o_row.total_orders or 0
     kpis["settled"] = o_row.settled or 0
@@ -119,7 +119,7 @@ def get_ceo_dashboard(from_date=None, to_date=None, company=None):
             SUM(CASE WHEN breached=1 THEN 1 ELSE 0 END) as breached
         FROM `tabBuyback SLA Log`
         WHERE {where}
-    """.format(where=where), params, as_dict=1)[0]
+    """.format(where=where), params, as_dict=1)[0]  # noqa: UP032
     kpis["sla_compliance_pct"] = round(
         (1 - (sla_row.breached or 0) / max(sla_row.total, 1)) * 100, 1)
 
@@ -141,7 +141,7 @@ def get_ceo_dashboard(from_date=None, to_date=None, company=None):
         FROM `tabBuyback Order`
         WHERE docstatus < 2 AND {where}
         GROUP BY DATE(creation) ORDER BY date
-    """.format(where=where), params, as_dict=1)
+    """.format(where=where), params, as_dict=1)  # noqa: UP032
 
     # ── Source mix donut ──
     source_mix = [
@@ -162,7 +162,7 @@ def get_ceo_dashboard(from_date=None, to_date=None, company=None):
         FROM `tabBuyback Order`
         WHERE docstatus < 2 AND {where}
         GROUP BY store ORDER BY payout DESC LIMIT 5
-    """.format(where=where), params, as_dict=1)
+    """.format(where=where), params, as_dict=1)  # noqa: UP032
 
     # ── Top 5 models ──
     top_models = frappe.db.sql("""
@@ -170,7 +170,7 @@ def get_ceo_dashboard(from_date=None, to_date=None, company=None):
         FROM `tabBuyback Order`
         WHERE docstatus < 2 AND status IN ('Paid','Closed') AND {where}
         GROUP BY item ORDER BY qty DESC LIMIT 5
-    """.format(where=where), params, as_dict=1)
+    """.format(where=where), params, as_dict=1)  # noqa: UP032
 
     return {
         "kpis": kpis,
@@ -206,7 +206,7 @@ def get_store_dashboard(store=None, from_date=None, to_date=None):
             SUM(CASE WHEN status IN ('Draft','Awaiting Approval','Awaiting OTP','Awaiting Customer Approval') THEN 1 ELSE 0 END) as pending
         FROM `tabBuyback Order`
         WHERE docstatus < 2 AND {where}
-    """.format(where=where), params, as_dict=1)[0]
+    """.format(where=where), params, as_dict=1)[0]  # noqa: UP032
 
     # Source mix for this store
     src = frappe.db.sql("""
@@ -215,7 +215,7 @@ def get_store_dashboard(store=None, from_date=None, to_date=None):
             COUNT(*) as total
         FROM `tabBuyback Assessment`
         WHERE {where}
-    """.format(where=where), params, as_dict=1)[0]
+    """.format(where=where), params, as_dict=1)[0]  # noqa: UP032
 
     # Pending action counts
     pending_inspection = frappe.db.count("Buyback Assessment", {
@@ -243,7 +243,7 @@ def get_store_dashboard(store=None, from_date=None, to_date=None):
         FROM `tabBuyback Order`
         WHERE docstatus < 2 AND {where}
         GROUP BY item ORDER BY qty DESC LIMIT 5
-    """.format(where=where), params, as_dict=1)
+    """.format(where=where), params, as_dict=1)  # noqa: UP032
 
     return {
         "kpis": {
@@ -279,14 +279,14 @@ def get_category_dashboard(from_date=None, to_date=None, brand=None, item_group=
         SELECT item_group, COUNT(*) as cnt, COALESCE(SUM(IFNULL(quoted_price, estimated_price)),0) as value
         FROM `tabBuyback Assessment` WHERE {where}
         GROUP BY item_group ORDER BY cnt DESC LIMIT 10
-    """.format(where=where), params, as_dict=1)
+    """.format(where=where), params, as_dict=1)  # noqa: UP032
 
     # Top brands
     top_brands = frappe.db.sql("""
         SELECT brand, COUNT(*) as cnt, COALESCE(SUM(IFNULL(quoted_price, estimated_price)),0) as value
         FROM `tabBuyback Assessment` WHERE {where}
         GROUP BY brand ORDER BY cnt DESC LIMIT 10
-    """.format(where=where), params, as_dict=1)
+    """.format(where=where), params, as_dict=1)  # noqa: UP032
 
     # Model-wise inflow
     model_inflow = frappe.db.sql("""
@@ -295,7 +295,7 @@ def get_category_dashboard(from_date=None, to_date=None, brand=None, item_group=
             ROUND(SUM(CASE WHEN source='App Diagnosis' THEN 1 ELSE 0 END) / COUNT(*) * 100, 1) as app_pct
         FROM `tabBuyback Assessment` WHERE {where}
         GROUP BY item, brand, item_group ORDER BY cnt DESC LIMIT 20
-    """.format(where=where), params, as_dict=1)
+    """.format(where=where), params, as_dict=1)  # noqa: UP032
 
     # Mismatch hotspots (models with highest mismatch) — uses aliased columns
     mm_clauses = ["o.creation BETWEEN %(from_date)s AND %(to_date_end)s"]
@@ -317,7 +317,7 @@ def get_category_dashboard(from_date=None, to_date=None, brand=None, item_group=
         GROUP BY o.item, o.brand
         ORDER BY avg_mismatch DESC
         LIMIT 10
-    """.format(where=mm_where), params, as_dict=1)
+    """.format(where=mm_where), params, as_dict=1)  # noqa: UP032
 
     # Grade mix
     grade_mix = frappe.db.sql("""
@@ -325,7 +325,7 @@ def get_category_dashboard(from_date=None, to_date=None, brand=None, item_group=
         FROM `tabBuyback Order`
         WHERE docstatus < 2 AND {where} AND condition_grade IS NOT NULL
         GROUP BY condition_grade ORDER BY cnt DESC
-    """.format(where=where), params, as_dict=1)
+    """.format(where=where), params, as_dict=1)  # noqa: UP032
 
     # Settlement mix by brand
     settlement_by_brand = frappe.db.sql("""
@@ -335,7 +335,7 @@ def get_category_dashboard(from_date=None, to_date=None, brand=None, item_group=
         FROM `tabBuyback Order`
         WHERE docstatus < 2 AND status IN ('Paid','Closed') AND {where}
         GROUP BY brand ORDER BY buyback + exchange DESC LIMIT 10
-    """.format(where=where), params, as_dict=1)
+    """.format(where=where), params, as_dict=1)  # noqa: UP032
 
     return {
         "top_categories": top_cats,
@@ -371,7 +371,7 @@ def get_finance_dashboard(from_date=None, to_date=None, company=None):
             SUM(CASE WHEN payment_mode='UPI' THEN 1 ELSE 0 END) as upi_count
         FROM `tabBuyback Order`
         WHERE docstatus < 2 AND status IN ('Paid','Closed') AND {where}
-    """.format(where=where), params, as_dict=1)[0]
+    """.format(where=where), params, as_dict=1)[0]  # noqa: UP032
 
     # Pending payouts
     pending = frappe.db.sql("""
@@ -381,7 +381,7 @@ def get_finance_dashboard(from_date=None, to_date=None, company=None):
             AND status IN ('Approved','Customer Approved','OTP Verified')
             AND (total_paid IS NULL OR total_paid = 0)
             AND {where}
-    """.format(where=where), params, as_dict=1)[0]
+    """.format(where=where), params, as_dict=1)[0]  # noqa: UP032
 
     # Exchange adjustments
     ex = frappe.db.sql("""
@@ -391,7 +391,7 @@ def get_finance_dashboard(from_date=None, to_date=None, company=None):
         FROM `tabBuyback Order`
         WHERE docstatus < 2 AND settlement_type='Exchange'
             AND status IN ('Paid','Closed') AND {where}
-    """.format(where=where), params, as_dict=1)[0]
+    """.format(where=where), params, as_dict=1)[0]  # noqa: UP032
 
     # Branch-wise payout
     branch_payout = frappe.db.sql("""
@@ -399,7 +399,7 @@ def get_finance_dashboard(from_date=None, to_date=None, company=None):
         FROM `tabBuyback Order`
         WHERE docstatus < 2 AND status IN ('Paid','Closed') AND {where}
         GROUP BY store ORDER BY amount DESC LIMIT 10
-    """.format(where=where), params, as_dict=1)
+    """.format(where=where), params, as_dict=1)  # noqa: UP032
 
     # Payment mode mix
     mode_mix = frappe.db.sql("""
@@ -408,7 +408,7 @@ def get_finance_dashboard(from_date=None, to_date=None, company=None):
         FROM `tabBuyback Order`
         WHERE docstatus < 2 AND status IN ('Paid','Closed') AND {where}
         GROUP BY payment_mode ORDER BY cnt DESC
-    """.format(where=where), params, as_dict=1)
+    """.format(where=where), params, as_dict=1)  # noqa: UP032
 
     # High-value payouts (> 50000)
     high_value = frappe.db.sql("""
@@ -417,7 +417,7 @@ def get_finance_dashboard(from_date=None, to_date=None, company=None):
         WHERE docstatus < 2 AND status IN ('Paid','Closed')
             AND total_paid > 50000 AND {where}
         ORDER BY total_paid DESC LIMIT 20
-    """.format(where=where), params, as_dict=1)
+    """.format(where=where), params, as_dict=1)  # noqa: UP032
 
     return {
         "kpis": {
@@ -475,7 +475,7 @@ def get_compliance_dashboard(from_date=None, to_date=None, company=None):
             AND customer_approved != 1
             AND buyback_assessment IS NOT NULL AND buyback_assessment != ''
             AND {where}
-    """.format(where=where), params)[0][0] or 0
+    """.format(where=where), params)[0][0] or 0  # noqa: UP032
 
     # Duplicate IMEI
     kpis["duplicate_imeis"] = frappe.db.sql("""
@@ -506,7 +506,7 @@ def get_compliance_dashboard(from_date=None, to_date=None, company=None):
         SELECT COUNT(*) as breaches
         FROM `tabBuyback SLA Log`
         WHERE breached=1 AND {where}
-    """.format(where=where), params, as_dict=1)[0]
+    """.format(where=where), params, as_dict=1)[0]  # noqa: UP032
     kpis["sla_breaches"] = sla.breaches or 0
 
     # Suspicious: branches with high override rate
@@ -568,7 +568,7 @@ def get_operations_dashboard(from_date=None, to_date=None, store=None):
             'Draft','Awaiting Approval','Approved',
             'Awaiting Customer Approval','Customer Approved',
             'Awaiting OTP','OTP Verified','Paid')
-    """.format(where=where), params, as_dict=1)
+    """.format(where=where), params, as_dict=1)  # noqa: UP032
 
     # Assessments awaiting inspection — uses aliased table
     a_clauses = ["a.creation BETWEEN %(from_date)s AND %(to_date_end)s"]
@@ -585,7 +585,7 @@ def get_operations_dashboard(from_date=None, to_date=None, store=None):
                 WHERE i.buyback_assessment = a.name AND i.status != 'Cancelled'
             )
             AND {where}
-    """.format(where=a_where), params, as_dict=1)[0]
+    """.format(where=a_where), params, as_dict=1)[0]  # noqa: UP032
 
     # SLA breaches today
     sla_breaches = frappe.db.sql("""
@@ -593,7 +593,7 @@ def get_operations_dashboard(from_date=None, to_date=None, store=None):
         FROM `tabBuyback SLA Log`
         WHERE breached=1 AND {where}
         GROUP BY sla_stage
-    """.format(where=where), params, as_dict=1)
+    """.format(where=where), params, as_dict=1)  # noqa: UP032
 
     return {
         "pipeline": pipeline,

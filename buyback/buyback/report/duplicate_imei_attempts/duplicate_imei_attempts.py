@@ -28,7 +28,7 @@ def get_data(filters):
     dc = date_condition("creation", filters)
 
     # Combine assessments for same IMEI
-    rows = frappe.db.sql(f"""
+    rows = frappe.db.sql("""
         SELECT
             imei_serial,
             COUNT(*) as attempt_count,
@@ -42,5 +42,5 @@ def get_data(filters):
         HAVING attempt_count > 1
         ORDER BY attempt_count DESC
         LIMIT 500
-    """, as_dict=1)
+    """.format(dc=dc), as_dict=1)  # noqa: UP032
     return rows

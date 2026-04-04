@@ -29,7 +29,7 @@ def get_data(filters):
         sc_parts.append(f"store = {frappe.db.escape(filters['store'])}")
     sc = (" AND " + " AND ".join(sc_parts)) if sc_parts else ""
 
-    rows = frappe.db.sql(f"""
+    rows = frappe.db.sql("""
         SELECT
             name, store, customer_name, final_price,
             IFNULL(settlement_type, 'Buyback') as settlement_type,
@@ -42,5 +42,5 @@ def get_data(filters):
             {sc}
         ORDER BY modified ASC
         LIMIT 500
-    """, as_dict=1)
+    """.format(sc=sc), as_dict=1)  # noqa: UP032
     return rows

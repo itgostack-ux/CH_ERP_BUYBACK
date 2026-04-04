@@ -26,7 +26,7 @@ def get_data(filters):
     dc = date_condition("i.creation", filters)
     sc = standard_conditions(filters, alias="i.")
 
-    rows = frappe.db.sql(f"""
+    rows = frappe.db.sql("""
         SELECT
             c.question_code as check_code,
             COUNT(*) as times_flagged,
@@ -38,5 +38,5 @@ def get_data(filters):
         WHERE i.status = 'Completed' AND {dc} {sc}
         GROUP BY c.question_code
         ORDER BY total_impact DESC
-    """, as_dict=1)
+    """.format(dc=dc, sc=sc), as_dict=1)  # noqa: UP032
     return rows

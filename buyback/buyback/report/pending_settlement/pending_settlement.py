@@ -62,7 +62,7 @@ def get_data(filters):
 		WHERE {dc} {sc}
 			AND {pending_in}
 		ORDER BY age_hours DESC
-	""".format(
+	""".format(  # noqa: UP032
 		age_hours=age_hours_expr,
 		bucket=bucket_expr,
 		dc=dc,

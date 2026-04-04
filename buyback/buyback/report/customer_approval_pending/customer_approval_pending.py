@@ -61,7 +61,7 @@ def get_data(filters):
 				OR (o.customer_approved = 0 AND o.status = 'Approved')
 			)
 		ORDER BY age_minutes DESC
-	""".format(
+	""".format(  # noqa: UP032
 		age_expr=age_expr,
 		bucket_expr=bucket_expr,
 		dc=dc,

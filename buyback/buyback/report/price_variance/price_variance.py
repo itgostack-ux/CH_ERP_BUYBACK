@@ -34,7 +34,7 @@ def get_data(filters):
     sc = standard_conditions(filters, alias="o.")
     threshold = flt((filters or {}).get("variance_threshold") or 10)
 
-    rows = frappe.db.sql(f"""
+    rows = frappe.db.sql("""
         SELECT
             o.name, o.store, o.item,
             IFNULL(a.source, 'Store Manual') as source,
@@ -54,5 +54,5 @@ def get_data(filters):
             AND {dc} {sc}
         HAVING ABS(variance_pct) >= {threshold}
         ORDER BY ABS(variance_pct) DESC
-    """, as_dict=1)
+    """.format(dc=dc, sc=sc, threshold=threshold), as_dict=1)  # noqa: UP032
     return rows

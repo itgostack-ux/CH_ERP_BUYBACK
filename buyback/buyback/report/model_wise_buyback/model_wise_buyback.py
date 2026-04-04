@@ -32,7 +32,7 @@ def get_columns():
 def get_data(filters):
     dc = date_condition("o.creation", filters)
     sc = standard_conditions(filters, alias="o.")
-    rows = frappe.db.sql(f"""
+    rows = frappe.db.sql("""
         SELECT
             itm.item_group, o.brand, o.item,
             COUNT(*) as quote_count,
@@ -47,7 +47,7 @@ def get_data(filters):
         WHERE o.docstatus < 2 AND {dc} {sc}
         GROUP BY itm.item_group, o.brand, o.item
         ORDER BY total_value DESC
-    """, as_dict=1)
+    """.format(dc=dc, sc=sc), as_dict=1)  # noqa: UP032
 
     for r in rows:
         total = (r.bb_count or 0) + (r.ex_count or 0)

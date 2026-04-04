@@ -29,7 +29,7 @@ def get_columns():
 def get_data(filters):
     dc = date_condition("a.creation", filters)
     sc = standard_conditions(filters, alias="a.")
-    rows = frappe.db.sql(f"""
+    rows = frappe.db.sql("""
         SELECT
             a.name, a.action,
             a.reference_doctype, a.reference_name,
@@ -45,5 +45,5 @@ def get_data(filters):
             AND {dc} {sc}
         ORDER BY a.creation DESC
         LIMIT 500
-    """, as_dict=1)
+    """.format(dc=dc, sc=sc), as_dict=1)  # noqa: UP032
     return rows

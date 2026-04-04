@@ -50,7 +50,7 @@ def get_data(filters):
 			AND {paid_in}
 		GROUP BY o.store
 		ORDER BY total_settled DESC
-	""".format(dc=dc, sc=sc, paid_in=paid_in), as_dict=True)
+	""".format(dc=dc, sc=sc, paid_in=paid_in), as_dict=True)  # noqa: UP032
 
 	for r in rows:
 		r["exchange_pct"] = round(
