@@ -237,9 +237,21 @@ def get_store_dashboard(store=None, from_date=None, to_date=None):
         "store": store, "breached": 1, "creation": ("between", [from_date, f"{to_date} 23:59:59"]),
     })
 
+    # SLA compliance
+    sla_total = frappe.db.count("Buyback SLA Log", {
+        "store": store, "creation": ("between", [from_date, f"{to_date} 23:59:59"]),
+    })
+    sla_compliance = round((1 - (sla_breaches or 0) / max(sla_total, 1)) * 100, 1) if sla_total else 100.0
+
+    # Pending pickups (paid but not yet closed)
+    pending_pickups = frappe.db.count("Buyback Order", {
+        "store": store, "status": "Paid", "docstatus": ("<", 2),
+        "settlement_type": ["in", ["Buyback", None, ""]],
+    })
+
     # Top models
     top_models = frappe.db.sql("""
-        SELECT item, COUNT(*) as qty
+        SELECT item, COUNT(*) as qty, COALESCE(SUM(final_price), 0) as value
         FROM `tabBuyback Order`
         WHERE docstatus < 2 AND {where}
         GROUP BY item ORDER BY qty DESC LIMIT 5
@@ -248,14 +260,16 @@ def get_store_dashboard(store=None, from_date=None, to_date=None):
     return {
         "kpis": {
             "total_orders": o_row.total_orders or 0,
-            "settled": o_row.settled or 0,
+            "paid": o_row.settled or 0,
             "total_payout": o_row.total_payout or 0,
             "pending": o_row.pending or 0,
             "app_quote_pct": round((src.app_cnt or 0) / max(src.total, 1) * 100, 1),
             "pending_inspection": pending_inspection,
-            "pending_approval": pending_approval,
-            "pending_settlement": pending_settlement,
+            "pending_approvals": pending_approval,
+            "pending_payments": pending_settlement,
             "sla_breaches": sla_breaches,
+            "sla_compliance": sla_compliance,
+            "pending_pickups": pending_pickups,
         },
         "top_models": top_models,
     }
@@ -487,19 +501,40 @@ def get_compliance_dashboard(from_date=None, to_date=None, company=None):
         ) dup
     """, date_params)[0][0] or 0
 
-    # Overrides count
-    kpis["overrides_count"] = frappe.db.count("Buyback Audit Log", {
+    # Manager overrides
+    kpis["manager_overrides"] = frappe.db.count("Buyback Audit Log", {
         "action": ["in", ["Price Override", "Grade Changed"]],
         "creation": ("between", [from_date, f"{to_date} 23:59:59"]),
     })
 
-    # High-mismatch inspections (>50%)
-    kpis["high_mismatch_count"] = frappe.db.sql("""
-        SELECT COUNT(*)
-        FROM `tabBuyback Inspection`
-        WHERE status='Completed' AND mismatch_percentage > 50
+    # High-value orders
+    threshold = flt(frappe.db.get_single_value("Buyback SLA Settings", "large_payout_threshold")) or 25000
+    kpis["large_payout_threshold"] = threshold
+    hv = frappe.db.sql("""
+        SELECT COUNT(*) as cnt, COALESCE(SUM(total_paid), 0) as total
+        FROM `tabBuyback Order`
+        WHERE docstatus < 2 AND status IN ('Paid','Closed')
+            AND total_paid > %(threshold)s AND {where}
+    """.format(where=where), {**params, "threshold": threshold}, as_dict=1)[0]  # noqa: UP032
+    kpis["high_value_orders"] = hv.cnt or 0
+    kpis["high_value_total"] = hv.total or 0
+
+    # Manual vs auto approvals
+    manual_approvals = frappe.db.sql("""
+        SELECT COUNT(DISTINCT reference_name)
+        FROM `tabBuyback Audit Log`
+        WHERE action IN ('Manual Approval','Price Override','Grade Changed')
             AND creation BETWEEN %(from_date)s AND %(to_date_end)s
     """, date_params)[0][0] or 0
+    kpis["manual_approvals"] = manual_approvals
+
+    total_approved = frappe.db.sql("""
+        SELECT COUNT(*)
+        FROM `tabBuyback Order`
+        WHERE docstatus < 2 AND status IN ('Paid','Closed','Approved','Customer Approved','OTP Verified')
+            AND {where}
+    """.format(where=where), params)[0][0] or 0  # noqa: UP032
+    kpis["auto_approvals"] = max(total_approved - manual_approvals, 0)
 
     # SLA breaches
     sla = frappe.db.sql("""
@@ -523,6 +558,15 @@ def get_compliance_dashboard(from_date=None, to_date=None, company=None):
         ORDER BY override_count DESC LIMIT 10
     """, date_params, as_dict=1)
 
+    # Recent audit actions
+    recent_audits = frappe.db.sql("""
+        SELECT creation, action, reference_name as reference,
+            reference_doctype as reference_type, owner as user, reason
+        FROM `tabBuyback Audit Log`
+        WHERE creation BETWEEN %(from_date)s AND %(to_date_end)s
+        ORDER BY creation DESC LIMIT 20
+    """, date_params, as_dict=1)
+
     # Mismatch anomaly trend (daily)
     mismatch_trend = frappe.db.sql("""
         SELECT DATE(creation) as date,
@@ -538,6 +582,7 @@ def get_compliance_dashboard(from_date=None, to_date=None, company=None):
         "kpis": kpis,
         "suspicious_branches": suspicious_branches,
         "mismatch_trend": mismatch_trend,
+        "recent_audits": recent_audits,
     }
 
 
@@ -554,49 +599,56 @@ def get_operations_dashboard(from_date=None, to_date=None, store=None):
 
     where, params = _build_params(from_date, to_date, store=store)
 
-    # Pipeline counts by status
-    pipeline = frappe.db.sql("""
+    # ── SLA overview ──
+    sla_row = frappe.db.sql("""
         SELECT
-            status,
-            COUNT(*) as cnt,
-            ROUND(AVG(TIMESTAMPDIFF(MINUTE, creation, NOW())),1) as avg_age_min
+            COUNT(*) as total,
+            SUM(CASE WHEN breached=1 THEN 1 ELSE 0 END) as breached
+        FROM `tabBuyback SLA Log`
+        WHERE {where}
+    """.format(where=where), params, as_dict=1)[0]  # noqa: UP032
+
+    sla_total = sla_row.total or 0
+    sla_breaches_cnt = sla_row.breached or 0
+    sla_on_time = sla_total - sla_breaches_cnt
+    sla_compliance = round(sla_on_time / max(sla_total, 1) * 100, 1) if sla_total else 100.0
+
+    kpis = {
+        "sla_on_time": sla_on_time,
+        "sla_warnings": 0,  # no warning flag tracked yet
+        "sla_breaches": sla_breaches_cnt,
+        "sla_compliance": sla_compliance,
+    }
+
+    # ── Inspection pipeline ──
+    inspection_pipeline = frappe.db.sql("""
+        SELECT status, COUNT(*) as count
+        FROM `tabBuyback Inspection`
+        WHERE creation BETWEEN %(from_date)s AND %(to_date_end)s
+        GROUP BY status ORDER BY count DESC
+    """, params, as_dict=1)
+
+    # ── Exchange pipeline ──
+    exchange_pipeline = frappe.db.sql("""
+        SELECT status, COUNT(*) as count
         FROM `tabBuyback Order`
-        WHERE docstatus < 2 AND status NOT IN ('Closed','Cancelled','Rejected')
+        WHERE docstatus < 2 AND settlement_type='Exchange'
             AND {where}
-        GROUP BY status
-        ORDER BY FIELD(status,
-            'Draft','Awaiting Approval','Approved',
-            'Awaiting Customer Approval','Customer Approved',
-            'Awaiting OTP','OTP Verified','Paid')
+        GROUP BY status ORDER BY count DESC
     """.format(where=where), params, as_dict=1)  # noqa: UP032
 
-    # Assessments awaiting inspection — uses aliased table
-    a_clauses = ["a.creation BETWEEN %(from_date)s AND %(to_date_end)s"]
-    if store:
-        a_clauses.append("a.store = %(store)s")
-    a_where = " AND ".join(a_clauses)
-
-    pending_insp = frappe.db.sql("""
-        SELECT COUNT(*) as cnt
-        FROM `tabBuyback Assessment` a
-        WHERE a.status = 'Submitted'
-            AND NOT EXISTS (
-                SELECT 1 FROM `tabBuyback Inspection` i
-                WHERE i.buyback_assessment = a.name AND i.status != 'Cancelled'
-            )
-            AND {where}
-    """.format(where=a_where), params, as_dict=1)[0]  # noqa: UP032
-
-    # SLA breaches today
-    sla_breaches = frappe.db.sql("""
-        SELECT sla_stage, COUNT(*) as cnt
-        FROM `tabBuyback SLA Log`
-        WHERE breached=1 AND {where}
-        GROUP BY sla_stage
+    # ── Hourly volume ──
+    hourly_volume = frappe.db.sql("""
+        SELECT CONCAT(LPAD(HOUR(creation), 2, '0'), ':00') as hour,
+            COUNT(*) as count
+        FROM `tabBuyback Order`
+        WHERE docstatus < 2 AND {where}
+        GROUP BY HOUR(creation) ORDER BY HOUR(creation)
     """.format(where=where), params, as_dict=1)  # noqa: UP032
 
     return {
-        "pipeline": pipeline,
-        "pending_inspection": pending_insp.cnt or 0,
-        "sla_breaches": sla_breaches,
+        "kpis": kpis,
+        "inspection_pipeline": inspection_pipeline,
+        "exchange_pipeline": exchange_pipeline,
+        "hourly_volume": hourly_volume,
     }

@@ -11,15 +11,14 @@ app_license = "mit"
 required_apps = ["frappe/erpnext", "AbirJ1/ch_item_master"]
 
 # Each item in the list will be shown as an app in the apps page
-# add_to_apps_screen = [
-# 	{
-# 		"name": "buyback",
-# 		"logo": "/assets/buyback/logo.png",
-# 		"title": "BuyBack",
-# 		"route": "/buyback",
-# 		"has_permission": "buyback.api.permission.has_app_permission"
-# 	}
-# ]
+add_to_apps_screen = [
+	{
+		"name": "buyback",
+		"logo": "/assets/buyback/icon.svg",
+		"title": "BuyBack",
+		"route": "/desk/buyback",
+	}
+]
 
 # Includes in <head>
 # ------------------
