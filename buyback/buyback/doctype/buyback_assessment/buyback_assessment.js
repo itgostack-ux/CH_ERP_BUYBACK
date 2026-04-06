@@ -143,7 +143,7 @@ frappe.ui.form.on("Buyback Assessment", {
 		if (frm.doc.buyback_inspection) {
 			frm.dashboard.add_comment(
 				__("Inspection created: {0}", [
-					`<a href="/app/buyback-inspection/${frm.doc.buyback_inspection}">${frm.doc.buyback_inspection}</a>`,
+					`<a href="/desk/buyback-inspection/${frm.doc.buyback_inspection}">${frm.doc.buyback_inspection}</a>`,
 				]),
 				"blue",
 				true

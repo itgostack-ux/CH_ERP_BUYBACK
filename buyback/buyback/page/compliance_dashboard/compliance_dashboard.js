@@ -92,7 +92,7 @@ function render_compliance(page, data) {
 							<tr>
 								<td>${a.creation || a.date || ""}</td>
 								<td><span class="badge badge-${audit_badge(a.action)}">${a.action || ""}</span></td>
-								<td>${a.reference ? `<a href="/app/${(a.reference_type || "buyback-order").toLowerCase().replace(/ /g, "-")}/${a.reference}">${a.reference}</a>` : ""}</td>
+								<td>${a.reference ? `<a href="/desk/${(a.reference_type || "buyback-order").toLowerCase().replace(/ /g, "-")}/${a.reference}">${a.reference}</a>` : ""}</td>
 								<td>${a.user || ""}</td>
 								<td>${a.reason || ""}</td>
 							</tr>

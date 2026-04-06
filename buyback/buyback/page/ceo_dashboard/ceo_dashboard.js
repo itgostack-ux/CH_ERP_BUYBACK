@@ -82,7 +82,7 @@ function render_ceo(page, data) {
 					<tbody>
 						${(data.top_branches || []).map(b => `
 							<tr>
-								<td><a href="/app/warehouse/${b.store}">${b.store}</a></td>
+								<td><a href="/desk/warehouse/${b.store}">${b.store}</a></td>
 								<td class="text-right">${b.orders}</td>
 								<td class="text-right">${format_currency(b.payout)}</td>
 							</tr>

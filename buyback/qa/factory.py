@@ -943,8 +943,8 @@ def _seed_accounts(company: str) -> int:
 
 def _seed_users() -> int:
     created = 0
-    _orig_in_test = frappe.flags.in_test
-    frappe.flags.in_test = True          # bypass password-strength check
+    _orig_in_test = frappe.in_test
+    frappe.in_test = True          # bypass password-strength check
     try:
         for u in TEST_USERS:
             if not frappe.db.exists("User", u["email"]):
@@ -963,7 +963,7 @@ def _seed_users() -> int:
                 user.insert(ignore_permissions=True)
                 created += 1
     finally:
-        frappe.flags.in_test = _orig_in_test
+        frappe.in_test = _orig_in_test
     return created
 
 
