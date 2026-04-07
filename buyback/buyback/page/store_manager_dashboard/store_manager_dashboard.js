@@ -13,13 +13,30 @@ frappe.pages["store-manager-dashboard"].on_page_load = function (wrapper) {
 	wrapper.page = page;
 
 	// Filters
+	page.company = page.add_field({
+		fieldname: "company",
+		label: __("Company"),
+		fieldtype: "Link",
+		options: "Company",
+		default: frappe.defaults.get_user_default("Company"),
+		change: () => {
+			// Reset store when company changes
+			page.fields_dict.store?.set_value("");
+			refresh(page);
+		},
+	});
 	page.store = page.add_field({
 		fieldname: "store",
 		label: __("Store"),
 		fieldtype: "Link",
 		options: "Warehouse",
 		reqd: 1,
-		get_query: () => ({ filters: { ch_is_buyback_enabled: 1 } }),
+		get_query: () => {
+			const filters = { is_group: 0, disabled: 0 };
+			const company = page.fields_dict.company?.get_value();
+			if (company) filters.company = company;
+			return { filters };
+		},
 		change: () => refresh(page),
 	});
 	page.from_date = page.add_field({
