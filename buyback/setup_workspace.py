@@ -89,6 +89,8 @@ def _setup_workspace():
         ws.icon = "shopping-cart"
         ws.is_hidden = 0
 
+    ws.type = ws.type or "Workspace"
+
     # ── Number Card section (top) ──
     ws.append("number_cards", {"number_card_name": "Todays Buyback Assessments"})
     ws.append("number_cards", {"number_card_name": "Pending Inspections"})
