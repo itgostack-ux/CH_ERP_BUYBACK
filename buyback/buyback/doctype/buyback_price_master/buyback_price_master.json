@@ -12,6 +12,7 @@
   "item_code",
   "product_col2",
   "buyback_price_id",
+  "sku_id",
   "is_active",
   "item_name",
   "price_grid_section",
@@ -86,6 +87,14 @@
    "label": "Buyback Price ID",
    "read_only": 1,
    "unique": 1
+  },
+  {
+   "fieldname": "sku_id",
+   "fieldtype": "Int",
+   "label": "SKU ID",
+   "read_only": 1,
+   "unique": 1,
+   "hidden": 1
   },
   {
    "default": "0",

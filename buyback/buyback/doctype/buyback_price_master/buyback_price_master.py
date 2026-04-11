@@ -22,6 +22,7 @@ class BuybackPriceMaster(Document):
                 SELECT MAX(buyback_price_id) FROM `tabBuyback Price Master`
             """)[0][0] or 0
             self.buyback_price_id = last + 1
+            self.sku_id = self.buyback_price_id
         finally:
             frappe.db.sql("SELECT RELEASE_LOCK('buyback_price_master_id')")
 
