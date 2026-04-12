@@ -40,17 +40,17 @@ class BuybackPricingRule(Document):
             prev_to = 0
             for slab in sorted(self.slabs, key=lambda s: s.from_amount):
                 if slab.from_amount < 0 or slab.to_amount < 0:
-                    frappe.throw(_("Slab amounts cannot be negative."))
+                    frappe.throw(_("Slab amounts cannot be negative."), title=_("Buyback Pricing Rule Error"))
                 if slab.from_amount >= slab.to_amount:
-                    frappe.throw(_("'From Amount' must be less than 'To Amount' in slabs."))
+                    frappe.throw(_("'From Amount' must be less than 'To Amount' in slabs."), title=_("Buyback Pricing Rule Error"))
                 if slab.from_amount < prev_to:
-                    frappe.throw(_("Pricing slabs must not overlap."))
+                    frappe.throw(_("Pricing slabs must not overlap."), title=_("Buyback Pricing Rule Error"))
                 prev_to = slab.to_amount
 
     def _validate_validity(self):
         if self.valid_from and self.valid_to:
             if getdate(self.valid_from) > getdate(self.valid_to):
-                frappe.throw(_("'Valid From' cannot be after 'Valid To'."))
+                frappe.throw(_("'Valid From' cannot be after 'Valid To'."), title=_("Buyback Pricing Rule Error"))
 
     def is_applicable(self, brand=None, category=None, grade=None,
                       warranty=None, age_months=None, amount=None):

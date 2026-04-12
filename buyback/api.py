@@ -305,7 +305,7 @@ def customer_approve_via_token(token: str, method: str = "SMS Link") -> dict:
         "Buyback Order", {"approval_token": token, "docstatus": ["!=", 2]}, "name"
     )
     if not order_name:
-        frappe.throw(_("Invalid or expired approval link."), exc=frappe.DoesNotExistError)
+        frappe.throw(_("Invalid or expired approval link."), exc=frappe.DoesNotExistError, title=_("API Error"))
 
     doc = frappe.get_doc("Buyback Order", order_name)
     doc.flags.ignore_permissions = True
@@ -398,7 +398,7 @@ def save_customer_payout_preference(
         "Buyback Order", {"approval_token": token, "docstatus": ["!=", 2]}, "name"
     )
     if not order_name:
-        frappe.throw(_("Invalid or expired approval link."), exc=frappe.DoesNotExistError)
+        frappe.throw(_("Invalid or expired approval link."), exc=frappe.DoesNotExistError, title=_("API Error"))
 
     doc = frappe.get_doc("Buyback Order", order_name)
     allowed_status = {"Approved", "Awaiting Customer Approval", "Awaiting OTP", "OTP Verified"}
@@ -1014,7 +1014,7 @@ def get_buyback_approval_details(token: str) -> dict:
         "Buyback Order", {"approval_token": token, "docstatus": ["!=", 2]}, "name"
     )
     if not order_name:
-        frappe.throw(_("Invalid or expired approval link."), exc=frappe.DoesNotExistError)
+        frappe.throw(_("Invalid or expired approval link."), exc=frappe.DoesNotExistError, title=_("API Error"))
 
     order = frappe.get_doc("Buyback Order", order_name)
 

@@ -40,7 +40,7 @@ from buyback.buyback.sla_engine import calculate_sla_status, DEFAULT_SLAS
 # ═══════════════════════════════════════════════════════════════════
 
 @frappe.whitelist()
-def get_store_scorecards(from_date=None, to_date=None, company=None):
+def get_store_scorecards(from_date=None, to_date=None, company=None) -> list:
     """Compute scorecard for all active stores."""
     from_date = from_date or add_months(nowdate(), -1)
     to_date = to_date or nowdate()
@@ -127,7 +127,7 @@ def get_store_scorecards(from_date=None, to_date=None, company=None):
 # ═══════════════════════════════════════════════════════════════════
 
 @frappe.whitelist()
-def get_inspector_scorecards(from_date=None, to_date=None, store=None):
+def get_inspector_scorecards(from_date=None, to_date=None, store=None) -> dict:
     """Compute scorecard for all inspectors."""
     from_date = from_date or add_months(nowdate(), -1)
     to_date = to_date or nowdate()
@@ -208,7 +208,7 @@ def get_inspector_scorecards(from_date=None, to_date=None, store=None):
 # ═══════════════════════════════════════════════════════════════════
 
 @frappe.whitelist()
-def get_executive_scorecards(from_date=None, to_date=None, store=None):
+def get_executive_scorecards(from_date=None, to_date=None, store=None) -> dict:
     """Compute scorecard for buyback agents/executives."""
     from_date = from_date or add_months(nowdate(), -1)
     to_date = to_date or nowdate()

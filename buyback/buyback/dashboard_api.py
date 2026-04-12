@@ -42,7 +42,7 @@ def _build_params(from_date, to_date, col="creation", **kwargs):
 def _check_dashboard_access():
     """Ensure caller has at least read access to Buyback Order."""
     if not frappe.has_permission("Buyback Order", "read"):
-        frappe.throw(_("You do not have permission to view buyback dashboards"), frappe.PermissionError)
+        frappe.throw(_("You do not have permission to view buyback dashboards"), frappe.PermissionError, title=_("API Error"))
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -50,13 +50,13 @@ def _check_dashboard_access():
 # ═══════════════════════════════════════════════════════════════════
 
 @frappe.whitelist()
-def get_store_dashboard(store=None, from_date=None, to_date=None):
+def get_store_dashboard(store=None, from_date=None, to_date=None) -> dict:
     """Store Manager — Branch-level performance with pending action counts."""
     _check_dashboard_access()
     from_date = from_date or nowdate()
     to_date = to_date or nowdate()
     if not store:
-        frappe.throw(_("Store is required"))
+        frappe.throw(_("Store is required"), title=_("API Error"))
 
     where, params = _build_params(from_date, to_date, store=store)
 
@@ -143,7 +143,7 @@ def get_store_dashboard(store=None, from_date=None, to_date=None):
 # ═══════════════════════════════════════════════════════════════════
 
 @frappe.whitelist()
-def get_category_dashboard(from_date=None, to_date=None, brand=None, item_group=None):
+def get_category_dashboard(from_date=None, to_date=None, brand=None, item_group=None) -> dict:
     """Category Manager — Model/brand performance & mismatch hotspots."""
     _check_dashboard_access()
     from_date = from_date or add_months(nowdate(), -1)
@@ -264,7 +264,7 @@ def get_category_dashboard(from_date=None, to_date=None, brand=None, item_group=
 # ═══════════════════════════════════════════════════════════════════
 
 @frappe.whitelist()
-def get_finance_dashboard(from_date=None, to_date=None, company=None):
+def get_finance_dashboard(from_date=None, to_date=None, company=None) -> dict:
     """Finance — Payouts, pending settlements, exchange adjustments."""
     _check_dashboard_access()
     from_date = from_date or add_months(nowdate(), -1)
@@ -374,7 +374,7 @@ def get_finance_dashboard(from_date=None, to_date=None, company=None):
 # ═══════════════════════════════════════════════════════════════════
 
 @frappe.whitelist()
-def get_compliance_dashboard(from_date=None, to_date=None, company=None):
+def get_compliance_dashboard(from_date=None, to_date=None, company=None) -> dict:
     """Compliance — Anomalies, OTP failures, mismatches, overrides."""
     _check_dashboard_access()
     from_date = from_date or add_months(nowdate(), -1)
@@ -507,7 +507,7 @@ def get_compliance_dashboard(from_date=None, to_date=None, company=None):
 # ═══════════════════════════════════════════════════════════════════
 
 @frappe.whitelist()
-def get_operations_dashboard(from_date=None, to_date=None, store=None):
+def get_operations_dashboard(from_date=None, to_date=None, store=None) -> dict:
     """Operations — Real-time pipeline counts and SLA status."""
     _check_dashboard_access()
     from_date = from_date or nowdate()

@@ -5,7 +5,7 @@ India Compliance keeps them in exceptions.py at app root.
 
 Usage:
     from buyback.exceptions import BuybackValidationError
-    frappe.throw(_("msg"), exc=BuybackValidationError)
+    frappe.throw(_("msg"), exc=BuybackValidationError, title=_("Validation Error"))
 """
 
 import frappe

@@ -214,11 +214,11 @@ class BuybackOrder(Document):
         for row in self.payments or []:
             amount = flt(row.amount)
             if amount <= 0:
-                frappe.throw(_("Payment row #{0}: amount must be greater than zero.").format(row.idx))
+                frappe.throw(_("Payment row #{0}: amount must be greater than zero.").format(row.idx), title=_("Buyback Order Error"))
             if not row.payment_method:
-                frappe.throw(_("Payment row #{0}: payment method is required.").format(row.idx))
+                frappe.throw(_("Payment row #{0}: payment method is required.").format(row.idx), title=_("Buyback Order Error"))
             if not row.payment_date:
-                frappe.throw(_("Payment row #{0}: payment date is required.").format(row.idx))
+                frappe.throw(_("Payment row #{0}: payment date is required.").format(row.idx), title=_("Buyback Order Error"))
 
             mode_type = (frappe.db.get_value("Mode of Payment", row.payment_method, "type") or "").strip()
             requires_reference = mode_type != "Cash"
@@ -352,12 +352,12 @@ class BuybackOrder(Document):
             new_device_price: Price of new device (required if Exchange)
         """
         if settlement_type not in ("Buyback", "Exchange"):
-            frappe.throw(_("Invalid settlement type: {0}").format(settlement_type))
+            frappe.throw(_("Invalid settlement type: {0}").format(settlement_type), title=_("Buyback Order Error"))
 
         self.settlement_type = settlement_type
         if settlement_type == "Exchange":
             if not new_item:
-                frappe.throw(_("New device item is required for exchange."))
+                frappe.throw(_("New device item is required for exchange."), title=_("Buyback Order Error"))
             self.new_item = new_item
             if new_device_price is not None:
                 self.new_device_price = flt(new_device_price)

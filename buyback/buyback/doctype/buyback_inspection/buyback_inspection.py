@@ -138,7 +138,7 @@ class BuybackInspection(Document):
     def start_inspection(self):
         """Begin the inspection process."""
         if self.status != "Draft":
-            frappe.throw(_("Can only start inspection from Draft status."), exc=BuybackStatusError)
+            frappe.throw(_("Can only start inspection from Draft status."), exc=BuybackStatusError, title=_("Buyback Inspection Error"))
         self.status = "In Progress"
         self.inspection_started_at = now_datetime()
         self.inspector = frappe.session.user
@@ -148,9 +148,9 @@ class BuybackInspection(Document):
     def complete_inspection(self):
         """Complete the inspection with results."""
         if self.status != "In Progress":
-            frappe.throw(_("Can only complete an In Progress inspection."), exc=BuybackStatusError)
+            frappe.throw(_("Can only complete an In Progress inspection."), exc=BuybackStatusError, title=_("Buyback Inspection Error"))
         if not self.condition_grade:
-            frappe.throw(_("Final Condition Grade is required to complete inspection."))
+            frappe.throw(_("Final Condition Grade is required to complete inspection."), title=_("Buyback Inspection Error"))
         self.status = "Completed"
         self.inspection_completed_at = now_datetime()
         self._build_comparison()

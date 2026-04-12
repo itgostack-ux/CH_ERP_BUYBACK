@@ -37,7 +37,8 @@
    "label": "Map Type",
    "options": "Subcategory\nModel",
    "reqd": 1,
-   "description": "Step 1: Map questions/tests to a Subcategory (Item Group). Step 2: Optionally override per Model (Item). If a model has no mapping, the subcategory mapping is used."
+   "description": "Step 1: Map questions/tests to a Subcategory (Item Group). Step 2: Optionally override per Model (Item). If a model has no mapping, the subcategory mapping is used.",
+   "search_index": 1
   },
   {
    "depends_on": "eval:doc.map_type === 'Model'",
@@ -47,7 +48,8 @@
    "in_standard_filter": 1,
    "label": "Model",
    "mandatory_depends_on": "eval:doc.map_type === 'Model'",
-   "options": "Item"
+   "options": "Item",
+   "search_index": 1
   },
   {
    "fetch_from": "item_code.item_name",
@@ -70,7 +72,8 @@
    "options": "Item Group",
    "fetch_from": "item_code.item_group",
    "mandatory_depends_on": "eval:doc.map_type === 'Subcategory'",
-   "description": "When Map Type = Model, auto-fetched from Item. When Map Type = Subcategory, select the category."
+   "description": "When Map Type = Model, auto-fetched from Item. When Map Type = Subcategory, select the category.",
+   "search_index": 1
   },
   {
    "default": "0",

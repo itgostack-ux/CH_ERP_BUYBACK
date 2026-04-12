@@ -142,7 +142,7 @@
    "fieldname": "iw_0_3_section",
    "fieldtype": "Section Break",
    "hidden": 1,
-   "label": "In Warranty 0–3 Months"
+   "label": "In Warranty 0\u20133 Months"
   },
   {
    "fieldname": "a_grade_iw_0_3",
@@ -171,7 +171,7 @@
    "fieldname": "iw_0_6_section",
    "fieldtype": "Section Break",
    "hidden": 1,
-   "label": "In Warranty 0–6 Months"
+   "label": "In Warranty 0\u20136 Months"
   },
   {
    "fieldname": "a_grade_iw_0_6",
@@ -206,7 +206,7 @@
    "fieldname": "iw_6_11_section",
    "fieldtype": "Section Break",
    "hidden": 1,
-   "label": "In Warranty 6–11 Months"
+   "label": "In Warranty 6\u201311 Months"
   },
   {
    "fieldname": "a_grade_iw_6_11",
@@ -297,5 +297,7 @@
  "search_fields": "item_code",
  "sort_field": "modified",
  "sort_order": "DESC",
- "states": []
+ "states": [],
+ "title_field": "item_code",
+ "track_changes": 1
 }

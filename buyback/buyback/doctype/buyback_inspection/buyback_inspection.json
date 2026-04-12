@@ -95,7 +95,8 @@
    "label": "Buyback Assessment",
    "options": "Buyback Assessment",
    "in_standard_filter": 1,
-   "description": "Linked customer assessment"
+   "description": "Linked customer assessment",
+   "search_index": 1
   },
   {
    "fieldname": "source",
@@ -105,7 +106,8 @@
    "read_only": 1,
    "in_standard_filter": 1,
    "fetch_from": "buyback_assessment.source",
-   "description": "Original assessment source"
+   "description": "Original assessment source",
+   "search_index": 1
   },
   {
    "default": "In-Store",
@@ -115,7 +117,8 @@
    "options": "In-Store\nMobile App",
    "in_standard_filter": 1,
    "read_only": 1,
-   "description": "Where the initial diagnostic was performed"
+   "description": "Where the initial diagnostic was performed",
+   "search_index": 1
   },
   {
    "fieldname": "mobile_diagnostic_id",
@@ -131,7 +134,8 @@
    "label": "Customer",
    "options": "Customer",
    "fetch_from": "buyback_assessment.customer",
-   "in_standard_filter": 1
+   "in_standard_filter": 1,
+   "search_index": 1
   },
   {
    "fieldname": "customer_name",
@@ -160,7 +164,8 @@
    "options": "Warehouse",
    "fetch_from": "buyback_assessment.store",
    "read_only": 1,
-   "in_standard_filter": 1
+   "in_standard_filter": 1,
+   "search_index": 1
   },
   {
    "fieldname": "company",
@@ -178,7 +183,8 @@
    "options": "Draft\nIn Progress\nCompleted\nRejected",
    "in_list_view": 1,
    "in_standard_filter": 1,
-   "read_only": 1
+   "read_only": 1,
+   "search_index": 1
   },
   {
    "fieldname": "inspector",
@@ -213,7 +219,8 @@
    "options": "Item Group",
    "fetch_from": "buyback_assessment.item_group",
    "read_only": 1,
-   "in_standard_filter": 1
+   "in_standard_filter": 1,
+   "search_index": 1
   },
   {
    "fieldname": "brand",
@@ -222,7 +229,8 @@
    "options": "Brand",
    "fetch_from": "buyback_assessment.brand",
    "read_only": 1,
-   "in_standard_filter": 1
+   "in_standard_filter": 1,
+   "search_index": 1
   },
   {
    "fieldname": "imei_serial",
@@ -569,7 +577,24 @@
  "search_fields": "customer_name,item_name,condition_grade,status",
  "sort_field": "creation",
  "sort_order": "DESC",
- "states": [],
+ "states": [
+  {
+   "color": "Green",
+   "title": "Passed"
+  },
+  {
+   "color": "Red",
+   "title": "Failed"
+  },
+  {
+   "color": "Yellow",
+   "title": "Pending"
+  },
+  {
+   "color": "Gray",
+   "title": "Draft"
+  }
+ ],
  "title_field": "customer_name",
  "show_title_field_in_link": 1,
  "track_changes": 1

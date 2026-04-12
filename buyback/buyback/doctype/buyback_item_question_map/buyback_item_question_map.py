@@ -18,11 +18,11 @@ class BuybackItemQuestionMap(Document):
         }
         if self.map_type == "Model":
             if not self.item_code:
-                frappe.throw("Model (Item) is required when Map Type is Model.")
+                frappe.throw("Model (Item) is required when Map Type is Model.", title=_("Buyback Item Question Map Error"))
             filters["item_code"] = self.item_code
         else:
             if not self.item_group:
-                frappe.throw("Subcategory (Item Group) is required when Map Type is Subcategory.")
+                frappe.throw("Subcategory (Item Group) is required when Map Type is Subcategory.", title=_("Buyback Item Question Map Error"))
             filters["item_group"] = self.item_group
 
         existing = frappe.db.exists("Buyback Item Question Map", filters)
@@ -36,7 +36,7 @@ class BuybackItemQuestionMap(Document):
     def _validate_has_entries(self):
         """At least one question or test must be mapped."""
         if not self.questions and not self.tests:
-            frappe.throw("Add at least one Customer Question or Automated Test.")
+            frappe.throw("Add at least one Customer Question or Automated Test.", title=_("Buyback Item Question Map Error"))
 
     def _validate_no_duplicate_questions(self):
         """No duplicate questions within the questions table."""

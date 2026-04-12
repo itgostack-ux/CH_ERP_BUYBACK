@@ -73,7 +73,8 @@
    "fieldtype": "Link",
    "label": "Buyback Order",
    "options": "Buyback Order",
-   "in_standard_filter": 1
+   "in_standard_filter": 1,
+   "search_index": 1
   },
   {
    "fieldname": "customer",
@@ -81,7 +82,8 @@
    "label": "Customer",
    "options": "Customer",
    "reqd": 1,
-   "in_standard_filter": 1
+   "in_standard_filter": 1,
+   "search_index": 1
   },
   {
    "fieldname": "customer_name",
@@ -108,7 +110,8 @@
    "label": "Store",
    "options": "Warehouse",
    "reqd": 1,
-   "in_standard_filter": 1
+   "in_standard_filter": 1,
+   "search_index": 1
   },
   {
    "fieldname": "company",
@@ -128,7 +131,8 @@
    "in_standard_filter": 1,
    "read_only": 1,
    "no_copy": 1,
-   "allow_on_submit": 1
+   "allow_on_submit": 1,
+   "search_index": 1
   },
   {
    "fieldname": "amended_from",
@@ -397,7 +401,28 @@
  "search_fields": "customer_name,old_item_name,new_item_name,status",
  "sort_field": "creation",
  "sort_order": "DESC",
- "states": [],
+ "states": [
+  {
+   "color": "Green",
+   "title": "Completed"
+  },
+  {
+   "color": "Yellow",
+   "title": "Pending"
+  },
+  {
+   "color": "Blue",
+   "title": "In Progress"
+  },
+  {
+   "color": "Red",
+   "title": "Cancelled"
+  },
+  {
+   "color": "Gray",
+   "title": "Draft"
+  }
+ ],
  "title_field": "customer_name",
  "show_title_field_in_link": 1,
  "track_changes": 1

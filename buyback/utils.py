@@ -58,7 +58,7 @@ def validate_indian_phone(raw: str, field_label: str = "Mobile number") -> str:
     Returns the normalised bare 10-digit string.
     """
     if not raw or not str(raw).strip():
-        frappe.throw(_("{0} is required.").format(field_label))
+        frappe.throw(_("{0} is required.").format(field_label), title=_("Validation Error"))
 
     digits = normalize_indian_phone(str(raw))
     if not _INDIAN_PHONE_RE.match(digits):

@@ -51,7 +51,7 @@ class BuybackExchangeOrder(Document):
     def deliver_new_device(self):
         """Mark new device as delivered."""
         if self.status != "New Device Delivered":
-            frappe.throw(_("Invalid status transition."), exc=BuybackStatusError)
+            frappe.throw(_("Invalid status transition."), exc=BuybackStatusError, title=_("Buyback Exchange Order Error"))
         self.new_device_delivered_at = now_datetime()
         self.status = "Awaiting Pickup"
         self.save()
@@ -59,7 +59,7 @@ class BuybackExchangeOrder(Document):
     def receive_old_device(self):
         """Mark old device as received."""
         if self.status != "Awaiting Pickup":
-            frappe.throw(_("Must be in 'Awaiting Pickup' status."), exc=BuybackStatusError)
+            frappe.throw(_("Must be in 'Awaiting Pickup' status."), exc=BuybackStatusError, title=_("Buyback Exchange Order Error"))
         self.old_device_received_at = now_datetime()
         self.status = "Old Device Received"
         self.save()
@@ -67,7 +67,7 @@ class BuybackExchangeOrder(Document):
     def inspect_old_device(self, grade=None):
         """Inspect the received old device."""
         if self.status != "Old Device Received":
-            frappe.throw(_("Must receive old device before inspection."), exc=BuybackStatusError)
+            frappe.throw(_("Must receive old device before inspection."), exc=BuybackStatusError, title=_("Buyback Exchange Order Error"))
         self.old_device_inspected_at = now_datetime()
         if grade:
             self.old_condition_grade = grade
@@ -77,7 +77,7 @@ class BuybackExchangeOrder(Document):
     def settle(self, reference=None):
         """Settle the exchange."""
         if self.status != "Inspected":
-            frappe.throw(_("Must inspect old device before settlement."), exc=BuybackStatusError)
+            frappe.throw(_("Must inspect old device before settlement."), exc=BuybackStatusError, title=_("Buyback Exchange Order Error"))
         self.settlement_date = frappe.utils.nowdate()
         if reference:
             self.settlement_reference = reference
@@ -88,6 +88,6 @@ class BuybackExchangeOrder(Document):
     def close(self):
         """Close the exchange order."""
         if self.status != "Settled":
-            frappe.throw(_("Can only close settled exchange orders."), exc=BuybackStatusError)
+            frappe.throw(_("Can only close settled exchange orders."), exc=BuybackStatusError, title=_("Buyback Exchange Order Error"))
         self.status = "Closed"
         self.save()

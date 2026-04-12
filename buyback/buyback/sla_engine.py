@@ -293,7 +293,7 @@ def _create_sla_log(doctype, name, sla_type, actual_minutes, breached=False,
 # ─── SLA computation for a single document ───────────────────────────────────
 
 @frappe.whitelist()
-def get_order_sla_summary(order_name):
+def get_order_sla_summary(order_name) -> dict:
     """Get SLA status for all stages of a Buyback Order."""
     doc = frappe.get_doc("Buyback Order", order_name)
 
@@ -351,7 +351,7 @@ def get_order_sla_summary(order_name):
 
 
 @frappe.whitelist()
-def get_branch_sla_summary(store, date=None):
+def get_branch_sla_summary(store, date=None) -> dict:
     """Get SLA summary for a branch on a given date."""
     date = date or nowdate()
 

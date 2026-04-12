@@ -5,6 +5,8 @@ app_description = "BuyBack"
 app_email = "abiraj@gostack.in"
 app_license = "mit"
 
+boot_session = "buyback.boot.boot_session"
+
 # Apps
 # ------------------
 
