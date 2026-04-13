@@ -219,8 +219,10 @@ class BuybackAssessment(Document):
             grade_letter = _auto_determine_grade(diagnostic_data)
             grade = frappe.db.get_value(
                 "Grade Master", {"grade_name": grade_letter}, "name"
-            ) or "GRD-00001"
-            self.estimated_grade = grade
+            )
+            if not grade:
+                frappe.log_error(f"Grade Master missing for grade '{grade_letter}'. Create A/B/C/D records in Grade Master.", "Buyback Grade Missing")
+            self.estimated_grade = grade or None
 
             responses_data = []
             for r in (self.responses or []):
