@@ -50,10 +50,29 @@ def after_install():
     """Run after the Buyback app is installed."""
     _create_roles()
     _create_default_settings()
+    seed_grade_master()
     # Create custom fields on Serial No etc.
     from buyback.custom_fields import setup_custom_fields
     setup_custom_fields()
     create_reporting_indexes()
+
+
+GRADE_MASTER_SEED = [
+    {"grade_name": "A", "description": "Like new / Excellent condition", "display_order": 1},
+    {"grade_name": "B", "description": "Good condition, minor cosmetic marks", "display_order": 2},
+    {"grade_name": "C", "description": "Fair condition, visible wear", "display_order": 3},
+    {"grade_name": "D", "description": "Poor condition, significant damage", "display_order": 4},
+]
+
+
+def seed_grade_master():
+    """Ensure standard A/B/C/D grades exist. Safe to run repeatedly."""
+    for g in GRADE_MASTER_SEED:
+        if not frappe.db.exists("Grade Master", {"grade_name": g["grade_name"]}):
+            doc = frappe.get_doc({"doctype": "Grade Master", **g})
+            doc.insert(ignore_permissions=True)
+            frappe.logger().info(f"Seeded Grade Master: {g['grade_name']}")
+    frappe.db.commit()
 
 
 def _create_roles():

@@ -88,6 +88,7 @@ after_install = "buyback.install.after_install"
 after_migrate = [
     "buyback.custom_fields.setup_custom_fields",
     "buyback.install.create_reporting_indexes",
+    "buyback.install.seed_grade_master",
     "buyback.setup_workspace.setup",
 ]
 
