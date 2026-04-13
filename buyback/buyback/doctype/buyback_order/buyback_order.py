@@ -29,6 +29,7 @@ class BuybackOrder(Document):
         self._ensure_mobile_no()
         if self.mobile_no:
             self.mobile_no = validate_indian_phone(self.mobile_no, "Mobile No")
+        self._update_customer_mobile()
         self._check_imei_blacklist()
         self._populate_item_hierarchy()
         self._link_assessment()
@@ -51,13 +52,31 @@ class BuybackOrder(Document):
             check_imei_and_block(self.imei_serial)
 
     def _ensure_mobile_no(self):
-        """Fallback: pull mobile_no from Buyback Assessment if not set."""
+        """Fallback chain: Assessment → Customer alternate/whatsapp phone."""
         if self.mobile_no:
             return
+        # 1. Try Buyback Assessment
         if self.buyback_assessment:
             self.mobile_no = frappe.db.get_value(
                 "Buyback Assessment", self.buyback_assessment, "mobile_no"
             )
+        # 2. Try Customer alternate phone / whatsapp
+        if not self.mobile_no and self.customer:
+            cust = frappe.db.get_value(
+                "Customer", self.customer,
+                ["mobile_no", "ch_alternate_phone", "ch_whatsapp_number"],
+                as_dict=True,
+            )
+            if cust:
+                self.mobile_no = cust.mobile_no or cust.ch_alternate_phone or cust.ch_whatsapp_number
+
+    def _update_customer_mobile(self):
+        """Write mobile_no back to Customer if Customer has none."""
+        if not self.mobile_no or not self.customer:
+            return
+        cust_mobile = frappe.db.get_value("Customer", self.customer, "mobile_no")
+        if not cust_mobile:
+            frappe.db.set_value("Customer", self.customer, "mobile_no", self.mobile_no)
 
     def _populate_item_hierarchy(self):
         """Auto-fill brand, item_name from Item if not set."""

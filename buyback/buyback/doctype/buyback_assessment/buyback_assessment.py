@@ -31,8 +31,10 @@ class BuybackAssessment(Document):
             self.quoted_price = self.estimated_price
 
     def validate(self):
+        self._ensure_mobile_no()
         if self.mobile_no:
             self.mobile_no = validate_indian_phone(self.mobile_no, "Mobile No")
+        self._update_customer_mobile()
         self._check_imei_blacklist()
         self._check_duplicate_active_assessment()
         self._resolve_customer_from_mobile()
@@ -66,6 +68,26 @@ class BuybackAssessment(Document):
         if self.imei_serial:
             from buyback.buyback.doctype.buyback_imei_blacklist.buyback_imei_blacklist import check_imei_and_block
             check_imei_and_block(self.imei_serial)
+
+    def _ensure_mobile_no(self):
+        """Fallback: pull mobile from Customer alternate/whatsapp if primary is empty."""
+        if self.mobile_no or not self.customer:
+            return
+        cust = frappe.db.get_value(
+            "Customer", self.customer,
+            ["mobile_no", "ch_alternate_phone", "ch_whatsapp_number"],
+            as_dict=True,
+        )
+        if cust:
+            self.mobile_no = cust.mobile_no or cust.ch_alternate_phone or cust.ch_whatsapp_number
+
+    def _update_customer_mobile(self):
+        """Write mobile_no back to Customer if Customer has none."""
+        if not self.mobile_no or not self.customer:
+            return
+        cust_mobile = frappe.db.get_value("Customer", self.customer, "mobile_no")
+        if not cust_mobile:
+            frappe.db.set_value("Customer", self.customer, "mobile_no", self.mobile_no)
 
     def _check_duplicate_active_assessment(self):
         """BB-1 fix: Prevent duplicate active buyback assessments for the same IMEI/serial."""
