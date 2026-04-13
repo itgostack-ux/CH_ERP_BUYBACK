@@ -26,6 +26,7 @@ class BuybackOrder(Document):
             self.approval_token = frappe.generate_hash(length=32)
 
     def validate(self):
+        self._ensure_mobile_no()
         if self.mobile_no:
             self.mobile_no = validate_indian_phone(self.mobile_no, "Mobile No")
         self._check_imei_blacklist()
@@ -48,6 +49,15 @@ class BuybackOrder(Document):
         if self.imei_serial:
             from buyback.buyback.doctype.buyback_imei_blacklist.buyback_imei_blacklist import check_imei_and_block
             check_imei_and_block(self.imei_serial)
+
+    def _ensure_mobile_no(self):
+        """Fallback: pull mobile_no from Buyback Assessment if not set."""
+        if self.mobile_no:
+            return
+        if self.buyback_assessment:
+            self.mobile_no = frappe.db.get_value(
+                "Buyback Assessment", self.buyback_assessment, "mobile_no"
+            )
 
     def _populate_item_hierarchy(self):
         """Auto-fill brand, item_name from Item if not set."""

@@ -42,6 +42,7 @@ frappe.ui.form.on("Buyback Inspection", {
                     buyback_assessment: frm.doc.buyback_assessment,
                     buyback_inspection: frm.doc.name,
                     customer: frm.doc.customer,
+                    mobile_no: frm.doc.mobile_no,
                     store: frm.doc.store,
                     item: frm.doc.item,
                     imei_serial: frm.doc.imei_serial,
