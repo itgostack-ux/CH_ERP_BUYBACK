@@ -45,6 +45,11 @@ class BuybackAssessment(Document):
             self._fill_response_impacts()
         if self.diagnostic_tests or self.responses:
             self._calculate_estimate()
+        # Default estimated_grade to "A" (best condition) if still unset
+        if not self.estimated_grade:
+            self.estimated_grade = frappe.db.get_value(
+                "Grade Master", {"grade_name": "A"}, "name"
+            )
 
     def before_save(self):
         if self.is_new():
