@@ -211,6 +211,26 @@
   {
    "hidden": 0,
    "is_query_report": 0,
+   "label": "Buyback SLA Rule",
+   "link_count": 0,
+   "link_to": "Buyback SLA Rule",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Buyback Item Test Map",
+   "link_count": 0,
+   "link_to": "Buyback Item Question Map",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
    "label": "Daily Operations",
    "link_count": 0,
    "link_type": "DocType",
@@ -518,6 +538,16 @@
    "label": "Buyback QA Test Run",
    "link_count": 0,
    "link_to": "Buyback QA Test Run",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Buyback QA Test Doc",
+   "link_count": 0,
+   "link_to": "Buyback QA Test Doc",
    "link_type": "DocType",
    "onboard": 0,
    "type": "Link"
