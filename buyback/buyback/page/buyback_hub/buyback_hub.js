@@ -58,6 +58,12 @@ class BuybackHub {
 		this.$root = $(`<div class="hub-root"></div>`).appendTo(this.page.body);
 	}
 
+	_go_list(doctype, filters = {}) {
+		const co = this.company_field?.get_value();
+		if (co) filters.company = co;
+		frappe.set_route("List", doctype, filters);
+	}
+
 	refresh() {
 		const company = this.company_field?.get_value() || "";
 		const store = this.store_field?.get_value() || "";
@@ -151,15 +157,28 @@ class BuybackHub {
 			<div class="hub-section">
 				<h5 class="hub-section-title"><i class="fa fa-bolt"></i> ${__("Quick Actions")}</h5>
 				<div class="hub-actions-grid">
-					<button class="hub-action-btn" onclick="frappe.set_route('List','Buyback Order',{status:'Draft'})"><i class="fa fa-plus"></i> ${__("New Orders")}</button>
-					<button class="hub-action-btn" onclick="frappe.set_route('List','Buyback Order',{status:'Awaiting OTP'})"><i class="fa fa-mobile"></i> ${__("Awaiting OTP")}</button>
-					<button class="hub-action-btn" onclick="frappe.set_route('List','Buyback Order',{status:'Approved'})"><i class="fa fa-check"></i> ${__("Approved")}</button>
-					<button class="hub-action-btn" onclick="frappe.set_route('List','Buyback Assessment')"><i class="fa fa-search"></i> ${__("Assessments")}</button>
-					<button class="hub-action-btn" onclick="frappe.set_route('List','Buyback Inspection')"><i class="fa fa-clipboard"></i> ${__("Inspections")}</button>
-					<button class="hub-action-btn" onclick="frappe.set_route('app','operations-dashboard')"><i class="fa fa-dashboard"></i> ${__("Ops Dashboard")}</button>
+					<button class="hub-action-btn" data-act="new_orders"><i class="fa fa-plus"></i> ${__("New Orders")}</button>
+					<button class="hub-action-btn" data-act="awaiting_otp"><i class="fa fa-mobile"></i> ${__("Awaiting OTP")}</button>
+					<button class="hub-action-btn" data-act="approved"><i class="fa fa-check"></i> ${__("Approved")}</button>
+					<button class="hub-action-btn" data-act="assessments"><i class="fa fa-search"></i> ${__("Assessments")}</button>
+					<button class="hub-action-btn" data-act="inspections"><i class="fa fa-clipboard"></i> ${__("Inspections")}</button>
+					<button class="hub-action-btn" data-act="ops_dash"><i class="fa fa-dashboard"></i> ${__("Ops Dashboard")}</button>
 				</div>
 			</div>
 		`);
+
+		this.$root.on("click", ".hub-action-btn", (e) => {
+			const actions = {
+				new_orders:   () => this._go_list("Buyback Order", { status: "Draft" }),
+				awaiting_otp: () => this._go_list("Buyback Order", { status: "Awaiting OTP" }),
+				approved:     () => this._go_list("Buyback Order", { status: "Approved" }),
+				assessments:  () => this._go_list("Buyback Assessment"),
+				inspections:  () => this._go_list("Buyback Inspection"),
+				ops_dash:     () => frappe.set_route("app", "operations-dashboard"),
+			};
+			const fn = actions[$(e.currentTarget).data("act")];
+			if (fn) fn();
+		});
 	}
 
 	_render_intelligence(insights, financial) {
