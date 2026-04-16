@@ -15,6 +15,14 @@ class BuybackQuestionBank(Document):
             frappe.db.sql("SELECT RELEASE_LOCK('buyback_question_bank_id')")
 
     def validate(self):
+        # Auto-generate question_code from question_text if not provided
+        if not self.question_code and self.question_text:
+            import re
+            code = self.question_text.strip().lower()
+            code = re.sub(r"[^a-z0-9\s_]", "", code)
+            code = re.sub(r"\s+", "_", code)[:140]
+            self.question_code = code
+
         if self.question_code:
             self.question_code = self.question_code.strip().lower().replace(" ", "_")
 

@@ -2,7 +2,21 @@ from frappe import _
 
 
 def get_dashboard_for_customer(data):
-    """Add buyback transactions to the Customer dashboard."""
+    """Add buyback transactions to the Customer dashboard.
+
+    Also chains through ch_item_master's Customer dashboard override
+    so that Warranty/VAS, Devices, Vouchers, and Exceptions links are
+    not lost (only one override_doctype_dashboards winner per doctype;
+    buyback loads after ch_item_master in apps.txt).
+    """
+    # ── Chain: apply ch_item_master's Customer dashboard additions first ──
+    try:
+        from ch_item_master.ch_item_master.overrides.customer_dashboard import get_data
+        data = get_data(data)
+    except Exception:
+        pass  # ch_item_master not installed or changed — degrade gracefully
+
+    # ── Buyback's own additions ──
     data["transactions"].append(
         {
             "label": _("Buyback"),

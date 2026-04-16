@@ -2,6 +2,17 @@
 // For license information, please see license.txt
 
 frappe.ui.form.on("Buyback Question Bank", {
+    question_text(frm) {
+        // Auto-generate question_code from question_text if blank or unchanged
+        if (frm.doc.question_text && !frm.doc.question_code) {
+            frm.set_value("question_code", frm.doc.question_text
+                .trim().toLowerCase()
+                .replace(/[^a-z0-9\s_]/g, "")
+                .replace(/\s+/g, "_")
+                .substring(0, 140)
+            );
+        }
+    },
     question_type(frm) {
         // Auto-populate Yes/No options
         if (frm.doc.question_type === "Yes/No" && (!frm.doc.options || frm.doc.options.length === 0)) {

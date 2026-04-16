@@ -584,6 +584,16 @@
   {
    "hidden": 0,
    "is_query_report": 0,
+   "label": "Buyback Hub",
+   "link_count": 0,
+   "link_to": "buyback-hub",
+   "link_type": "Page",
+   "onboard": 1,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
    "label": "Store Manager Dashboard",
    "link_count": 0,
    "link_to": "store-manager-dashboard",
@@ -658,6 +668,13 @@
  "roles": [],
  "sequence_id": 1.5,
  "shortcuts": [
+  {
+   "color": "Orange",
+   "doc_view": "",
+   "label": "Buyback Hub",
+   "link_to": "buyback-hub",
+   "type": "Page"
+  },
   {
    "doc_view": "",
    "label": "Assessments",
