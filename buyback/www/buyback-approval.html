@@ -257,7 +257,7 @@
 
     frappe.call({
       method: 'buyback.api.send_otp',
-      args: { order_name: ORDER_NAME },
+      args: { token: TOKEN },
       callback: function(r) {
         document.getElementById('send-otp-section').style.display = 'none';
         document.getElementById('verify-otp-section').style.display = 'block';
@@ -287,7 +287,7 @@
 
     frappe.call({
       method: 'buyback.api.verify_otp',
-      args: { order_name: ORDER_NAME, otp_code: otp },
+      args: { token: TOKEN, otp_code: otp },
       callback: function(r) {
         if (r.message && r.message.valid) {
           msg.innerHTML = '<div class="alert alert-success"><strong>✅ Approved!</strong> Your buyback has been confirmed.</div>';

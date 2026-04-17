@@ -468,20 +468,48 @@ def select_settlement_type(
 # ── Step 7: OTP Verification ─────────────────────────────────────
 
 
-@frappe.whitelist()
-def send_otp(order_name: str) -> dict:
-    """Send OTP for buyback order confirmation."""
+@frappe.whitelist(allow_guest=True)
+def send_otp(order_name: str = None, token: str = None) -> dict:
+    """Send OTP for buyback order confirmation.
+
+    Accepts either order_name (for logged-in users) or token (for guest approval page).
+    """
+    if token:
+        order_name = frappe.db.get_value(
+            "Buyback Order", {"approval_token": token, "docstatus": ["!=", 2]}, "name"
+        )
+        if not order_name:
+            frappe.throw(_("Invalid or expired approval link."))
+    elif not order_name:
+        frappe.throw(_("order_name or token is required."))
+
     doc = frappe.get_doc("Buyback Order", order_name)
-    doc.check_permission("write")
+    if not token:
+        doc.check_permission("write")
+    doc.flags.ignore_permissions = True
     doc.send_otp()
     return {"status": "sent", "message": _("OTP sent to {0}").format(doc.mobile_no)}
 
 
-@frappe.whitelist()
-def verify_otp(order_name: str, otp_code: str) -> dict:
-    """Verify customer OTP for a buyback order."""
+@frappe.whitelist(allow_guest=True)
+def verify_otp(order_name: str = None, otp_code: str = "", token: str = None) -> dict:
+    """Verify customer OTP for a buyback order.
+
+    Accepts either order_name (for logged-in users) or token (for guest approval page).
+    """
+    if token:
+        order_name = frappe.db.get_value(
+            "Buyback Order", {"approval_token": token, "docstatus": ["!=", 2]}, "name"
+        )
+        if not order_name:
+            frappe.throw(_("Invalid or expired approval link."))
+    elif not order_name:
+        frappe.throw(_("order_name or token is required."))
+
     doc = frappe.get_doc("Buyback Order", order_name)
-    doc.check_permission("write")
+    if not token:
+        doc.check_permission("write")
+    doc.flags.ignore_permissions = True
     return doc.verify_otp(otp_code)
 
 

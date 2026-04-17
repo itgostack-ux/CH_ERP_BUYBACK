@@ -26,6 +26,23 @@ class BuybackQuestionBank(Document):
         if self.question_code:
             self.question_code = self.question_code.strip().lower().replace(" ", "_")
 
+        # Ensure question_code is unique — append suffix if a duplicate exists
+        if self.question_code:
+            base_code = self.question_code
+            existing = frappe.db.get_value(
+                "Buyback Question Bank",
+                {"question_code": self.question_code, "name": ["!=", self.name]},
+                "name",
+            )
+            if existing:
+                suffix = 2
+                while frappe.db.exists(
+                    "Buyback Question Bank",
+                    {"question_code": f"{base_code}_{suffix}", "name": ["!=", self.name]},
+                ):
+                    suffix += 1
+                self.question_code = f"{base_code}_{suffix}"
+
         # Yes/No questions should have exactly 2 options
         if self.question_type == "Yes/No" and self.options:
             if len(self.options) != 2:
