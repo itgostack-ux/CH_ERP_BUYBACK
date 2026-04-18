@@ -21,11 +21,32 @@ from frappe import _
 from frappe.rate_limiter import rate_limit
 from frappe.utils import flt, now_datetime
 
+from contextlib import contextmanager
+
 from buyback.exceptions import (
     BuybackStatusError,
     BuybackValidationError,
 )
 from buyback.utils import validate_indian_phone
+
+
+@contextmanager
+def _as_system_user():
+    """Temporarily set session user to Administrator for guest API calls.
+
+    Frappe's workflow engine reads frappe.session.user for permission
+    checks.  Guest endpoints (allow_guest=True) have user=None which
+    causes 'User None not found'.  This context manager sets a valid
+    user so .save() / workflow transitions succeed, then restores the
+    original user.
+    """
+    prev = frappe.session.user
+    if not prev or prev == "Guest":
+        frappe.set_user("Administrator")
+    try:
+        yield
+    finally:
+        frappe.set_user(prev or "Guest")
 
 
 # ── Step 1: Get Estimate ─────────────────────────────────────────
@@ -309,7 +330,8 @@ def customer_approve_via_token(token: str, method: str = "SMS Link") -> dict:
 
     doc = frappe.get_doc("Buyback Order", order_name)
     doc.flags.ignore_permissions = True
-    doc.customer_approve(method)
+    with _as_system_user():
+        doc.customer_approve(method)
     return {
         "name": doc.name,
         "status": doc.status,
@@ -423,8 +445,9 @@ def save_customer_payout_preference(
     for key, value in data.items():
         setattr(doc, key, value)
     doc.customer_payout_updated_at = now_datetime()
-    doc.customer_payout_updated_by = frappe.session.user
-    doc.save(ignore_permissions=True)
+    doc.customer_payout_updated_by = "Customer (via approval link)"
+    with _as_system_user():
+        doc.save(ignore_permissions=True)
 
     return {
         "name": doc.name,
@@ -487,7 +510,8 @@ def send_otp(order_name: str = None, token: str = None) -> dict:
     if not token:
         doc.check_permission("write")
     doc.flags.ignore_permissions = True
-    doc.send_otp()
+    with _as_system_user():
+        doc.send_otp()
     return {"status": "sent", "message": _("OTP sent to {0}").format(doc.mobile_no)}
 
 
@@ -510,7 +534,8 @@ def verify_otp(order_name: str = None, otp_code: str = "", token: str = None) ->
     if not token:
         doc.check_permission("write")
     doc.flags.ignore_permissions = True
-    return doc.verify_otp(otp_code)
+    with _as_system_user():
+        return doc.verify_otp(otp_code)
 
 
 # ── Step 8: Payment ──────────────────────────────────────────────
