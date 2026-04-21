@@ -34,20 +34,20 @@
    "fieldtype": "Select",
    "in_list_view": 1,
    "in_standard_filter": 1,
-   "label": "Map Type",
-   "options": "Subcategory\nModel",
+    "label": "Mapping Scope",
+    "options": "Subcategory Default\nModel Override",
    "reqd": 1,
-   "description": "Step 1: Map questions/tests to a Subcategory (Item Group). Step 2: Optionally override per Model (Item). If a model has no mapping, the subcategory mapping is used.",
+    "description": "Use Subcategory Default for the standard question/test set by Item Group. Use Model Override only when a specific model needs a different mapping. If no model override exists, the subcategory default is used.",
    "search_index": 1
   },
   {
-   "depends_on": "eval:doc.map_type === 'Model'",
+    "depends_on": "eval:doc.map_type === 'Model Override'",
    "fieldname": "item_code",
    "fieldtype": "Link",
    "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Model",
-   "mandatory_depends_on": "eval:doc.map_type === 'Model'",
+    "mandatory_depends_on": "eval:doc.map_type === 'Model Override'",
    "options": "Item",
    "search_index": 1
   },
@@ -57,7 +57,7 @@
    "fieldtype": "Data",
    "label": "Model Name",
    "read_only": 1,
-   "depends_on": "eval:doc.map_type === 'Model'"
+    "depends_on": "eval:doc.map_type === 'Model Override'"
   },
   {
    "fieldname": "column_break_01",
@@ -71,8 +71,8 @@
    "label": "Subcategory",
    "options": "Item Group",
    "fetch_from": "item_code.item_group",
-   "mandatory_depends_on": "eval:doc.map_type === 'Subcategory'",
-   "description": "When Map Type = Model, auto-fetched from Item. When Map Type = Subcategory, select the category.",
+    "mandatory_depends_on": "eval:doc.map_type === 'Subcategory Default'",
+    "description": "When Mapping Scope = Model Override, this is auto-fetched from the selected Item. When Mapping Scope = Subcategory Default, select the Item Group to define the base mapping.",
    "search_index": 1
   },
   {

@@ -1,5 +1,5 @@
 """
-Patch: Rename map_type values from Item/Item Group to Model/Subcategory.
+Patch: Normalize map_type values to UI-facing labels.
 """
 
 import frappe
@@ -13,12 +13,12 @@ def execute():
 
     frappe.db.sql("""
         UPDATE `tabBuyback Item Question Map`
-        SET map_type = 'Model'
-        WHERE map_type = 'Item'
+        SET map_type = 'Model Override'
+        WHERE map_type IN ('Item', 'Model')
     """)
     frappe.db.sql("""
         UPDATE `tabBuyback Item Question Map`
-        SET map_type = 'Subcategory'
-        WHERE map_type = 'Item Group'
+        SET map_type = 'Subcategory Default'
+        WHERE map_type IN ('Item Group', 'Subcategory')
     """)
     frappe.db.commit()

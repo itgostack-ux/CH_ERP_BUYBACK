@@ -4,10 +4,21 @@ from frappe.model.document import Document
 
 class BuybackItemQuestionMap(Document):
     def validate(self):
+        self._normalize_map_type()
         self._validate_unique_mapping()
         self._validate_has_entries()
         self._validate_no_duplicate_questions()
         self._validate_no_duplicate_tests()
+
+    def _normalize_map_type(self):
+        mapping = {
+            "Subcategory": "Subcategory Default",
+            "Model": "Model Override",
+            "Item Group": "Subcategory Default",
+            "Item": "Model Override",
+        }
+        if self.map_type in mapping:
+            self.map_type = mapping[self.map_type]
 
     def _validate_unique_mapping(self):
         """Ensure only one active map per item or item group."""
@@ -16,18 +27,18 @@ class BuybackItemQuestionMap(Document):
             "disabled": 0,
             "name": ("!=", self.name),
         }
-        if self.map_type == "Model":
+        if self.map_type == "Model Override":
             if not self.item_code:
-                frappe.throw("Model (Item) is required when Map Type is Model.", title=_("Buyback Item Question Map Error"))
+                frappe.throw("Model (Item) is required when Mapping Scope is Model Override.", title=_("Buyback Item Question Map Error"))
             filters["item_code"] = self.item_code
         else:
             if not self.item_group:
-                frappe.throw("Subcategory (Item Group) is required when Map Type is Subcategory.", title=_("Buyback Item Question Map Error"))
+                frappe.throw("Subcategory (Item Group) is required when Mapping Scope is Subcategory Default.", title=_("Buyback Item Question Map Error"))
             filters["item_group"] = self.item_group
 
         existing = frappe.db.exists("Buyback Item Question Map", filters)
         if existing:
-            target = self.item_code if self.map_type == "Model" else self.item_group
+            target = self.item_code if self.map_type == "Model Override" else self.item_group
             frappe.throw(
                 f"An active mapping already exists for {self.map_type} '{target}': {existing}. "
                 "Disable the existing one first, or edit it."

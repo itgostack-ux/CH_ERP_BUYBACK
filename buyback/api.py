@@ -1329,7 +1329,7 @@ def _get_mapped_question_names(item_code: str, diagnosis_type: str) -> list[str]
 
     item_map = frappe.db.get_value(
         "Buyback Item Question Map",
-        {"map_type": "Model", "item_code": item_code, "disabled": 0},
+        {"map_type": "Model Override", "item_code": item_code, "disabled": 0},
         "name",
     )
     if item_map:
@@ -1338,7 +1338,7 @@ def _get_mapped_question_names(item_code: str, diagnosis_type: str) -> list[str]
     if item_group:
         group_map = frappe.db.get_value(
             "Buyback Item Question Map",
-            {"map_type": "Subcategory", "item_group": item_group, "disabled": 0},
+            {"map_type": "Subcategory Default", "item_group": item_group, "disabled": 0},
             "name",
         )
         if group_map:

@@ -12,8 +12,8 @@ frappe.ui.form.on("Buyback Item Question Map", {
     },
 
     map_type(frm) {
-        if (frm.doc.map_type === "Subcategory") {
-            // Clear model-level fields when switching to Subcategory
+        if (frm.doc.map_type === "Subcategory Default") {
+            // Clear model-level fields when switching to the base subcategory mapping
             frm.set_value("item_code", "");
             frm.set_value("item_name", "");
         }
@@ -21,7 +21,7 @@ frappe.ui.form.on("Buyback Item Question Map", {
 
     item_code(frm) {
         // When model changes, auto-fetch subcategory
-        if (frm.doc.item_code && frm.doc.map_type === "Model") {
+        if (frm.doc.item_code && frm.doc.map_type === "Model Override") {
             frappe.db.get_value("Item", frm.doc.item_code, "item_group", (r) => {
                 if (r && r.item_group) {
                     frm.set_value("item_group", r.item_group);
