@@ -135,6 +135,7 @@ class BuybackInspection(Document):
             if impact is not None:
                 r.inspector_impact = impact
 
+    @frappe.whitelist()
     def start_inspection(self):
         """Begin the inspection process."""
         if self.status != "Draft":
@@ -145,6 +146,7 @@ class BuybackInspection(Document):
         self.save()
         log_audit("Inspection Started", "Buyback Inspection", self.name)
 
+    @frappe.whitelist()
     def complete_inspection(self):
         """Complete the inspection with results."""
         if self.status != "In Progress":
@@ -377,6 +379,7 @@ class BuybackInspection(Document):
                 title=f"Inspection price recalc failed for {self.name}",
             )
 
+    @frappe.whitelist()
     def reject_device(self, reason=None):
         """Reject the device during inspection."""
         if self.status not in ("Draft", "In Progress"):
@@ -392,6 +395,7 @@ class BuybackInspection(Document):
         log_audit("Inspection Rejected", "Buyback Inspection", self.name,
                   new_value={"status": "Rejected", "reason": reason})
 
+    @frappe.whitelist()
     def populate_checklist(self):
         """Auto-populate inspection results from the selected checklist template."""
         if not self.checklist_template:

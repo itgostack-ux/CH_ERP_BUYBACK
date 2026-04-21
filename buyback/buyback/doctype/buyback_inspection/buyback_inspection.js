@@ -9,6 +9,12 @@ const CHECK_TYPE_OPTIONS = {
 };
 
 frappe.ui.form.on("Buyback Inspection", {
+    buyback_assessment(frm) {
+        // When assessment is set on a new inspection, auto-populate tests & questions
+        if (!frm.doc.buyback_assessment || !frm.is_new()) return;
+        _populate_from_assessment(frm);
+    },
+
     refresh(frm) {
         if (frm.doc.status === "Draft" && !frm.is_new()) {
             frm.add_custom_button(__("Start Inspection"), () => {
@@ -76,6 +82,77 @@ frappe.ui.form.on("Buyback Inspection", {
         _setup_result_row_options(frm);
     },
 });
+
+// ═══════════════════════════════════════════════════════════════════
+// POPULATE FROM ASSESSMENT — auto-load tests & questions on new doc
+// ═══════════════════════════════════════════════════════════════════
+
+function _populate_from_assessment(frm) {
+    frappe.call({
+        method: "frappe.client.get",
+        args: {
+            doctype: "Buyback Assessment",
+            name: frm.doc.buyback_assessment,
+        },
+        callback(r) {
+            if (!r.message) return;
+            const a = r.message;
+
+            // Fill header fields from assessment
+            const map = {
+                item: a.item, item_name: a.item_name, item_group: a.item_group,
+                brand: a.brand, imei_serial: a.imei_serial,
+                customer: a.customer, mobile_no: a.mobile_no,
+                store: a.store, company: a.company,
+                warranty_status: a.warranty_status,
+                device_age_months: a.device_age_months,
+                quoted_price: a.quoted_price || a.estimated_price,
+                estimated_price: a.estimated_price,
+                pre_inspection_grade: a.estimated_grade,
+                estimated_grade: a.estimated_grade,
+            };
+            Object.entries(map).forEach(([f, v]) => { if (v) frappe.model.set_value(frm.doctype, frm.docname, f, v); });
+
+            // Load diagnostic tests
+            if (a.diagnostic_tests && a.diagnostic_tests.length) {
+                frm.clear_table("inspection_diagnostics");
+                a.diagnostic_tests.forEach(d => {
+                    const row = frm.add_child("inspection_diagnostics");
+                    row.test = d.test;
+                    row.test_code = d.test_code;
+                    row.test_name = d.test_name;
+                    row.assessment_result = d.result;
+                    row.assessment_depreciation = d.depreciation_percent;
+                });
+                frm.refresh_field("inspection_diagnostics");
+            }
+
+            // Load question responses
+            if (a.responses && a.responses.length) {
+                frm.clear_table("inspection_responses");
+                a.responses.forEach(r => {
+                    const row = frm.add_child("inspection_responses");
+                    row.question = r.question;
+                    row.question_code = r.question_code;
+                    row.question_text = r.question_text;
+                    row.assessment_answer = r.answer_value;
+                    row.assessment_answer_label = r.answer_label;
+                    row.assessment_impact = r.price_impact_percent;
+                });
+                frm.refresh_field("inspection_responses");
+            }
+
+            const total = (a.diagnostic_tests || []).length + (a.responses || []).length;
+            if (total) {
+                frappe.show_alert({ message: __("{0} tests/questions loaded from assessment", [total]), indicator: "green" });
+            }
+
+            // Reload dropdown options for the newly added rows
+            _load_inspection_diagnostic_options(frm);
+            _load_inspection_response_options(frm);
+        },
+    });
+}
 
 // ═══════════════════════════════════════════════════════════════════
 // INSPECTION DIAGNOSTICS — load options & handle inspector_result
