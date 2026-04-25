@@ -9,21 +9,41 @@ from buyback.utils import log_audit, validate_indian_phone
 
 class BuybackOrder(Document):
     def before_insert(self):
-        """Auto-assign sequential integer ID.
-
-        Uses MAX+1.  The unique DB constraint on order_id is the safety
-        net; callers catch UniqueValidationError and retry/return existing.
-        """
-        last = frappe.db.sql(
-            "SELECT MAX(order_id) FROM `tabBuyback Order`"
-        )[0][0] or 0
-        self.order_id = last + 1
-
+        """Validate uniqueness, assign sequential order_id, generate approval token."""
+        self._check_duplicate_active_order()
+        self._assign_order_id()
         self.status = "Draft"
-
-        # Generate approval token for customer-facing page
         if not self.approval_token:
             self.approval_token = frappe.generate_hash(length=32)
+
+    def _check_duplicate_active_order(self):
+        """Prevent creating a second active buyback order for the same serial number."""
+        if not self.imei_serial:
+            return
+        existing = frappe.db.get_value(
+            "Buyback Order",
+            {
+                "imei_serial": self.imei_serial,
+                "docstatus": ["!=", 2],
+                "status": ["not in", ("Cancelled", "Rejected", "Closed")],
+            },
+            "name",
+        )
+        if existing:
+            frappe.throw(
+                _("An active buyback order {0} already exists for serial/IMEI {1}. "
+                  "Cancel it before creating a new one.").format(
+                    frappe.bold(existing), frappe.bold(self.imei_serial)
+                ),
+                title=_("Duplicate Buyback Order"),
+            )
+
+    def _assign_order_id(self):
+        """Assign a unique sequential order_id using a table-level lock to prevent races."""
+        # Lock the table briefly so two concurrent inserts don't get the same MAX
+        frappe.db.sql("SELECT MAX(order_id) FROM `tabBuyback Order` FOR UPDATE")
+        last = frappe.db.sql("SELECT MAX(order_id) FROM `tabBuyback Order`")[0][0] or 0
+        self.order_id = last + 1
 
     def validate(self):
         self._ensure_mobile_no()

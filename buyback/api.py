@@ -520,6 +520,7 @@ def verify_otp(order_name: str = None, otp_code: str = "", token: str = None) ->
     """Verify customer OTP for a buyback order.
 
     Accepts either order_name (for logged-in users) or token (for guest approval page).
+    Rate-limited to 5 attempts per order per 15 minutes to prevent brute-force.
     """
     if token:
         order_name = frappe.db.get_value(
@@ -530,12 +531,32 @@ def verify_otp(order_name: str = None, otp_code: str = "", token: str = None) ->
     elif not order_name:
         frappe.throw(_("order_name or token is required."))
 
+    # Rate limiting: max 5 OTP attempts per order in a 15-minute window
+    cache_key = f"otp_attempts:{order_name}"
+    attempts = frappe.cache().get_value(cache_key) or 0
+    if int(attempts) >= 5:
+        frappe.throw(
+            _("Too many OTP attempts for this order. "
+              "Please wait 15 minutes before trying again."),
+            frappe.PermissionError,
+            title=_("Rate Limit Exceeded"),
+        )
+
     doc = frappe.get_doc("Buyback Order", order_name)
     if not token:
         doc.check_permission("write")
     doc.flags.ignore_permissions = True
     with _as_system_user():
-        return doc.verify_otp(otp_code)
+        result = doc.verify_otp(otp_code)
+
+    if result.get("success"):
+        # Clear counter on successful verification
+        frappe.cache().delete_value(cache_key)
+    else:
+        # Increment attempt counter; expire after 15 minutes
+        frappe.cache().set_value(cache_key, int(attempts) + 1, expires_in_sec=900)
+
+    return result
 
 
 # ── Step 8: Payment ──────────────────────────────────────────────
