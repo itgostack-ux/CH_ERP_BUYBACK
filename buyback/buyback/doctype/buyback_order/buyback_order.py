@@ -894,6 +894,8 @@ class BuybackOrder(Document):
             "company": self.company or settings.default_company,
             "posting_date": frappe.utils.nowdate(),
             "remarks": f"Buyback device received — {self.name}",
+            "custom_source_type": "Buyback",
+            "custom_buyback_order": self.name,
             "items": [
                 {
                     "item_code": self.item,
