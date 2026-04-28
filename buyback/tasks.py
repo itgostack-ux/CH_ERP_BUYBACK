@@ -27,7 +27,10 @@ def expire_assessments():
             doc.mark_expired()
             frappe.logger("buyback").info(f"Auto-expired assessment {name}")
         except Exception:
-            frappe.log_error(f"Failed to expire assessment {name}", "Buyback Assessment Expiry")
+            frappe.log_error(
+                title=f"Buyback Assessment Expiry: {name}",
+                message=frappe.get_traceback(),
+            )
 
     if expired:
         frappe.db.commit()

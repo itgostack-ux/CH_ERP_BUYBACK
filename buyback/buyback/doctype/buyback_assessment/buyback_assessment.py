@@ -98,6 +98,10 @@ class BuybackAssessment(Document):
         """BB-1 fix: Prevent duplicate active buyback assessments for the same IMEI/serial."""
         if not self.imei_serial:
             return
+        # Internal lifecycle transitions (e.g. mark_expired, cancel_assessment) must be able
+        # to save even when another active assessment exists for the same IMEI.
+        if self.flags.get("skip_duplicate_check"):
+            return
         active_statuses = ("Draft", "Submitted", "In Progress", "Inspected", "Quoted")
         existing = frappe.db.get_value(
             "Buyback Assessment",
@@ -407,6 +411,9 @@ class BuybackAssessment(Document):
         """Auto-expire assessment."""
         if self.status in ("Draft", "Submitted"):
             self.status = "Expired"
+            # Lifecycle close-out: bypass duplicate-active guard so the very record we are
+            # expiring (which IS the duplicate-blocker) can be saved cleanly.
+            self.flags.skip_duplicate_check = True
             self.save()
             log_audit("Assessment Expired", "Buyback Assessment", self.name)
 
@@ -415,6 +422,7 @@ class BuybackAssessment(Document):
         if self.status in ("Expired", "Cancelled"):
             return
         self.status = "Cancelled"
+        self.flags.skip_duplicate_check = True
         self.save()
         log_audit("Assessment Cancelled", "Buyback Assessment", self.name)
 
