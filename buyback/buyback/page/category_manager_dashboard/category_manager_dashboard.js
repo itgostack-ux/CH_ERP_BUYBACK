@@ -124,7 +124,7 @@ function render_category(page, data) {
 		new frappe.Chart("#cat-grade-chart", {
 			title: __("Grade Distribution"),
 			data: {
-				labels: data.grade_data.map((d) => d.grade),
+				labels: data.grade_data.map((d) => d.grade || d.grade_id),
 				datasets: [{ values: data.grade_data.map((d) => d.qty) }],
 			},
 			type: "pie",

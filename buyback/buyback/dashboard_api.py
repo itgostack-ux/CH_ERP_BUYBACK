@@ -153,6 +153,7 @@ def get_category_dashboard(from_date=None, to_date=None, brand=None, item_group=
 
     # Build a separate where clause for Buyback Order (no item_group column)
     order_where, order_params = _build_params(from_date, to_date, brand=brand)
+    order_where_aliased = order_where.replace("creation", "o.creation").replace("brand", "o.brand")
 
     # Top categories
     top_cats = frappe.db.sql("""
@@ -200,11 +201,16 @@ def get_category_dashboard(from_date=None, to_date=None, brand=None, item_group=
 
     # Grade mix (for pie chart) — uses order_where (no item_group on Buyback Order)
     grade_data = frappe.db.sql("""
-        SELECT condition_grade as grade, COUNT(*) as qty
-        FROM `tabBuyback Order`
-        WHERE docstatus < 2 AND {where} AND condition_grade IS NOT NULL
-        GROUP BY condition_grade ORDER BY qty DESC
-    """.format(where=order_where), order_params, as_dict=1)  # noqa: UP032
+        SELECT
+            o.condition_grade AS grade_id,
+            COALESCE(gm.grade_name, o.condition_grade) AS grade,
+            COUNT(*) AS qty
+        FROM `tabBuyback Order` o
+        LEFT JOIN `tabGrade Master` gm ON gm.name = o.condition_grade
+        WHERE o.docstatus < 2 AND {where} AND o.condition_grade IS NOT NULL
+        GROUP BY o.condition_grade, gm.grade_name
+        ORDER BY qty DESC
+    """.format(where=order_where_aliased), order_params, as_dict=1)  # noqa: UP032
 
     # Settlement mix by brand — uses order_where (no item_group on Buyback Order)
     settlement_by_brand = frappe.db.sql("""

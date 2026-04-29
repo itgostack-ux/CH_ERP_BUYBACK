@@ -143,15 +143,21 @@ def get_buyback_hub_data(company=None, store=None, from_date=None, to_date=None)
 
     recent_assessments = frappe.db.sql(
         f"""SELECT ba.name, ba.customer_name, ba.item_name,
-                   ba.estimated_grade AS grade, ba.estimated_price, ba.creation
+                   ba.estimated_grade AS grade,
+                   COALESCE(gm.grade_name, ba.estimated_grade) AS grade_name,
+                   ba.estimated_price, ba.creation
             FROM `tabBuyback Assessment` ba
+            LEFT JOIN `tabGrade Master` gm ON gm.name = ba.estimated_grade
             WHERE 1=1 {dc('ba.creation').replace('bo.','ba.')}
             ORDER BY ba.creation DESC LIMIT 30""", prm, as_dict=True
     )
 
     recent_inspections = frappe.db.sql(
-        f"""SELECT bi.name, bi.buyback_assessment, bi.condition_grade, bi.status, bi.creation
+        f"""SELECT bi.name, bi.buyback_assessment, bi.condition_grade,
+                   COALESCE(gm.grade_name, bi.condition_grade) AS condition_grade_name,
+                   bi.status, bi.creation
             FROM `tabBuyback Inspection` bi
+            LEFT JOIN `tabGrade Master` gm ON gm.name = bi.condition_grade
             WHERE 1=1 {dc('bi.creation').replace('bo.','bi.')}
             ORDER BY bi.creation DESC LIMIT 30""", prm, as_dict=True
     )

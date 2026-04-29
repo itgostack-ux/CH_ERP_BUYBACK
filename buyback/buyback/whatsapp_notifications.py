@@ -103,10 +103,12 @@ def _notify_awaiting_customer_approval(doc, phone, customer_name):
                 customer_email = frappe.db.get_value("Customer", {"mobile_no": doc.mobile_no}, "email_id")
 
             if customer_email:
-                subject = f"GoGizmo Buyback — Approve {price_str} offer for {item_label}"
+                subject = f"Congruence Holdings | GoGizmo Buyback Approval | {doc.name}"
                 html = f"""
-                <div style="font-family:Arial,sans-serif;max-width:520px;margin:auto">
-                    <h2 style="color:#1a1a2e">Buyback Offer for Your Approval</h2>
+                <div style="font-family:Segoe UI,Arial,sans-serif;max-width:620px;margin:auto;border:1px solid #e5e7eb;border-radius:10px;overflow:hidden">
+                    <div style="background:#0f172a;color:#ffffff;padding:12px 16px;font-weight:600">Congruence Holdings - GoGizmo Buyback</div>
+                    <div style="padding:16px">
+                    <h2 style="color:#1a1a2e;margin-top:0">Buyback Offer for Your Approval</h2>
                     <p>Hi {escape_html(customer_name)},</p>
                     <p>We have evaluated your <strong>{escape_html(item_label)}</strong>
                        and are offering <strong>{price_str}</strong>.</p>
@@ -125,6 +127,7 @@ def _notify_awaiting_customer_approval(doc, phone, customer_name):
                     <p style="color:#6b7280;font-size:12px">
                         Order: {doc.name} | This link is unique to your transaction.
                     </p>
+                    </div>
                 </div>
                 """
                 frappe.sendmail(

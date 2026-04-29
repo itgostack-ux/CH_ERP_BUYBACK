@@ -259,7 +259,11 @@ class BuybackHub {
 		});
 	}
 
-	_lnk(dt, name) { return `<a href="/app/${frappe.router.slug(dt)}/${name}">${name}</a>`; }
+	_lnk(dt, name, label = null) {
+		if (!name) return "";
+		const text = label || __("Open");
+		return `<a href="/app/${frappe.router.slug(dt)}/${name}">${text}</a>`;
+	}
 	_badge(status) {
 		const map = { "Draft": "grey", "Awaiting OTP": "yellow", "Awaiting Customer Approval": "yellow", "Approved": "green", "Rejected": "red", "Paid": "blue", "Closed": "grey", "Cancelled": "grey" };
 		return `<span class="hub-badge hub-badge-${map[status] || "grey"}">${status}</span>`;
@@ -271,7 +275,7 @@ class BuybackHub {
 			<th>${__("Order")}</th><th>${__("Customer")}</th><th>${__("Device")}</th>
 			<th>${__("Status")}</th><th class="text-right">${__("Value")}</th><th>${__("Date")}</th>
 		</tr></thead><tbody>${rows.map((r) => `<tr>
-			<td>${this._lnk("Buyback Order", r.name)}</td>
+			<td>${this._lnk("Buyback Order", r.name, __("Open"))}</td>
 			<td>${r.customer_name || r.customer || ""}</td>
 			<td>${r.device_name || r.item_name || ""}</td>
 			<td>${this._badge(r.status)}</td>
@@ -286,7 +290,7 @@ class BuybackHub {
 			<th>${__("Order")}</th><th>${__("Customer")}</th><th>${__("Status")}</th>
 			<th>${__("Pending Since")}</th><th>${__("Days")}</th>
 		</tr></thead><tbody>${rows.map((r) => `<tr>
-			<td>${this._lnk("Buyback Order", r.name)}</td>
+			<td>${this._lnk("Buyback Order", r.name, __("Open"))}</td>
 			<td>${r.customer_name || r.customer || ""}</td>
 			<td>${this._badge(r.status)}</td>
 			<td>${frappe.datetime.str_to_user(r.modified)}</td>
@@ -300,10 +304,10 @@ class BuybackHub {
 			<th>${__("Assessment")}</th><th>${__("Customer")}</th><th>${__("Device")}</th>
 			<th>${__("Grade")}</th><th>${__("Est. Price")}</th><th>${__("Date")}</th>
 		</tr></thead><tbody>${rows.map((r) => `<tr>
-			<td>${this._lnk("Buyback Assessment", r.name)}</td>
+			<td>${this._lnk("Buyback Assessment", r.name, __("Open"))}</td>
 			<td>${r.customer_name || ""}</td>
 			<td>${r.item_name || ""}</td>
-			<td><span class="hub-badge hub-badge-blue">${r.grade || "-"}</span></td>
+			<td><span class="hub-badge hub-badge-blue">${r.grade_name || r.grade || "-"}</span></td>
 			<td class="text-right">${frappe.format(r.estimated_price || 0, {fieldtype:"Currency"})}</td>
 			<td>${frappe.datetime.str_to_user(r.creation)}</td>
 		</tr>`).join("")}</tbody></table></div>`;
@@ -315,9 +319,9 @@ class BuybackHub {
 			<th>${__("Inspection")}</th><th>${__("Assessment")}</th><th>${__("Grade")}</th>
 			<th>${__("Status")}</th><th>${__("Date")}</th>
 		</tr></thead><tbody>${rows.map((r) => `<tr>
-			<td>${this._lnk("Buyback Inspection", r.name)}</td>
-			<td>${r.buyback_assessment || ""}</td>
-			<td><span class="hub-badge hub-badge-blue">${r.condition_grade || "-"}</span></td>
+			<td>${this._lnk("Buyback Inspection", r.name, __("Open"))}</td>
+			<td>${this._lnk("Buyback Assessment", r.buyback_assessment, __("Open"))}</td>
+			<td><span class="hub-badge hub-badge-blue">${r.condition_grade_name || r.condition_grade || "-"}</span></td>
 			<td>${this._badge(r.status)}</td>
 			<td>${frappe.datetime.str_to_user(r.creation)}</td>
 		</tr>`).join("")}</tbody></table></div>`;
