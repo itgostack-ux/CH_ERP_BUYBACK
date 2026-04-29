@@ -12,6 +12,7 @@ def setup():
     _setup_number_cards()
     frappe.db.commit()  # commit cards first so workspace link validation passes
     _setup_workspace()
+    _setup_sidebar()
     frappe.db.commit()
     print("Buyback workspace configured successfully.")
 
@@ -183,6 +184,27 @@ def _setup_workspace():
             "label": dt,
         })
 
+    # --- Dashboard Pages ---
+    ws.append("links", {
+        "type": "Card Break",
+        "label": "Dashboard Pages",
+    })
+    for page_name, label in [
+        ("buyback-hub", "Buyback Hub"),
+        ("store-manager-dashboard", "Store Manager Dashboard"),
+        ("operations-dashboard", "Operations Dashboard"),
+        ("finance-dashboard", "Finance Dashboard"),
+        ("compliance-dashboard", "Compliance Dashboard"),
+        ("category-manager-dashboard", "Category Manager Dashboard"),
+    ]:
+        if frappe.db.exists("Page", page_name):
+            ws.append("links", {
+                "type": "Link",
+                "link_type": "Page",
+                "link_to": page_name,
+                "label": label,
+            })
+
     # --- Reports ---
     report_categories = {
         "Daily Operations": [
@@ -244,6 +266,77 @@ def _setup_workspace():
     ws.flags.ignore_links = True
     ws.save(ignore_permissions=True)
     print(f"  Workspace '{ws_name}' configured with {len(ws.links)} links")
+
+
+def _setup_sidebar():
+    """Create v16 Workspace Sidebar entries for BuyBack.
+
+    Frappe v16 uses Workspace Sidebar for the left navigation. Keep dashboard
+    hubs, daily transaction documents, configuration, reports, and audit links
+    visible from the sidebar, matching enterprise launchpad patterns used by
+    SAP Fiori / Oracle Retail / Dynamics role centers.
+    """
+    title = "BuyBack"
+    if frappe.db.exists("Workspace Sidebar", title):
+        sidebar = frappe.get_doc("Workspace Sidebar", title)
+        sidebar.items = []
+    else:
+        sidebar = frappe.new_doc("Workspace Sidebar")
+        sidebar.title = title
+        sidebar.header_icon = "shopping-cart"
+        sidebar.module = "BuyBack"
+        sidebar.standard = 0
+
+    rows = [
+        {"label": "Home", "link_type": "Workspace", "link_to": "BuyBack"},
+        {"type": "Section Break", "label": "Dashboards", "indent": 1, "keep_closed": 0},
+        {"label": "Buyback Hub", "link_type": "Page", "link_to": "buyback-hub", "child": 1},
+        {"label": "Store Manager Dashboard", "link_type": "Page", "link_to": "store-manager-dashboard", "child": 1},
+        {"label": "Operations Dashboard", "link_type": "Page", "link_to": "operations-dashboard", "child": 1},
+        {"label": "Finance Dashboard", "link_type": "Page", "link_to": "finance-dashboard", "child": 1},
+        {"label": "Compliance Dashboard", "link_type": "Page", "link_to": "compliance-dashboard", "child": 1},
+        {"label": "Category Manager Dashboard", "link_type": "Page", "link_to": "category-manager-dashboard", "child": 1},
+        {"type": "Section Break", "label": "Transactions", "indent": 1, "keep_closed": 0},
+        {"label": "Assessments", "link_type": "DocType", "link_to": "Buyback Assessment", "child": 1},
+        {"label": "Inspections", "link_type": "DocType", "link_to": "Buyback Inspection", "child": 1},
+        {"label": "Orders", "link_type": "DocType", "link_to": "Buyback Order", "child": 1},
+        {"label": "Exchange Orders", "link_type": "DocType", "link_to": "Buyback Exchange Order", "child": 1},
+        {"type": "Section Break", "label": "Reports & Audit", "indent": 1, "keep_closed": 0},
+        {"label": "Daily Ops Queue", "link_type": "Report", "link_to": "Daily Ops Queue", "child": 1},
+        {"label": "Settlement Register", "link_type": "Report", "link_to": "Settlement Register", "child": 1},
+        {"label": "SLA Breach Report", "link_type": "Report", "link_to": "SLA Breach Report", "child": 1},
+        {"label": "Audit Log", "link_type": "DocType", "link_to": "Buyback Audit Log", "child": 1},
+        {"type": "Section Break", "label": "Setup", "indent": 1, "keep_closed": 1},
+        {"label": "Price Master", "link_type": "DocType", "link_to": "Buyback Price Master", "child": 1},
+        {"label": "Grade Master", "link_type": "DocType", "link_to": "Grade Master", "child": 1},
+        {"label": "Settings", "link_type": "DocType", "link_to": "Buyback Settings", "child": 1},
+        {"label": "SLA Settings", "link_type": "DocType", "link_to": "Buyback SLA Settings", "child": 1},
+    ]
+    for row in rows:
+        link_type = row.get("link_type", "DocType")
+        link_to = row.get("link_to")
+        if link_type == "DocType" and link_to and not frappe.db.exists("DocType", link_to):
+            continue
+        if link_type == "Report" and link_to and not frappe.db.exists("Report", link_to):
+            continue
+        if link_type == "Page" and link_to and not frappe.db.exists("Page", link_to):
+            continue
+        if link_type == "Workspace" and link_to and not frappe.db.exists("Workspace", link_to):
+            continue
+        sidebar.append("items", {
+            "type": row.get("type", "Link"),
+            "label": row.get("label"),
+            "link_type": link_type,
+            "link_to": link_to,
+            "child": row.get("child", 0),
+            "indent": row.get("indent", 0),
+            "collapsible": row.get("collapsible", 1),
+            "keep_closed": row.get("keep_closed", 0),
+        })
+
+    sidebar.flags.ignore_permissions = True
+    sidebar.save(ignore_permissions=True) if sidebar.name else sidebar.insert(ignore_permissions=True)
+    print(f"  Workspace Sidebar '{title}' configured with {len(sidebar.items)} items")
 
 
 def _build_content():
@@ -402,6 +495,11 @@ def _build_content():
             "id": "card_rpt_audit",
             "type": "card",
             "data": {"card_name": "Compliance & Audit", "col": 4},
+        },
+        {
+            "id": "card_dashboards",
+            "type": "card",
+            "data": {"card_name": "Dashboard Pages", "col": 4},
         },
     ]
     return json.dumps(blocks)
