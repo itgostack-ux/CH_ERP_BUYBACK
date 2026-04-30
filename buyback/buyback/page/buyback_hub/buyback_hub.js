@@ -132,6 +132,24 @@ class BuybackHub {
 				<div class="hub-flow-wrap"><div class="hub-flow">${nodes}</div></div>
 			</div>
 		`);
+
+		// Pipeline node click → drill into Buyback Order list filtered by status
+		const status_map = {
+			draft:     "Draft",
+			otp:       "Awaiting OTP",
+			cust_appr: "Awaiting Customer Approval",
+			approved:  "Approved",
+			paid:      "Paid",
+			closed:    "Closed",
+			rejected:  "Rejected",
+		};
+		this.$root.find(".hub-flow-node").css("cursor", "pointer").on("click", (e) => {
+			const step = $(e.currentTarget).data("step");
+			const status = status_map[step];
+			if (status) {
+				this._go_list("Buyback Order", { status });
+			}
+		});
 	}
 
 	_render_kpis(kpis) {
