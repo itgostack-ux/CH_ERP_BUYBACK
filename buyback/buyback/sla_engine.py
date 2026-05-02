@@ -206,12 +206,13 @@ def _fire_sla_alert(doctype, name, sla_type, minutes_taken):
         return
 
     doc = frappe.get_doc(doctype, name)
-    store = getattr(doc, "store", "")
+    ctx = _get_company_zone_location_context(doc)
     url = get_url_to_form(doctype, name)
 
     message = (
         f"⚠️ SLA Breach: {sla_type.replace('_', ' ').title()} — "
-        f"{doctype} {name} at store {store}. "
+        f"{doctype} {name}. "
+        f"Company: {ctx['company']} | Zone: {ctx['zone']} | Location: {ctx['location']}. "
         f"Time elapsed: {minutes_taken:.0f} min. "
         f"<a href='{url}'>View</a>"
     )
@@ -234,6 +235,43 @@ def _fire_sla_alert(doctype, name, sla_type, minutes_taken):
 
     # Set cache to prevent re-alert for 1 hour
     frappe.cache.set_value(alert_key, 1, expires_in_sec=3600)
+
+
+def _get_company_zone_location_context(doc):
+    """Resolve basic Company/Zone/Location context for alert messages."""
+    company = (getattr(doc, "company", "") or "").strip()
+    zone = (
+        getattr(doc, "zone", "")
+        or getattr(doc, "ch_zone", "")
+        or ""
+    ).strip()
+
+    store = (
+        getattr(doc, "store", "")
+        or getattr(doc, "source_warehouse", "")
+        or getattr(doc, "warehouse", "")
+        or ""
+    ).strip()
+    location = store
+
+    if store and frappe.db.exists("Warehouse", store):
+        wh = frappe.db.get_value(
+            "Warehouse",
+            store,
+            ["company", "ch_zone", "warehouse_name"],
+            as_dict=True,
+        ) or {}
+        if not company:
+            company = (wh.get("company") or "").strip()
+        if not zone:
+            zone = (wh.get("ch_zone") or "").strip()
+        location = (wh.get("warehouse_name") or store or "").strip()
+
+    return {
+        "company": company or "-",
+        "zone": zone or "-",
+        "location": location or "-",
+    }
 
 
 def _log_sla_breach(doctype, name, sla_type, minutes_taken):
