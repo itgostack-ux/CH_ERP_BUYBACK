@@ -453,12 +453,19 @@ class BuybackOrder(Document):
         self.save()
         log_audit("OTP Sent", "Buyback Order", self.name)
 
-        # Deliver OTP via WhatsApp
+        # Deliver OTP via WhatsApp + Email
         try:
-            from buyback.buyback.whatsapp_notifications import send_otp_whatsapp
+            from buyback.buyback.whatsapp_notifications import send_otp_whatsapp, send_otp_email, _get_email_for_mobile
             send_otp_whatsapp(self.mobile_no, otp_code, self.name)
+            # Get customer email: prefer customer record, fallback to mobile lookup
+            customer_email = ""
+            if self.customer:
+                customer_email = frappe.db.get_value("Customer", self.customer, "email_id") or ""
+            if not customer_email:
+                customer_email = _get_email_for_mobile(self.mobile_no)
+            send_otp_email(customer_email, otp_code, "Buyback Confirmation", self.name)
         except Exception:
-            frappe.log_error(title="OTP WhatsApp delivery failed")
+            frappe.log_error(title="OTP delivery failed")
 
         return otp_code
 

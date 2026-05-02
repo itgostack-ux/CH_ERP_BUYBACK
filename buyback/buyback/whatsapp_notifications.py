@@ -52,6 +52,52 @@ def send_otp_whatsapp(mobile_no: str, otp_code: str, order_name: str):
     )
 
 
+def send_otp_email(to_email: str, otp_code: str, purpose: str, ref_name: str = ""):
+    """Send OTP via email. Used alongside WhatsApp for all OTP types."""
+    if not to_email:
+        return
+    subject = f"Your OTP for {purpose}"
+    body = f"""<p>Dear Customer,</p>
+<p>Your One-Time Password (OTP) for <strong>{frappe.utils.escape_html(purpose)}</strong>
+{(' — ' + frappe.utils.escape_html(ref_name)) if ref_name else ''} is:</p>
+<h2 style="letter-spacing:6px;font-size:32px;font-family:monospace;
+    background:#f0f4ff;display:inline-block;padding:10px 24px;
+    border-radius:8px;border:2px solid #c7d2fe">{frappe.utils.escape_html(otp_code)}</h2>
+<p>This OTP is valid for <strong>5 minutes</strong>. Do not share it with anyone.</p>
+<p style="color:#6b7280;font-size:12px">If you did not request this OTP, please ignore this email.</p>
+"""
+    try:
+        frappe.sendmail(
+            recipients=[to_email],
+            subject=subject,
+            message=body,
+            delayed=False,
+        )
+    except Exception:
+        frappe.log_error(title="OTP email delivery failed")
+
+
+def _get_email_for_mobile(mobile_no: str) -> str:
+    """Look up email by mobile number — checks User, Employee, and Customer tables."""
+    if not mobile_no:
+        return ""
+    # 1. User table (covers managers/staff)
+    email = frappe.db.get_value("User", {"mobile_no": mobile_no, "enabled": 1}, "email")
+    if email:
+        return email
+    # 2. Employee table
+    email = frappe.db.get_value(
+        "Employee",
+        {"cell_number": mobile_no, "status": "Active"},
+        "prefered_email",
+    )
+    if email:
+        return email
+    # 3. Customer table
+    email = frappe.db.get_value("Customer", {"mobile_no": mobile_no}, "email_id")
+    return email or ""
+
+
 # ── Private helpers ──────────────────────────────────────────────────
 
 def _get_settings():

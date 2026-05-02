@@ -16,6 +16,19 @@ frappe.ui.form.on("Buyback Inspection", {
     },
 
     refresh(frm) {
+        // Auto-set inspector to current user if not set
+        if (!frm.doc.inspector && frm.doc.status !== "Rejected") {
+            frm.set_value("inspector", frappe.session.user);
+        }
+
+        // Auto-populate checklist if template is set but results are empty
+        if (frm.doc.checklist_template && !(frm.doc.results && frm.doc.results.length) && !frm.is_new()) {
+            frm.call("populate_checklist").then(() => {
+                frm.refresh_fields();
+                frappe.show_alert({ message: __("Checklist loaded from template"), indicator: "blue" });
+            });
+        }
+
         if (frm.doc.status === "Draft" && !frm.is_new()) {
             frm.add_custom_button(__("Start Inspection"), () => {
                 frm.call("start_inspection").then(() => frm.reload_doc());
