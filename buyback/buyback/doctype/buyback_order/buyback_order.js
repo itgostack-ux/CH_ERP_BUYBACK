@@ -35,6 +35,19 @@ frappe.ui.form.on("Buyback Order", {
                     }
                 });
             }, __("Actions"));
+
+            // Issue #3: customer has no phone — allow In-Store Signature as alternate approval
+            frm.add_custom_button(__("Customer Approve (In-Store)"), () => {
+                frappe.confirm(
+                    __("Confirm customer has physically signed / approved the offer in-store?"),
+                    () => {
+                        frm.call("customer_approve", { method: "In-Store Signature" }).then(() => {
+                            frappe.show_alert({ message: __("Customer approval recorded."), indicator: "green" });
+                            frm.reload_doc();
+                        });
+                    }
+                );
+            }, __("Actions"));
         }
 
         if (frm.doc.status === "Awaiting OTP") {

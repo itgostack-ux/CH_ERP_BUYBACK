@@ -433,6 +433,16 @@ class BuybackOrder(Document):
                 exc=BuybackStatusError,
             )
 
+        # Issue #3: customer may have no phone number at all.
+        # Provide a clear message so staff uses In-Store Signature instead.
+        if not self.mobile_no:
+            frappe.throw(
+                _("No mobile number on record for this customer. "
+                  "Use \"Customer Approve (In-Store)\" to collect a physical signature instead."),
+                title=_("Mobile Number Required"),
+                exc=BuybackStatusError,
+            )
+
         otp_code = CHOTPLog.generate_otp(
             self.mobile_no,
             "Buyback Confirmation",
