@@ -55,7 +55,7 @@
             <strong>✅ Verified & Approved</strong><br>
             You have already approved this buyback.
           </div>
-        {% elif order.status in ('Approved', 'Awaiting OTP') %}
+        {% elif order.status in ('Approved', 'Awaiting OTP', 'Awaiting Customer Approval') %}
           <!-- Payout Preference -->
           <div class="border rounded p-3 mb-4">
             <h6 class="mb-3">Preferred Payout Method</h6>

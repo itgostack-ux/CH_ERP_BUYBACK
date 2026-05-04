@@ -382,10 +382,11 @@ class BuybackAssessment(Document):
                 row["inspector_impact"] = r.price_impact_percent
             inspection.append("inspection_responses", row)
 
-        # For POS, also pre-fill the post-inspection grade
+        # For POS, also pre-fill the post-inspection grade and set inspector to current user
         if is_pos:
             inspection.post_inspection_grade = self.estimated_grade
             inspection.revised_price = self.quoted_price or self.estimated_price
+            inspection.inspector = frappe.session.user
 
         inspection.insert(ignore_permissions=True)
 
