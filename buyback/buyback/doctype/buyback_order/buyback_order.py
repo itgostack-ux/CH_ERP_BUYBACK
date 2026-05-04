@@ -7,6 +7,25 @@ from buyback.exceptions import BuybackStatusError
 from buyback.utils import log_audit, validate_indian_phone
 
 
+def _normalize_customer_approval_method(method: str | None) -> str:
+    method = (method or "In-Store Signature").strip()
+    aliases = {
+        "OTP": "App Confirmation",
+        "OTP Verification": "App Confirmation",
+        "App OTP": "App Confirmation",
+        "Approval Link": "SMS Link",
+        "Token Link": "SMS Link",
+    }
+    method = aliases.get(method, method)
+    allowed = {"In-Store Signature", "SMS Link", "App Confirmation"}
+    if method not in allowed:
+        frappe.throw(
+            _("Invalid customer approval method: {0}").format(method),
+            title=_("Buyback Order Error"),
+        )
+    return method
+
+
 class BuybackOrder(Document):
     def before_insert(self):
         """Validate uniqueness, assign sequential order_id, generate approval token."""
@@ -403,6 +422,7 @@ class BuybackOrder(Document):
                 ),
                 exc=BuybackStatusError,
             )
+        method = _normalize_customer_approval_method(method)
         self.customer_approved = 1
         self.customer_approved_at = now_datetime()
         self.customer_approval_method = method

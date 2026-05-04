@@ -517,9 +517,8 @@
   },
   {
    "fieldname": "customer_payout_updated_by",
-   "fieldtype": "Link",
+    "fieldtype": "Data",
    "label": "Payout Details Updated By",
-   "options": "User",
    "read_only": 1,
    "allow_on_submit": 1
   },
