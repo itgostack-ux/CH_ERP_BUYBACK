@@ -21,7 +21,23 @@ class BuybackExchangeOrder(Document):
     def validate(self):
         if self.mobile_no:
             self.mobile_no = validate_indian_phone(self.mobile_no, "Mobile No")
+        self._sync_customer_id()
         self._calculate_amount_to_pay()
+
+    def _sync_customer_id(self):
+        """Populate ch_customer_id / ch_membership_id from Customer master."""
+        if not self.customer or (self.ch_customer_id and self.ch_membership_id):
+            return
+        cust = frappe.db.get_value(
+            "Customer", self.customer,
+            ["ch_customer_id", "ch_membership_id"],
+            as_dict=True,
+        )
+        if cust:
+            if not self.ch_customer_id:
+                self.ch_customer_id = cust.ch_customer_id
+            if not self.ch_membership_id:
+                self.ch_membership_id = cust.ch_membership_id
 
     def on_submit(self):
         if self.status == "Draft":

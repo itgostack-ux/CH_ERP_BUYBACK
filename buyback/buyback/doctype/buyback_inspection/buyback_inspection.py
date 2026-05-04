@@ -26,27 +26,84 @@ class BuybackInspection(Document):
     def validate(self):
         if self.mobile_no:
             self.mobile_no = validate_indian_phone(self.mobile_no, "Mobile No")
-        self._validate_diagnostic_ranges()
-        self._fill_inspector_diagnostic_impacts()
-        self._fill_inspector_response_impacts()
+        self._sync_customer_id()
+        qbank_cache = self._load_question_bank_cache()
+        self._validate_diagnostic_ranges(qbank_cache)
+        self._fill_inspector_diagnostic_impacts(qbank_cache)
+        self._fill_inspector_response_impacts(qbank_cache)
         self._set_condition_grade()
 
-    def _validate_diagnostic_ranges(self):
+    def _sync_customer_id(self):
+        """Populate ch_customer_id and ch_membership_id from the linked Customer.
+
+        fetch_from fires only in the browser; this ensures API/programmatic
+        document creation also gets the values.
+        """
+        if not self.customer or (self.ch_customer_id and self.ch_membership_id):
+            return
+        cust = frappe.db.get_value(
+            "Customer", self.customer,
+            ["ch_customer_id", "ch_membership_id"],
+            as_dict=True,
+        )
+        if cust:
+            if not self.ch_customer_id:
+                self.ch_customer_id = cust.ch_customer_id
+            if not self.ch_membership_id:
+                self.ch_membership_id = cust.ch_membership_id
+
+    def _load_question_bank_cache(self):
+        """Batch-load all Question Bank entries and their options needed by this inspection."""
+        diag_codes = [d.test_code for d in (self.inspection_diagnostics or []) if d.test_code]
+        resp_codes = [r.question_code for r in (self.inspection_responses or []) if r.question_code]
+        all_codes = list(set(diag_codes + resp_codes))
+        if not all_codes:
+            return {}
+
+        rows = frappe.db.sql(
+            """
+            SELECT name, question_code, question_text, min_value, max_value
+            FROM `tabBuyback Question Bank`
+            WHERE question_code IN %(codes)s AND disabled = 0
+            """,
+            {"codes": tuple(all_codes)},
+            as_dict=True,
+        )
+        qbank = {r.question_code: r for r in rows}
+
+        if not qbank:
+            return {}
+
+        qnames = [r.name for r in rows]
+        options = frappe.db.sql(
+            """
+            SELECT parent, option_value, price_impact_percent
+            FROM `tabBuyback Question Option`
+            WHERE parent IN %(names)s
+            """,
+            {"names": tuple(qnames)},
+            as_dict=True,
+        )
+        # Map: question_code → {option_value → price_impact_percent}
+        opts_by_code = {}
+        qname_to_code = {r.name: r.question_code for r in rows}
+        for opt in options:
+            code = qname_to_code.get(opt.parent)
+            if code:
+                opts_by_code.setdefault(code, {})[opt.option_value] = opt.price_impact_percent
+
+        return {"qbank": qbank, "options": opts_by_code}
+
+    def _validate_diagnostic_ranges(self, qbank_cache=None):
         """BB-2 fix: Validate numeric diagnostic results fall within acceptable ranges."""
+        qbank = (qbank_cache or {}).get("qbank", {})
         for d in (self.inspection_diagnostics or []):
             result = d.inspector_result or d.assessment_result
             if not result or not d.test_code:
                 continue
-            # Look up min/max from the question bank
-            qdata = frappe.db.get_value(
-                "Buyback Question Bank",
-                {"question_code": d.test_code, "disabled": 0},
-                ["min_value", "max_value", "question_text"],
-                as_dict=True,
-            )
+            qdata = qbank.get(d.test_code)
             if not qdata:
                 continue
-            # Only validate if min/max bounds are configured
             if qdata.min_value is not None or qdata.max_value is not None:
                 try:
                     num_result = flt(result)
@@ -90,48 +147,31 @@ class BuybackInspection(Document):
                         self.condition_grade = grade
                         return
                 except Exception:
-                    pass
+                    frappe.log_error(
+                        title=f"Auto-grade determination failed for {self.name}",
+                        message=frappe.get_traceback(),
+                    )
 
         if self.pre_inspection_grade:
             self.condition_grade = self.pre_inspection_grade
 
-    def _fill_inspector_diagnostic_impacts(self):
+    def _fill_inspector_diagnostic_impacts(self, qbank_cache=None):
         """Look up depreciation_percent for inspector's re-test results."""
+        opts = (qbank_cache or {}).get("options", {})
         for d in (self.inspection_diagnostics or []):
             if not d.inspector_result or not d.test_code:
                 continue
-            qname = frappe.db.get_value(
-                "Buyback Question Bank",
-                {"question_code": d.test_code, "disabled": 0},
-                "name",
-            )
-            if not qname:
-                continue
-            impact = frappe.db.get_value(
-                "Buyback Question Option",
-                {"parent": qname, "option_value": d.inspector_result},
-                "price_impact_percent",
-            )
+            impact = (opts.get(d.test_code) or {}).get(d.inspector_result)
             if impact is not None:
                 d.inspector_depreciation = abs(impact)
 
-    def _fill_inspector_response_impacts(self):
+    def _fill_inspector_response_impacts(self, qbank_cache=None):
         """Look up price_impact_percent for inspector's re-assessment answers."""
+        opts = (qbank_cache or {}).get("options", {})
         for r in (self.inspection_responses or []):
             if not r.inspector_answer or not r.question_code:
                 continue
-            qname = frappe.db.get_value(
-                "Buyback Question Bank",
-                {"question_code": r.question_code, "disabled": 0},
-                "name",
-            )
-            if not qname:
-                continue
-            impact = frappe.db.get_value(
-                "Buyback Question Option",
-                {"parent": qname, "option_value": r.inspector_answer},
-                "price_impact_percent",
-            )
+            impact = (opts.get(r.question_code) or {}).get(r.inspector_answer)
             if impact is not None:
                 r.inspector_impact = impact
 

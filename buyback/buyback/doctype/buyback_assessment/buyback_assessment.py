@@ -1,7 +1,7 @@
 import frappe
 from frappe import _
 from frappe.model.document import Document
-from frappe.utils import nowdate, add_days, getdate
+from frappe.utils import nowdate, add_days, getdate, now_datetime
 
 from buyback.exceptions import BuybackStatusError
 from buyback.utils import log_audit, validate_indian_phone
@@ -38,6 +38,7 @@ class BuybackAssessment(Document):
         self._check_imei_blacklist()
         self._check_duplicate_active_assessment()
         self._resolve_customer_from_mobile()
+        self._sync_customer_id()
         self._auto_fill_item_details()
         if self.diagnostic_tests:
             self._fill_diagnostic_impacts()
@@ -50,6 +51,21 @@ class BuybackAssessment(Document):
             self.estimated_grade = frappe.db.get_value(
                 "Grade Master", {"grade_name": "A"}, "name"
             )
+
+    def _sync_customer_id(self):
+        """Populate ch_customer_id / ch_membership_id from Customer master."""
+        if not self.customer or (self.ch_customer_id and self.ch_membership_id):
+            return
+        cust = frappe.db.get_value(
+            "Customer", self.customer,
+            ["ch_customer_id", "ch_membership_id"],
+            as_dict=True,
+        )
+        if cust:
+            if not self.ch_customer_id:
+                self.ch_customer_id = cust.ch_customer_id
+            if not self.ch_membership_id:
+                self.ch_membership_id = cust.ch_membership_id
 
     def before_save(self):
         if self.is_new():
@@ -346,6 +362,8 @@ class BuybackAssessment(Document):
         inspection.estimated_price = self.estimated_price
         inspection.pre_inspection_grade = self.estimated_grade
         inspection.checklist_template = checklist_template
+        inspection.ch_customer_id = self.ch_customer_id
+        inspection.ch_membership_id = self.ch_membership_id
 
         if self.source in ("Mobile App", "In-Store Kiosk"):
             inspection.diagnostic_source = "Mobile App"
@@ -434,3 +452,50 @@ class BuybackAssessment(Document):
         if self.expires_on and getdate(self.expires_on) < getdate(nowdate()):
             return False
         return True
+
+    @frappe.whitelist()
+    def mark_customer_interested(self):
+        """Called when customer taps 'Sell Now' in the mobile app or kiosk.
+
+        Idempotent — safe to call multiple times; only sets the flag once.
+        Returns the current assessment state so the caller can read
+        quoted_price, expires_on, etc. in a single round trip.
+        """
+        if not self.customer_interested:
+            self.customer_interested = 1
+            self.interested_at = now_datetime()
+            # allow_on_submit is set on both fields so this works for submitted docs too
+            self.flags.ignore_mandatory = True
+            self.save(ignore_permissions=False)
+            log_audit(
+                "Customer Interested",
+                "Buyback Assessment", self.name,
+                new_value={"interested_at": str(self.interested_at)},
+            )
+
+        return {
+            "assessment": self.name,
+            "assessment_id": self.assessment_id,
+            "customer": self.customer,
+            "ch_customer_id": self.ch_customer_id,
+            "ch_membership_id": self.ch_membership_id,
+            "item": self.item,
+            "item_name": self.item_name,
+            "quoted_price": self.quoted_price or self.estimated_price,
+            "estimated_grade": self.estimated_grade,
+            "expires_on": str(self.expires_on) if self.expires_on else None,
+            "customer_interested": self.customer_interested,
+            "interested_at": str(self.interested_at) if self.interested_at else None,
+            "status": self.status,
+        }
+
+
+@frappe.whitelist()
+def mark_interested(assessment_name):
+    """REST-friendly wrapper — callable without a document instance.
+
+    Endpoint: POST /api/method/buyback.buyback.doctype.buyback_assessment.buyback_assessment.mark_interested
+    Body: { "assessment_name": "BBA-2026-00001" }
+    """
+    doc = frappe.get_doc("Buyback Assessment", assessment_name)
+    return doc.mark_customer_interested()

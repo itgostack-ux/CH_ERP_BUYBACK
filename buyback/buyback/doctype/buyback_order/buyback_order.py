@@ -39,10 +39,13 @@ class BuybackOrder(Document):
             )
 
     def _assign_order_id(self):
-        """Assign a unique sequential order_id using a table-level lock to prevent races."""
-        # Lock the table briefly so two concurrent inserts don't get the same MAX
-        frappe.db.sql("SELECT MAX(order_id) FROM `tabBuyback Order` FOR UPDATE")
-        last = frappe.db.sql("SELECT MAX(order_id) FROM `tabBuyback Order`")[0][0] or 0
+        """Assign a unique sequential order_id using a row-level lock to prevent races."""
+        # FOR UPDATE on the same statement that reads the value — keeps the lock
+        # until the INSERT commits, preventing two concurrent inserts from reading
+        # the same MAX and colliding on order_id.
+        last = frappe.db.sql(
+            "SELECT MAX(order_id) FROM `tabBuyback Order` FOR UPDATE"
+        )[0][0] or 0
         self.order_id = last + 1
 
     def validate(self):
@@ -50,6 +53,7 @@ class BuybackOrder(Document):
         if self.mobile_no:
             self.mobile_no = validate_indian_phone(self.mobile_no, "Mobile No")
         self._update_customer_mobile()
+        self._sync_customer_id()
         self._check_imei_blacklist()
         self._populate_item_hierarchy()
         self._link_assessment()
@@ -61,6 +65,21 @@ class BuybackOrder(Document):
         self._check_approval_requirement()
         self._validate_kyc_for_otp_stage()
         self._check_exchange_value_override()
+
+    def _sync_customer_id(self):
+        """Populate ch_customer_id / ch_membership_id from Customer master."""
+        if not self.customer or (self.ch_customer_id and self.ch_membership_id):
+            return
+        cust = frappe.db.get_value(
+            "Customer", self.customer,
+            ["ch_customer_id", "ch_membership_id"],
+            as_dict=True,
+        )
+        if cust:
+            if not self.ch_customer_id:
+                self.ch_customer_id = cust.ch_customer_id
+            if not self.ch_membership_id:
+                self.ch_membership_id = cust.ch_membership_id
 
     def before_update_after_submit(self):
         self._calculate_payment_totals()

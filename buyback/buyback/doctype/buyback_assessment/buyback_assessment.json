@@ -14,6 +14,8 @@
   "customer_section",
   "customer",
   "customer_name",
+  "ch_customer_id",
+  "ch_membership_id",
   "mobile_no",
   "column_break_cust",
   "store",
@@ -44,6 +46,9 @@
   "column_break_result",
   "expires_on",
   "exchange_amount",
+  "intent_section",
+  "customer_interested",
+  "interested_at",
   "remarks_section",
   "remarks",
   "amended_from"
@@ -126,6 +131,24 @@
    "in_list_view": 1,
    "label": "Customer Name",
    "read_only": 1
+  },
+  {
+   "fieldname": "ch_customer_id",
+   "fieldtype": "Int",
+   "label": "Customer ID",
+   "fetch_from": "customer.ch_customer_id",
+   "read_only": 1,
+   "search_index": 1,
+   "no_copy": 0,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "ch_membership_id",
+   "fieldtype": "Data",
+   "label": "Membership ID",
+   "fetch_from": "customer.ch_membership_id",
+   "read_only": 1,
+   "no_copy": 0
   },
   {
    "fetch_from": "customer.mobile_no",
@@ -329,6 +352,31 @@
    "fieldname": "exchange_amount",
    "fieldtype": "Currency",
    "label": "Exchange Amount",
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "intent_section",
+   "fieldtype": "Section Break",
+   "label": "Customer Intent"
+  },
+  {
+   "allow_on_submit": 1,
+   "default": 0,
+   "description": "Set when customer taps 'Sell Now' in the mobile app or kiosk",
+   "fieldname": "customer_interested",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Customer Interested",
+   "search_index": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "interested_at",
+   "fieldtype": "Datetime",
+   "label": "Interest Expressed At",
+   "no_copy": 1,
    "read_only": 1
   },
   {
