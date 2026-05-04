@@ -77,11 +77,10 @@
    "search_index": 1
   },
   {
-   "default": "General",
    "fieldname": "question_category",
-   "fieldtype": "Select",
+   "fieldtype": "Link",
    "label": "Category",
-   "options": "General\nFunctional\nPhysical\nCosmetic\nAccessories\nSoftware\nBattery\nNetwork\nOther",
+   "options": "Buyback Question Category",
    "in_list_view": 1,
    "in_standard_filter": 1,
    "description": "Classifies the question for reporting and filtering.",
