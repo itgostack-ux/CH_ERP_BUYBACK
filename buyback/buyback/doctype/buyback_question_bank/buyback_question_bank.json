@@ -11,6 +11,7 @@
   "question_code",
   "column_break_01",
   "diagnosis_type",
+    "question_category",
   "question_type",
   "applies_to_category",
   "display_order",
@@ -75,6 +76,18 @@
    "description": "Customer Question = manual multiple-choice; Automated Test = mobile app diagnostic (Pass/Fail/Partial)",
    "search_index": 1
   },
+    {
+     "default": "General",
+     "fieldname": "question_category",
+     "fieldtype": "Select",
+     "label": "Category",
+     "options": "General\nFunctional\nPhysical\nCosmetic\nAccessories\nSoftware\nBattery\nNetwork\nOther",
+     "reqd": 1,
+     "in_list_view": 1,
+     "in_standard_filter": 1,
+     "description": "Classifies the question for reporting and filtering.",
+     "search_index": 1
+    },
   {
    "default": "Yes/No",
    "fieldname": "question_type",
@@ -169,7 +182,7 @@
    "role": "All"
   }
  ],
- "search_fields": "question_text,question_code,question_type",
+ "search_fields": "question_text,question_code,question_category,question_type",
  "sort_field": "display_order",
  "sort_order": "ASC",
  "states": [],
