@@ -32,6 +32,9 @@ class BuybackInspection(Document):
         self._fill_inspector_diagnostic_impacts(qbank_cache)
         self._fill_inspector_response_impacts(qbank_cache)
         self._set_condition_grade()
+        # Recalculate price on every save when inspection is active
+        if self.buyback_assessment and self.status in ("In Progress", "Draft") and self.condition_grade:
+            self._recalculate_price()
 
     def _sync_customer_id(self):
         """Populate ch_customer_id and ch_membership_id from the linked Customer.
@@ -123,12 +126,15 @@ class BuybackInspection(Document):
                     pass  # Non-numeric result — skip range check
 
     def _set_condition_grade(self):
-        """Set final condition grade from inspector diagnostics or post-inspection grade."""
-        if self.post_inspection_grade:
-            self.condition_grade = self.post_inspection_grade
-            return
+        """Set final condition grade from inspector diagnostics or post-inspection grade.
 
-        # Auto-determine grade from inspector's diagnostic results
+        Auto-determination always runs when inspector has filled in diagnostic results.
+        The inspector's manual `post_inspection_grade` choice is protected only when a
+        `grade_changed_reason` has been entered — signalling an explicit override.
+        """
+        auto_grade = None
+
+        # Always try to auto-determine from inspector diagnostic results
         if self.inspection_diagnostics:
             diagnostic_data = []
             for d in self.inspection_diagnostics:
@@ -141,18 +147,24 @@ class BuybackInspection(Document):
             if diagnostic_data:
                 try:
                     from buyback.api import _auto_determine_grade
-                    grade = _auto_determine_grade(diagnostic_data)
-                    if grade:
-                        self.post_inspection_grade = grade
-                        self.condition_grade = grade
-                        return
+                    auto_grade = _auto_determine_grade(diagnostic_data)
                 except Exception:
                     frappe.log_error(
                         title=f"Auto-grade determination failed for {self.name}",
                         message=frappe.get_traceback(),
                     )
 
-        if self.pre_inspection_grade:
+        if auto_grade:
+            # Respect inspector's explicit override (signalled by grade_changed_reason)
+            if self.grade_changed_reason and self.post_inspection_grade:
+                self.condition_grade = self.post_inspection_grade
+            else:
+                # Update post_inspection_grade with auto-determined value
+                self.post_inspection_grade = auto_grade
+                self.condition_grade = auto_grade
+        elif self.post_inspection_grade:
+            self.condition_grade = self.post_inspection_grade
+        elif self.pre_inspection_grade:
             self.condition_grade = self.pre_inspection_grade
 
     def _fill_inspector_diagnostic_impacts(self, qbank_cache=None):
@@ -450,5 +462,22 @@ class BuybackInspection(Document):
                 "result": "",
             })
 
-
+    @frappe.whitelist()
+    def recalculate_grade_and_price(self):
+        """Force re-run grade determination and price recalculation.
+        Clears grade_changed_reason so auto-grade from diagnostics takes effect.
+        """
+        self.grade_changed_reason = None
+        qbank_cache = self._load_question_bank_cache()
+        self._fill_inspector_diagnostic_impacts(qbank_cache)
+        self._fill_inspector_response_impacts(qbank_cache)
+        self._set_condition_grade()
+        if self.buyback_assessment and self.condition_grade:
+            self._recalculate_price()
+        self.save()
+        return {
+            "post_inspection_grade": self.post_inspection_grade,
+            "condition_grade": self.condition_grade,
+            "revised_price": self.revised_price,
+        }
 

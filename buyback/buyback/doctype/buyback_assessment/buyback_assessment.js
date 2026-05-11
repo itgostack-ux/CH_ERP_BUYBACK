@@ -1,5 +1,8 @@
 frappe.ui.form.on("Buyback Assessment", {
 	refresh(frm) {
+		// Clear custom buttons first to prevent duplicates on repeated refreshes
+		frm.clear_custom_buttons();
+
 		// Detect POS origin — either from route_options or stored flag
 		const from_pos = (frappe.route_options && frappe.route_options._from_pos)
 			|| frm.doc.__from_pos;

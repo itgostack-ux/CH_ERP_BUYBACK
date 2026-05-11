@@ -3,6 +3,7 @@
 
 frappe.ui.form.on("Buyback Order", {
     refresh(frm) {
+        frm.clear_custom_buttons();
         if (frm.doc.docstatus !== 1) return;
 
         if (frm.doc.status === "Awaiting Approval") {
