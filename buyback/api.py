@@ -1018,25 +1018,49 @@ def verify_kyc(order_name: str) -> dict:
     }
 
 
+def _get_question_applicable_categories(question_name: str, legacy_category: str | None = None) -> list[str]:
+    rows = frappe.get_all(
+        "Buyback Question Applicable Category",
+        filters={
+            "parent": question_name,
+            "parenttype": "Buyback Question Bank",
+            "parentfield": "applies_to_categories",
+        },
+        pluck="item_group",
+    )
+    cleaned = [r for r in (rows or []) if r]
+    if cleaned:
+        return cleaned
+    if legacy_category:
+        return [legacy_category]
+    return []
+
+
 @frappe.whitelist()
 def get_questions(category: str | None = None) -> list[dict]:
     """Get active questions for a category (or all)."""
-    filters: dict = {"disabled": 0}
-    if category:
-        filters["applies_to_category"] = ["in", [category, "", None]]
-
     questions = frappe.get_all(
         "Buyback Question Bank",
-        filters=filters,
+        filters={"disabled": 0},
         fields=[
             "name", "question_id", "question_text", "question_code",
-            "question_type", "display_order", "is_mandatory",
+            "question_type", "display_order", "is_mandatory", "applies_to_category",
         ],
-        order_by="display_order asc",
+        order_by="display_order asc, question_id asc",
     )
+
+    if category:
+        filtered = []
+        for q in questions:
+            applicable = _get_question_applicable_categories(q["name"], q.get("applies_to_category"))
+            # No category set means "global" question, applicable to all categories.
+            if not applicable or category in applicable:
+                filtered.append(q)
+        questions = filtered
 
     # Attach options
     for q in questions:
+        q.pop("applies_to_category", None)
         q["options"] = frappe.get_all(
             "Buyback Question Option",
             filters={"parent": q["name"]},

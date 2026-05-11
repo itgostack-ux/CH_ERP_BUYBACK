@@ -166,10 +166,53 @@ class BuybackAssessment(Document):
             if not self.item_name:
                 self.item_name = item.item_name
 
-    def _fill_response_impacts(self):
-        """Look up price_impact_percent from Question Bank options for each response.
-        BB-4 fix: Filter by applies_to_category if available on the assessment.
+    def _get_question_applicable_categories(self, question_name: str, legacy_category: str | None = None) -> list[str]:
+        rows = frappe.get_all(
+            "Buyback Question Applicable Category",
+            filters={
+                "parent": question_name,
+                "parenttype": "Buyback Question Bank",
+                "parentfield": "applies_to_categories",
+            },
+            pluck="item_group",
+        )
+        cleaned = [r for r in (rows or []) if r]
+        if cleaned:
+            return cleaned
+        if legacy_category:
+            return [legacy_category]
+        return []
+
+    def _resolve_question_bank_name(self, question_code: str, category: str | None) -> str | None:
+        """Resolve question by category-specific match first, then global match.
+
+        Ordering is deterministic by display_order, then question_id, so repeated
+        runs return the same question even when multiple rows share a code.
         """
+        candidates = frappe.get_all(
+            "Buyback Question Bank",
+            filters={"question_code": question_code, "disabled": 0},
+            fields=["name", "display_order", "question_id", "applies_to_category"],
+            order_by="display_order asc, question_id asc",
+        )
+        if not candidates:
+            return None
+        if not category:
+            return candidates[0].name
+
+        specific = None
+        global_q = None
+        for c in candidates:
+            applicable = self._get_question_applicable_categories(c.name, c.get("applies_to_category"))
+            if not applicable and not global_q:
+                global_q = c.name
+            if category in applicable and not specific:
+                specific = c.name
+
+        return specific or global_q or candidates[0].name
+
+    def _fill_response_impacts(self):
+        """Look up price_impact_percent from Question Bank options for each response."""
         category = self.get("item_group") or self.get("category")
         for r in self.responses:
             # fetch_from runs after validate, so resolve manually
@@ -179,24 +222,11 @@ class BuybackAssessment(Document):
                 )
             if not r.question_code or not r.answer_value:
                 continue
-            # BB-4 fix: Prefer category-specific question, fall back to global
-            filters = {"question_code": r.question_code, "disabled": 0}
-            if category:
-                qname = frappe.db.get_value(
-                    "Buyback Question Bank",
-                    {**filters, "applies_to_category": category},
-                    "name",
-                )
-                if not qname:
-                    qname = frappe.db.get_value(
-                        "Buyback Question Bank",
-                        {**filters, "applies_to_category": ["in", ["", None]]},
-                        "name",
-                    )
-            else:
-                qname = frappe.db.get_value("Buyback Question Bank", filters, "name")
+
+            qname = self._resolve_question_bank_name(r.question_code, category)
             if not qname:
                 continue
+
             impact = frappe.db.get_value(
                 "Buyback Question Option",
                 {"parent": qname, "option_value": r.answer_value},
@@ -210,7 +240,6 @@ class BuybackAssessment(Document):
 
         Automated tests store results as Pass/Fail/Partial which map to
         option_value in the Question Bank options table.
-        BB-4 fix: Filter by applies_to_category if available.
         """
         category = self.get("item_group") or self.get("category")
         for d in self.diagnostic_tests:
@@ -221,24 +250,11 @@ class BuybackAssessment(Document):
                 )
             if not d.test_code or not d.result:
                 continue
-            # BB-4 fix: Prefer category-specific question, fall back to global
-            filters = {"question_code": d.test_code, "disabled": 0}
-            if category:
-                qname = frappe.db.get_value(
-                    "Buyback Question Bank",
-                    {**filters, "applies_to_category": category},
-                    "name",
-                )
-                if not qname:
-                    qname = frappe.db.get_value(
-                        "Buyback Question Bank",
-                        {**filters, "applies_to_category": ["in", ["", None]]},
-                        "name",
-                    )
-            else:
-                qname = frappe.db.get_value("Buyback Question Bank", filters, "name")
+
+            qname = self._resolve_question_bank_name(d.test_code, category)
             if not qname:
                 continue
+
             impact = frappe.db.get_value(
                 "Buyback Question Option",
                 {"parent": qname, "option_value": d.result},

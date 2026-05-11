@@ -26,6 +26,7 @@ class BuybackQuestionBank(Document):
         if self.question_code:
             self.question_code = self.question_code.strip().lower().replace(" ", "_")
 
+        self._sync_applies_to_categories()
         self._ensure_unique_question_code()
 
         # Yes/No questions should have exactly 2 options
@@ -44,6 +45,23 @@ class BuybackQuestionBank(Document):
                     frappe._("Option values must be unique within a question."),
                     title=frappe._("Duplicate Option Values"),
                 )
+
+    def _sync_applies_to_categories(self):
+        """Keep legacy single-category field in sync with multiselect values."""
+        selected = []
+        seen = set()
+        for row in self.get("applies_to_categories") or []:
+            item_group = (row.item_group or "").strip()
+            if not item_group or item_group in seen:
+                continue
+            seen.add(item_group)
+            selected.append(item_group)
+
+        # Preserve compatibility with legacy code/data until all callers are migrated.
+        if selected:
+            self.applies_to_category = selected[0]
+        elif self.applies_to_category:
+            self.append("applies_to_categories", {"item_group": self.applies_to_category})
 
     def _ensure_unique_question_code(self):
         """Ensure question_code uniqueness under advisory lock to prevent races."""

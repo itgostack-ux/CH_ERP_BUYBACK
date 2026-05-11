@@ -13,7 +13,7 @@
   "diagnosis_type",
     "question_category",
   "question_type",
-  "applies_to_category",
+  "applies_to_categories",
   "display_order",
   "is_mandatory",
   "disabled",
@@ -79,11 +79,11 @@
   {
    "fieldname": "question_category",
    "fieldtype": "Link",
-   "label": "Category",
+   "label": "Reporting Category",
    "options": "Buyback Question Category",
    "in_list_view": 1,
    "in_standard_filter": 1,
-   "description": "Classifies the question for reporting and filtering.",
+   "description": "Reporting/classification label for analytics and filters.",
    "search_index": 1
   },
   {
@@ -96,11 +96,19 @@
    "depends_on": "eval:doc.diagnosis_type === 'Customer Question'"
   },
   {
+   "fieldname": "applies_to_categories",
+   "fieldtype": "Table MultiSelect",
+   "label": "Applies to Item Categories",
+   "options": "Buyback Question Applicable Category",
+   "description": "Select one or more Item Groups. Leave blank to apply to all categories"
+  },
+  {
    "fieldname": "applies_to_category",
    "fieldtype": "Link",
-   "label": "Applies to Category",
+   "label": "Legacy Applies to Category",
    "options": "Item Group",
-   "description": "Leave blank to apply to all categories"
+   "hidden": 1,
+   "description": "Legacy single-category field kept for compatibility"
   },
   {
    "default": "0",

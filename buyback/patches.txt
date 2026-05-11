@@ -9,3 +9,4 @@ buyback.patches.backfill_question_category
 buyback.patches.backfill_customer_ids
 buyback.patches.seed_question_categories
 buyback.patches.fix_customer_approval_and_payout_fields
+buyback.patches.backfill_question_applicable_categories
