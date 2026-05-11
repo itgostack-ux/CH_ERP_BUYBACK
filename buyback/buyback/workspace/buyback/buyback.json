@@ -154,55 +154,6 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Question Category",
-   "link_count": 0,
-   "link_to": "Buyback Question Category",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Shared Masters",
-   "link_count": 0,
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Card Break"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Stores",
-   "link_count": 0,
-   "link_to": "Warehouse",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Payment Methods",
-   "link_count": 0,
-   "link_to": "Mode of Payment",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "OTP Log",
-   "link_count": 0,
-   "link_to": "CH OTP Log",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
    "label": "Settings & Configuration",
    "link_count": 0,
    "link_type": "DocType",
@@ -603,7 +554,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-05-11 00:00:00.000000",
+ "modified": "2026-05-11 12:06:15.282709",
  "modified_by": "Administrator",
  "module": "BuyBack",
  "name": "BuyBack",

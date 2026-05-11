@@ -150,24 +150,6 @@ def _setup_workspace():
             "label": dt,
         })
 
-    # --- Shared Masters (CH Core) ---
-    ws.append("links", {
-        "type": "Card Break",
-        "label": "Shared Masters",
-    })
-    for dt_label in [
-        ("Warehouse", "Stores"),
-        ("Mode of Payment", "Payment Methods"),
-        ("CH OTP Log", "OTP Log"),
-    ]:
-        dt, label = dt_label
-        ws.append("links", {
-            "type": "Link",
-            "link_type": "DocType",
-            "link_to": dt,
-            "label": label,
-        })
-
     # --- Settings ---
     ws.append("links", {
         "type": "Card Break",
