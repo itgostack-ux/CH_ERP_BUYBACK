@@ -227,7 +227,9 @@
     try {
       await callApi('buyback.api.save_customer_payout_preference', args);
       payoutSaved = true;
-      msg.innerHTML = '<span class="text-success">Payout details saved.</span>';
+      if (!silent) {
+        msg.innerHTML = '<span class="text-success">Payout details saved.</span>';
+      }
       return true;
     } catch (e) {
       payoutSaved = false;

@@ -27,7 +27,7 @@ from buyback.exceptions import (
     BuybackStatusError,
     BuybackValidationError,
 )
-from buyback.utils import validate_indian_phone
+from buyback.utils import log_audit, validate_indian_phone
 
 
 @contextmanager
@@ -398,6 +398,37 @@ def _validate_customer_payout_inputs(
     return data
 
 
+def _normalize_kyc_id_type(id_type: str | None) -> str:
+    """Normalize incoming KYC ID labels to Buyback Order select options."""
+    raw = (id_type or "").strip()
+    if not raw:
+        return ""
+
+    alias_map = {
+        "aadhaar": "Aadhar Card",
+        "aadhar": "Aadhar Card",
+        "aadhar card": "Aadhar Card",
+        "aadhaar card": "Aadhar Card",
+        "pan": "PAN Card",
+        "pan card": "PAN Card",
+        "driving licence": "Driving License",
+        "driving license": "Driving License",
+        "voter id": "Voter ID",
+        "passport": "Passport",
+    }
+    normalized = alias_map.get(raw.casefold(), raw)
+
+    allowed = {"Aadhar Card", "PAN Card", "Driving License", "Voter ID", "Passport"}
+    if normalized not in allowed:
+        frappe.throw(
+            _("Invalid ID Proof Type. Allowed values: {0}").format(
+                ", ".join(sorted(allowed))
+            ),
+            exc=BuybackValidationError,
+        )
+    return normalized
+
+
 @frappe.whitelist(allow_guest=True)
 @rate_limit(limit=20, seconds=60, methods=["POST"], ip_based=True)
 def save_customer_payout_preference(
@@ -441,6 +472,17 @@ def save_customer_payout_preference(
         payout_notes=payout_notes,
     )
 
+    old_values = {
+        "customer_payout_mode": doc.customer_payout_mode,
+        "customer_cash_receiver_name": doc.customer_cash_receiver_name,
+        "customer_upi_id": doc.customer_upi_id,
+        "customer_bank_account_holder": doc.customer_bank_account_holder,
+        "customer_bank_account_number": doc.customer_bank_account_number,
+        "customer_bank_ifsc": doc.customer_bank_ifsc,
+        "customer_bank_name": doc.customer_bank_name,
+        "customer_payout_notes": doc.customer_payout_notes,
+    }
+
     doc.flags.ignore_permissions = True
     for key, value in data.items():
         setattr(doc, key, value)
@@ -448,6 +490,26 @@ def save_customer_payout_preference(
     doc.customer_payout_updated_by = "Customer (via approval link)"
     with _as_system_user():
         doc.save(ignore_permissions=True)
+
+    new_values = {
+        "customer_payout_mode": doc.customer_payout_mode,
+        "customer_cash_receiver_name": doc.customer_cash_receiver_name,
+        "customer_upi_id": doc.customer_upi_id,
+        "customer_bank_account_holder": doc.customer_bank_account_holder,
+        "customer_bank_account_number": doc.customer_bank_account_number,
+        "customer_bank_ifsc": doc.customer_bank_ifsc,
+        "customer_bank_name": doc.customer_bank_name,
+        "customer_payout_notes": doc.customer_payout_notes,
+    }
+    if old_values != new_values:
+        log_audit(
+            "Customer Payout Updated",
+            "Buyback Order",
+            doc.name,
+            old_value=old_values,
+            new_value=new_values,
+            reason="Updated via approval link",
+        )
 
     return {
         "name": doc.name,
@@ -549,7 +611,7 @@ def verify_otp(order_name: str = None, otp_code: str = "", token: str = None) ->
     with _as_system_user():
         result = doc.verify_otp(otp_code)
 
-    if result.get("success"):
+    if result.get("valid"):
         # Clear counter on successful verification
         frappe.cache().delete_value(cache_key)
     else:
@@ -557,6 +619,107 @@ def verify_otp(order_name: str = None, otp_code: str = "", token: str = None) ->
         frappe.cache().set_value(cache_key, int(attempts) + 1, expires_in_sec=900)
 
     return result
+
+
+@frappe.whitelist()
+def resend_customer_approval_link(order_name: str, reason: str | None = None) -> dict:
+    """Regenerate and resend approval link, keeping an audit history."""
+    from buyback.buyback.whatsapp_notifications import _notify_awaiting_customer_approval
+
+    doc = frappe.get_doc("Buyback Order", order_name)
+    doc.check_permission("write")
+
+    if doc.status not in {"Approved", "Awaiting Customer Approval", "Awaiting OTP", "OTP Verified"}:
+        frappe.throw(
+            _("Approval link can be resent only during customer-approval stages."),
+            exc=BuybackStatusError,
+        )
+
+    old_token = doc.approval_token
+    doc.flags.ignore_permissions = True
+    doc.approval_token = frappe.generate_hash(length=32)
+    doc.save(ignore_permissions=True)
+
+    phone = doc.mobile_no
+    if phone:
+        _notify_awaiting_customer_approval(doc, phone, doc.customer_name or "Customer")
+
+    approval_url = f"{frappe.utils.get_url()}/buyback-approval?token={doc.approval_token}"
+    log_audit(
+        "Customer Approval Link Resent",
+        "Buyback Order",
+        doc.name,
+        old_value={"approval_token": old_token},
+        new_value={"approval_token": doc.approval_token, "approval_url": approval_url},
+        reason=(reason or "Manual resend from desk"),
+    )
+
+    return {
+        "name": doc.name,
+        "status": doc.status,
+        "approval_url": approval_url,
+        "resent_to_mobile": bool(phone),
+    }
+
+
+@frappe.whitelist()
+def request_price_exception(order_name: str, requested_price: float | str, reason: str) -> dict:
+    """Raise a manager-governed exception for negotiated buyback price changes."""
+    if not reason or not str(reason).strip():
+        frappe.throw(_("Reason is required to request a price exception."), exc=BuybackValidationError)
+
+    doc = frappe.get_doc("Buyback Order", order_name)
+    doc.check_permission("write")
+
+    current_price = flt(doc.final_price)
+    requested = flt(requested_price)
+    if requested <= 0:
+        frappe.throw(_("Requested price must be greater than zero."), exc=BuybackValidationError)
+    if requested == current_price:
+        frappe.throw(_("Requested price is same as current final price."), exc=BuybackValidationError)
+
+    if not frappe.db.exists("CH Exception Type", "Exchange Value Override"):
+        frappe.throw(_("Exception Type 'Exchange Value Override' is not configured."), exc=BuybackValidationError)
+
+    from ch_item_master.ch_item_master.exception_api import raise_exception
+
+    ex = raise_exception(
+        exception_type="Exchange Value Override",
+        company=doc.company,
+        reason=(
+            f"Negotiated price change requested on {doc.name}: "
+            f"₹{current_price:,.2f} -> ₹{requested:,.2f}. "
+            f"Reason: {str(reason).strip()}"
+        ),
+        requested_value=abs(requested - current_price),
+        original_value=current_price,
+        reference_doctype="Buyback Order",
+        reference_name=doc.name,
+        item_code=doc.item,
+        serial_no=doc.imei_serial,
+        store_warehouse=doc.store,
+        customer=doc.customer,
+    )
+
+    log_audit(
+        "Price Exception Requested",
+        "Buyback Order",
+        doc.name,
+        old_value={"current_final_price": current_price},
+        new_value={
+            "requested_final_price": requested,
+            "exception_request": ex,
+            "requested_by": frappe.session.user,
+        },
+        reason=str(reason).strip(),
+    )
+
+    return {
+        "name": doc.name,
+        "current_price": current_price,
+        "requested_price": requested,
+        "exception_request": ex,
+    }
 
 
 # ── Step 8: Payment ──────────────────────────────────────────────

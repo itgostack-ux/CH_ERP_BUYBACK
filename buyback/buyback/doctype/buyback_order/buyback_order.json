@@ -147,6 +147,7 @@
   },
   {
    "default": "Buyback",
+    "allow_on_submit": 1,
    "fieldname": "settlement_type",
    "fieldtype": "Select",
    "label": "Settlement Type",
@@ -529,12 +530,14 @@
   },
   {
    "default": "0",
+    "allow_on_submit": 1,
    "fieldname": "otp_verified",
    "fieldtype": "Check",
    "label": "OTP Verified",
    "read_only": 1
   },
   {
+    "allow_on_submit": 1,
    "fieldname": "otp_verified_at",
    "fieldtype": "Datetime",
    "label": "OTP Verified At",
@@ -676,18 +679,21 @@
    "collapsible": 1
   },
   {
+    "allow_on_submit": 1,
    "fieldname": "customer_photo",
    "fieldtype": "Attach Image",
    "label": "Customer Photo",
    "description": "Customer selfie / photo for identity verification"
   },
   {
+    "allow_on_submit": 1,
    "fieldname": "customer_id_type",
    "fieldtype": "Select",
    "label": "ID Proof Type",
    "options": "\nAadhar Card\nPAN Card\nDriving License\nVoter ID\nPassport"
   },
   {
+    "allow_on_submit": 1,
    "fieldname": "customer_id_number",
    "fieldtype": "Data",
    "label": "ID Number",
@@ -698,12 +704,14 @@
    "fieldtype": "Column Break"
   },
   {
+    "allow_on_submit": 1,
    "fieldname": "customer_id_front",
    "fieldtype": "Attach Image",
    "label": "ID Front Image",
    "depends_on": "customer_id_type"
   },
   {
+    "allow_on_submit": 1,
    "fieldname": "customer_id_back",
    "fieldtype": "Attach Image",
    "label": "ID Back Image",
@@ -711,12 +719,14 @@
   },
   {
    "default": "0",
+    "allow_on_submit": 1,
    "fieldname": "kyc_verified",
    "fieldtype": "Check",
    "label": "KYC Verified",
    "read_only": 1
   },
   {
+    "allow_on_submit": 1,
    "fieldname": "kyc_verified_by",
    "fieldtype": "Link",
    "label": "KYC Verified By",
@@ -725,6 +735,7 @@
    "depends_on": "kyc_verified"
   },
   {
+    "allow_on_submit": 1,
    "fieldname": "kyc_verified_at",
    "fieldtype": "Datetime",
    "label": "KYC Verified At",

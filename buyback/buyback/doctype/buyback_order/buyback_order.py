@@ -527,10 +527,24 @@ class BuybackOrder(Document):
         )
 
         if result["valid"]:
-            self.otp_verified = 1
-            self.otp_verified_at = now_datetime()
-            self.status = "OTP Verified"
-            self.save()
+            verified_at = now_datetime()
+            updates = {
+                "otp_verified": 1,
+                "otp_verified_at": verified_at,
+                "status": "OTP Verified",
+            }
+
+            # OTP verification is often done after submit from customer flows.
+            # Use db_set for submitted docs to avoid update-after-submit errors.
+            if self.docstatus == 1:
+                self.db_set(updates, update_modified=True)
+                self.reload()
+            else:
+                self.otp_verified = 1
+                self.otp_verified_at = verified_at
+                self.status = "OTP Verified"
+                self.save()
+
             log_audit("OTP Verified", "Buyback Order", self.name)
 
         return result
