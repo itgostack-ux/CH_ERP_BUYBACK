@@ -512,6 +512,14 @@ class BuybackOrder(Document):
         """Verify customer OTP."""
         from ch_item_master.ch_core.doctype.ch_otp_log.ch_otp_log import CHOTPLog
 
+        # Idempotent: if already verified, treat retry as success (Oracle/Stripe pattern).
+        if self.status == "OTP Verified" or self.otp_verified:
+            return {
+                "valid": True,
+                "already_verified": True,
+                "message": _("OTP already verified."),
+            }
+
         if self.status != "Awaiting OTP":
             frappe.throw(
                 _("OTP verification only applicable in 'Awaiting OTP' status."),
