@@ -85,3 +85,14 @@ class TestBuybackQuestionBankCategories(FrappeTestCase):
 
         result = _get_question_applicable_categories("NONEXISTENT-Q-XYZ")
         self.assertIsInstance(result, list)
+
+
+def run_all():
+    import sys
+    import unittest
+    loader = unittest.TestLoader()
+    suite = loader.loadTestsFromModule(sys.modules[__name__])
+    runner = unittest.TextTestRunner(verbosity=2)
+    result = runner.run(suite)
+    if result.failures or result.errors:
+        raise Exception(f"test_buyback_assessment: {len(result.failures)} failure(s), {len(result.errors)} error(s)")
