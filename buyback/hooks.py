@@ -45,6 +45,10 @@ doc_events = {
             "buyback.buyback.whatsapp_notifications.on_buyback_order_whatsapp",
         ],
     },
+    # Prevent cross-customer exchange credit misuse on every SI save/submit
+    "Sales Invoice": {
+        "validate": "buyback.exchange_hooks.validate_exchange_order_customer_match",
+    },
 }
 
 scheduler_events = {

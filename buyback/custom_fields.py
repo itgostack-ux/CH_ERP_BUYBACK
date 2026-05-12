@@ -12,6 +12,48 @@ from frappe import _
 
 CUSTOM_FIELDS = {
     # ──────────────────────────────────────────────────────────────
+    # Sales Invoice — exchange/trade-in reference
+    # Locks the exchange credit to one customer+invoice; validated
+    # server-side in hooks so staff cannot cross-apply credits.
+    # ──────────────────────────────────────────────────────────────
+    "Sales Invoice": [
+        {
+            "fieldname": "ch_exchange_section",
+            "label": _("Exchange / Trade-In"),
+            "fieldtype": "Section Break",
+            "insert_after": "pos_profile",
+            "collapsible": 1,
+            "description": _(
+                "Link a Buyback Exchange Order to apply the trade-in credit. "
+                "Customer on the exchange order must match this invoice's customer."
+            ),
+        },
+        {
+            "fieldname": "ch_exchange_order",
+            "label": _("Exchange Order"),
+            "fieldtype": "Link",
+            "options": "Buyback Exchange Order",
+            "insert_after": "ch_exchange_section",
+            "in_standard_filter": 1,
+            "bold": 1,
+            "description": _(
+                "Set via the Apply Exchange API. "
+                "Validates that the exchange order belongs to this customer."
+            ),
+        },
+        {
+            "fieldname": "ch_exchange_credit",
+            "label": _("Exchange Credit Applied (₹)"),
+            "fieldtype": "Currency",
+            "insert_after": "ch_exchange_order",
+            "read_only": 1,
+            "description": _(
+                "Buyback amount from the linked exchange order, applied as "
+                "a trade-in credit on this invoice."
+            ),
+        },
+    ],
+    # ──────────────────────────────────────────────────────────────
     # Serial No — buyback lifecycle fields
     # ──────────────────────────────────────────────────────────────
     "Serial No": [

@@ -1698,4 +1698,208 @@ def get_customer_questions_for_item(item_code: str) -> list:
             ],
         })
 
+
+# ── Exchange → Invoice auto-mapping ──────────────────────────────
+
+
+@frappe.whitelist()
+def get_open_exchange_orders_for_customer(
+    customer: str,
+    mobile_no: str | None = None,
+) -> list[dict]:
+    """Return open (unlinked) Buyback Exchange Orders for a customer.
+
+    Used by the POS / billing UI to show available trade-in credits when
+    creating a Sales Invoice.  Only returns orders that:
+      - belong to the customer (or match mobile_no)
+      - are submitted (docstatus=1)
+      - have not yet been linked to a Sales Invoice
+      - are in a status that allows crediting (New Device Delivered,
+        Awaiting Pickup, Old Device Received, Inspected, Settled)
+
+    Args:
+        customer: ERPNext Customer link value
+        mobile_no: Optional mobile number (fallback lookup when customer link
+                   is not yet set)
+
+    Returns:
+        List of dicts with exchange order details and amount to credit.
+    """
+    frappe.has_permission("Buyback Exchange Order", ptype="read", throw=True)
+
+    CREDITABLE_STATUSES = (
+        "New Device Delivered",
+        "Awaiting Pickup",
+        "Old Device Received",
+        "Inspected",
+        "Settled",
+    )
+
+    filters: dict = {
+        "docstatus": 1,
+        "sales_invoice": ["is", "not set"],
+        "status": ["in", list(CREDITABLE_STATUSES)],
+    }
+    if customer:
+        filters["customer"] = customer
+    elif mobile_no:
+        filters["mobile_no"] = validate_indian_phone(mobile_no, "Mobile No")
+    else:
+        frappe.throw(
+            _("Provide either customer or mobile_no."),
+            exc=BuybackValidationError,
+            title=_("Exchange Lookup Error"),
+        )
+
+    orders = frappe.get_all(
+        "Buyback Exchange Order",
+        filters=filters,
+        fields=[
+            "name", "exchange_id", "customer", "mobile_no",
+            "old_item", "old_item_name", "old_imei_serial",
+            "old_condition_grade", "buyback_amount",
+            "new_item", "new_item_name", "new_imei_serial",
+            "new_device_price", "exchange_discount", "amount_to_pay",
+            "status", "store",
+        ],
+        order_by="exchange_id desc",
+        limit=10,
+    )
+    return orders
+
+
+@frappe.whitelist()
+def apply_exchange_to_invoice(
+    exchange_order: str,
+    sales_invoice: str,
+) -> dict:
+    """Link a Buyback Exchange Order to a Sales Invoice and return the
+    buyback amount to apply as a trade-in credit.
+
+    Enforces:
+      1. Customer on exchange order == customer on Sales Invoice
+         → prevents staff applying Exchange Order from Customer A to
+           Customer B's bill
+      2. Exchange order not already applied to another invoice
+      3. Sales Invoice not already linked to a different exchange order
+      4. Exchange order in a creditable status
+
+    This is the **only** authorised way to link an exchange to a sale.
+    Direct field edits on either side will fail the validation hook.
+
+    Returns:
+        dict with exchange_order, sales_invoice, buyback_amount, amount_to_pay
+    """
+    frappe.has_permission("Buyback Exchange Order", ptype="write", throw=True)
+    frappe.has_permission("Sales Invoice", ptype="write", throw=True)
+
+    exo = frappe.get_doc("Buyback Exchange Order", exchange_order)
+    si  = frappe.get_doc("Sales Invoice", sales_invoice)
+
+    # ── Guard 1: customer must match ──────────────────────────────
+    if exo.customer != si.customer:
+        frappe.throw(
+            _(
+                "Exchange Order {0} belongs to customer <b>{1}</b> but "
+                "Sales Invoice {2} is for customer <b>{3}</b>. "
+                "Cannot apply exchange credit across customers."
+            ).format(
+                frappe.bold(exo.name),
+                exo.customer,
+                frappe.bold(si.name),
+                si.customer,
+            ),
+            exc=BuybackValidationError,
+            title=_("Customer Mismatch"),
+        )
+
+    # ── Guard 2: exchange order not already used ──────────────────
+    if exo.sales_invoice:
+        frappe.throw(
+            _(
+                "Exchange Order {0} has already been applied to "
+                "Sales Invoice {1}. Each exchange order can only be "
+                "used once."
+            ).format(frappe.bold(exo.name), frappe.bold(exo.sales_invoice)),
+            exc=BuybackValidationError,
+            title=_("Exchange Already Used"),
+        )
+
+    # ── Guard 3: invoice not already linked to a different order ──
+    existing = frappe.db.get_value("Sales Invoice", sales_invoice, "ch_exchange_order")
+    if existing and existing != exchange_order:
+        frappe.throw(
+            _(
+                "Sales Invoice {0} is already linked to Exchange Order {1}."
+            ).format(frappe.bold(si.name), frappe.bold(existing)),
+            exc=BuybackValidationError,
+            title=_("Invoice Already Has Exchange"),
+        )
+
+    # ── Guard 4: creditable status ────────────────────────────────
+    CREDITABLE_STATUSES = {
+        "New Device Delivered", "Awaiting Pickup",
+        "Old Device Received", "Inspected", "Settled",
+    }
+    if exo.status not in CREDITABLE_STATUSES:
+        frappe.throw(
+            _(
+                "Exchange Order {0} is in status <b>{1}</b> which does not "
+                "allow crediting. Allowed statuses: {2}."
+            ).format(
+                frappe.bold(exo.name),
+                exo.status,
+                ", ".join(sorted(CREDITABLE_STATUSES)),
+            ),
+            exc=BuybackValidationError,
+            title=_("Invalid Exchange Status"),
+        )
+
+    buyback_amount = flt(exo.buyback_amount)
+
+    # ── Apply linkage (bypass submit lock — these are audit fields) ─
+    frappe.db.set_value(
+        "Buyback Exchange Order",
+        exchange_order,
+        {
+            "sales_invoice": sales_invoice,
+            "exchange_applied_at": now_datetime(),
+        },
+        update_modified=True,
+    )
+    frappe.db.set_value(
+        "Sales Invoice",
+        sales_invoice,
+        {
+            "ch_exchange_order": exchange_order,
+            "ch_exchange_credit": buyback_amount,
+        },
+        update_modified=True,
+    )
+    frappe.db.commit()
+
+    log_audit(
+        "Exchange Applied to Invoice",
+        "Buyback Exchange Order",
+        exchange_order,
+        new_value={
+            "sales_invoice": sales_invoice,
+            "buyback_amount": buyback_amount,
+            "customer": exo.customer,
+        },
+    )
+
+    return {
+        "exchange_order": exchange_order,
+        "sales_invoice": sales_invoice,
+        "customer": exo.customer,
+        "buyback_amount": buyback_amount,
+        "amount_to_pay": flt(exo.amount_to_pay),
+        "old_imei_serial": exo.old_imei_serial,
+        "old_item_name": exo.old_item_name,
+        "message": _(
+            "Exchange credit ₹{0} applied to invoice {1}."
+        ).format(buyback_amount, sales_invoice),
+    }
+
     return result

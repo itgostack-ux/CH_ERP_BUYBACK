@@ -45,6 +45,9 @@
   "settlement_date",
   "column_break_settle",
   "settlement_reference",
+  "sale_link_section",
+  "sales_invoice",
+  "exchange_applied_at",
   "remarks_section",
   "remarks"
  ],
@@ -317,6 +320,30 @@
    "fieldname": "settlement_reference",
    "fieldtype": "Data",
    "label": "Settlement Reference",
+   "allow_on_submit": 1
+  },
+  {
+   "fieldname": "sale_link_section",
+   "fieldtype": "Section Break",
+   "label": "Linked Sale",
+   "collapsible": 1,
+   "description": "The Sales Invoice this exchange credit was applied to. Set automatically via Apply Exchange API."
+  },
+  {
+   "fieldname": "sales_invoice",
+   "fieldtype": "Link",
+   "label": "Sales Invoice",
+   "options": "Sales Invoice",
+   "read_only": 1,
+   "allow_on_submit": 1,
+   "in_standard_filter": 1,
+   "description": "Invoice on which this exchange amount was credited. Locked once applied."
+  },
+  {
+   "fieldname": "exchange_applied_at",
+   "fieldtype": "Datetime",
+   "label": "Exchange Applied At",
+   "read_only": 1,
    "allow_on_submit": 1
   },
   {

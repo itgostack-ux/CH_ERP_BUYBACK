@@ -155,13 +155,21 @@ class BuybackInspection(Document):
                     )
 
         if auto_grade:
+            # Resolve grade letter ("A"/"B"/"C"/"D") to Grade Master record name.
+            # _auto_determine_grade returns a plain letter, but condition_grade and
+            # post_inspection_grade are Link → Grade Master fields which need the
+            # docname, not the letter.
+            auto_grade_name = (
+                frappe.db.get_value("Grade Master", {"grade_name": auto_grade}, "name")
+                or auto_grade
+            )
             # Respect inspector's explicit override (signalled by grade_changed_reason)
             if self.grade_changed_reason and self.post_inspection_grade:
                 self.condition_grade = self.post_inspection_grade
             else:
                 # Update post_inspection_grade with auto-determined value
-                self.post_inspection_grade = auto_grade
-                self.condition_grade = auto_grade
+                self.post_inspection_grade = auto_grade_name
+                self.condition_grade = auto_grade_name
         elif self.post_inspection_grade:
             self.condition_grade = self.post_inspection_grade
         elif self.pre_inspection_grade:
