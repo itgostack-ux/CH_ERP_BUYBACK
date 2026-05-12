@@ -118,6 +118,17 @@ frappe.ui.form.on("Buyback Inspection", {
 
         // ── Per-row result options for legacy Results table ──
         _setup_result_row_options(frm);
+
+        // ── Hide "Add Row" on auto-populated grids ────────────────────────
+        // These grids are populated from the Assessment / Checklist Template;
+        // users should not manually add rows to them.
+        ["inspection_diagnostics", "inspection_responses", "results"].forEach(fname => {
+            const fd = frm.fields_dict[fname];
+            if (fd && fd.grid) {
+                fd.grid.cannot_add_rows = true;
+                fd.grid.wrapper.find(".grid-add-row").hide();
+            }
+        });
     },
 });
 
