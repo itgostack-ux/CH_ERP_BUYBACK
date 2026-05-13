@@ -674,6 +674,15 @@
    "read_only": 1
   },
   {
+   "allow_on_submit": 1,
+   "fieldname": "sales_invoice",
+   "fieldtype": "Link",
+   "label": "Exchange Sales Invoice",
+   "options": "Sales Invoice",
+   "read_only": 1,
+   "depends_on": "eval:doc.settlement_type=='Exchange'"
+  },
+  {
    "fieldname": "kyc_section",
    "fieldtype": "Section Break",
    "label": "Customer KYC",
