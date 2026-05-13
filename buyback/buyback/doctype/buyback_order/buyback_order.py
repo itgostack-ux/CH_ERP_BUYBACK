@@ -463,12 +463,21 @@ class BuybackOrder(Document):
                   new_value={"settlement_type": settlement_type, "new_item": new_item})
 
     def send_otp(self):
-        """Send OTP for customer verification."""
+        """Send OTP for customer verification.
+
+        Allowed states:
+          • "Approved" / "Awaiting OTP" — staff-driven flow (manager approved
+            the order, now requesting customer's OTP confirmation).
+          • "Awaiting Customer Approval" — customer-portal flow where the
+            customer themselves approve the buyback by entering the OTP
+            (the OTP IS the approval, not a step after a separate approval).
+        """
         from ch_item_master.ch_core.doctype.ch_otp_log.ch_otp_log import CHOTPLog
 
-        if self.status not in ("Approved", "Awaiting OTP"):
+        if self.status not in ("Approved", "Awaiting OTP", "Awaiting Customer Approval"):
             frappe.throw(
-                _("OTP can only be sent after approval."),
+                _("OTP can only be sent once the order has reached customer approval. "
+                  "Current status: {0}.").format(self.status),
                 exc=BuybackStatusError,
             )
 
