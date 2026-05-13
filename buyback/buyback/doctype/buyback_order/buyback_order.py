@@ -207,6 +207,25 @@ class BuybackOrder(Document):
         """
         status = self.workflow_state or self.status
 
+        # Auto-dispatch OTP whenever the doc enters "Awaiting OTP" via any
+        # path (workflow Action button, direct status edit, etc.). The
+        # workflow transition just sets the state field — it does NOT call
+        # send_otp(), so without this hook the customer never receives the
+        # code and staff have to click "Resend OTP". Dedupe via a transient
+        # flag so the explicit send_otp() call (which sets status itself
+        # before saving) doesn't trigger a second OTP here.
+        if (
+            status == "Awaiting OTP"
+            and not self.otp_verified
+            and not self.flags.get("otp_just_dispatched")
+            and self.mobile_no
+        ):
+            try:
+                self._dispatch_otp()
+                self.flags.otp_just_dispatched = True
+            except Exception:
+                frappe.log_error(title=f"Auto OTP dispatch failed for {self.name}")
+
         # Safety net: create JE + SE if somehow on_submit missed it
         if status == "Paid" and not self.journal_entry and not self.stock_entry:
             self._create_accounting_entries()
@@ -472,8 +491,6 @@ class BuybackOrder(Document):
             customer themselves approve the buyback by entering the OTP
             (the OTP IS the approval, not a step after a separate approval).
         """
-        from ch_item_master.ch_core.doctype.ch_otp_log.ch_otp_log import CHOTPLog
-
         if self.status not in ("Approved", "Awaiting OTP", "Awaiting Customer Approval"):
             frappe.throw(
                 _("OTP can only be sent once the order has reached customer approval. "
@@ -491,21 +508,40 @@ class BuybackOrder(Document):
                 exc=BuybackStatusError,
             )
 
+        otp_code = self._dispatch_otp()
+        self.flags.otp_just_dispatched = True
+        self.status = "Awaiting OTP"
+        self.save()
+        return otp_code
+
+    def _dispatch_otp(self):
+        """Generate an OTP and deliver via WhatsApp + Email. No save() side effects.
+
+        Used both by the explicit send_otp() flow and by the workflow auto-send
+        path in on_update_after_submit() so the OTP gets dispatched whether
+        staff click "Send OTP" in the form, the workflow Action button, or any
+        other code path that simply moves the doc into 'Awaiting OTP'.
+        """
+        from ch_item_master.ch_core.doctype.ch_otp_log.ch_otp_log import CHOTPLog
+
+        if not self.mobile_no:
+            return None
+
         otp_code = CHOTPLog.generate_otp(
             self.mobile_no,
             "Buyback Confirmation",
             reference_doctype="Buyback Order",
             reference_name=self.name,
         )
-        self.status = "Awaiting OTP"
-        self.save()
         log_audit("OTP Sent", "Buyback Order", self.name)
 
-        # Deliver OTP via WhatsApp + Email
+        # Deliver OTP via WhatsApp + Email — failures are logged, not raised,
+        # so a delivery hiccup never blocks the workflow transition.
         try:
-            from buyback.buyback.whatsapp_notifications import send_otp_whatsapp, send_otp_email, _get_email_for_mobile
+            from buyback.buyback.whatsapp_notifications import (
+                send_otp_whatsapp, send_otp_email, _get_email_for_mobile,
+            )
             send_otp_whatsapp(self.mobile_no, otp_code, self.name)
-            # Get customer email: prefer customer record, fallback to mobile lookup
             customer_email = ""
             if self.customer:
                 customer_email = frappe.db.get_value("Customer", self.customer, "email_id") or ""
