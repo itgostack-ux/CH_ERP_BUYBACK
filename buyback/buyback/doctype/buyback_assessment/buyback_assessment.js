@@ -153,6 +153,12 @@ frappe.ui.form.on("Buyback Assessment", {
 			);
 		}
 
+		// Hide "Add row" buttons — rows are auto-loaded from item diagnostics/questions
+		frm.fields_dict.diagnostic_tests.grid.cannot_add_rows = true;
+		frm.fields_dict.diagnostic_tests.grid.refresh();
+		frm.fields_dict.responses.grid.cannot_add_rows = true;
+		frm.fields_dict.responses.grid.refresh();
+
 		// Filter diagnostic_tests Link to only show Automated Test type
 		frm.set_query("test", "diagnostic_tests", () => ({
 			filters: { diagnosis_type: "Automated Test", disabled: 0 },
