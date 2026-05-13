@@ -44,38 +44,7 @@ frappe.ui.form.on("Buyback Assessment", {
 		// "New Customer" quick-entry button (always visible in Draft / unsaved)
 		if (!frm.doc.docstatus && (!frm.doc.status || frm.doc.status === "Draft")) {
 			frm.add_custom_button(__("New Customer"), () => {
-				frappe.prompt([
-					{ fieldname: "customer_name", fieldtype: "Data", label: __("Customer Name"), reqd: 1 },
-					{ fieldname: "mobile_no", fieldtype: "Data", label: __("Mobile No"), reqd: 1 },
-					{ fieldname: "email_id", fieldtype: "Data", label: __("Email (optional)") },
-				], (values) => {
-					frappe.call({
-						method: "frappe.client.insert",
-						args: {
-							doc: {
-								doctype: "Customer",
-								customer_name: values.customer_name,
-								customer_type: "Individual",
-								customer_group: "Individual",
-								territory: "India",
-								mobile_no: values.mobile_no,
-								email_id: values.email_id || "",
-							},
-						},
-						callback(r) {
-							if (r.message) {
-								frm.set_value("customer", r.message.name);
-								if (!frm.doc.mobile_no) {
-									frm.set_value("mobile_no", values.mobile_no);
-								}
-								frappe.show_alert({
-									message: __("Customer {0} created", [r.message.customer_name]),
-									indicator: "green",
-								});
-							}
-						},
-					});
-				}, __("Create New Customer"), __("Create"));
+				buyback_open_new_customer_dialog(frm);
 			});
 		}
 
@@ -513,6 +482,34 @@ function buyback_load_customer_questions(frm) {
 				message: __("{0} customer questions loaded", [r.message.length]),
 				indicator: "blue",
 			});
+		},
+	});
+}
+
+function buyback_normalize_phone(value) {
+	const digits = String(value || "").replace(/\D/g, "");
+	if (digits.length >= 10) return digits.slice(-10);
+	return digits;
+}
+
+function buyback_is_valid_indian_phone(value) {
+	const normalized = buyback_normalize_phone(value);
+	return /^[6-9]\d{9}$/.test(normalized);
+}
+
+function buyback_status_html(message, color = "#64748b") {
+	return `<div style="font-size:12px;color:${color};padding-top:4px">${frappe.utils.escape_html(message || "")}</div>`;
+}
+
+
+function buyback_open_new_customer_dialog(frm) {
+	window.ch_open_new_customer_dialog({
+		company: frappe.defaults.get_default("company"),
+		on_success: (name) => {
+			frm.set_value("customer", name);
+		},
+		on_use_existing: (customer) => {
+			frm.set_value("customer", customer);
 		},
 	});
 }
