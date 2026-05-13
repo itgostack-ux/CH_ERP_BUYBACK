@@ -35,6 +35,10 @@ class BuybackInspection(Document):
         # Recalculate price on every save when inspection is active
         if self.buyback_assessment and self.status in ("In Progress", "Draft") and self.condition_grade:
             self._recalculate_price()
+        # Refresh comparison summary on every save so inspector sees live mismatch
+        # totals/variance as soon as they change an inspector answer.
+        if self.status in ("In Progress", "Draft", "Completed"):
+            self._build_comparison()
 
     def _sync_customer_id(self):
         """Populate ch_customer_id and ch_membership_id from the linked Customer.
@@ -213,10 +217,22 @@ class BuybackInspection(Document):
             frappe.throw(_("Can only complete an In Progress inspection."), exc=BuybackStatusError, title=_("Buyback Inspection Error"))
         if not self.condition_grade:
             frappe.throw(_("Final Condition Grade is required to complete inspection."), title=_("Buyback Inspection Error"))
-        self.status = "Completed"
-        self.inspection_completed_at = now_datetime()
+
+        # Hard block: refuse to complete inspection when no base price is configured
+        # in the Buyback Pricing Master for this item/grade. We must not present
+        # a \u20b90 buyback offer to the customer.
         self._build_comparison()
         self._recalculate_price()
+        if not flt(self.revised_price):
+            frappe.throw(
+                _("Cannot complete inspection: no buyback price is configured for this device "
+                  "at grade {0}. Please ask pricing/admin to set the base price in "
+                  "Buyback Pricing Master before completing the inspection.").format(self.condition_grade),
+                title=_("Pricing Not Configured"),
+            )
+
+        self.status = "Completed"
+        self.inspection_completed_at = now_datetime()
         self.save()
         log_audit("Inspection Completed", "Buyback Inspection", self.name,
                   new_value={"grade": self.condition_grade, "revised_price": self.revised_price})

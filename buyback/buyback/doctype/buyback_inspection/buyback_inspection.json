@@ -347,13 +347,17 @@
   {
    "fieldname": "results_section",
    "fieldtype": "Section Break",
-   "label": "Inspection Results"
+   "label": "Inspection Results (Checklist)",
+   "depends_on": "eval:doc.checklist_template || (doc.results && doc.results.length)",
+   "collapsible": 1
   },
   {
    "fieldname": "results",
    "fieldtype": "Table",
    "label": "Results",
-   "options": "Buyback Inspection Result"
+   "options": "Buyback Inspection Result",
+   "depends_on": "eval:doc.checklist_template || (doc.results && doc.results.length)",
+   "description": "Optional checklist results. Only used when a Checklist Template is selected; the side-by-side Diagnostics + Question Responses tables above drive grading/pricing."
   },
   {
    "fieldname": "comparison_section",
