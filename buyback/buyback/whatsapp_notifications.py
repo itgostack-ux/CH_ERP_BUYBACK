@@ -52,10 +52,10 @@ def send_otp_whatsapp(mobile_no: str, otp_code: str, order_name: str):
     )
 
 
-def send_otp_email(to_email: str, otp_code: str, purpose: str, ref_name: str = ""):
+def send_otp_email(to_email: str, otp_code: str, purpose: str, ref_name: str = "") -> bool:
     """Send OTP via email. Used alongside WhatsApp for all OTP types."""
     if not to_email:
-        return
+        return False
     subject = f"Your OTP for {purpose}"
     body = f"""<p>Dear Customer,</p>
 <p>Your One-Time Password (OTP) for <strong>{frappe.utils.escape_html(purpose)}</strong>
@@ -73,8 +73,10 @@ def send_otp_email(to_email: str, otp_code: str, purpose: str, ref_name: str = "
             message=body,
             delayed=False,
         )
+        return True
     except Exception:
-        frappe.log_error(title="OTP email delivery failed")
+        frappe.log_error(frappe.get_traceback(), f"OTP email delivery failed for {to_email}")
+        return False
 
 
 def _get_email_for_mobile(mobile_no: str) -> str:
