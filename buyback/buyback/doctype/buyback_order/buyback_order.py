@@ -557,6 +557,44 @@ class BuybackOrder(Document):
 
         return result
 
+    @frappe.whitelist()
+    def bypass_otp_instore(self, remarks=None):
+        """Skip OTP verification for in-store approvals.
+
+        Used when the customer is physically present and verbal/signature
+        approval is sufficient, or when no mobile number is available.
+        Logs an audit trail with the staff member's remarks.
+        """
+        if self.status not in ("Awaiting OTP", "Approved"):
+            frappe.throw(
+                _("OTP bypass is only applicable when status is 'Awaiting OTP' or 'Approved'."),
+                exc=BuybackStatusError,
+            )
+
+        verified_at = now_datetime()
+        updates = {
+            "otp_verified": 1,
+            "otp_verified_at": verified_at,
+            "customer_approved": 1,
+            "customer_approved_at": verified_at,
+            "status": "OTP Verified",
+        }
+
+        if self.docstatus == 1:
+            self.db_set(updates, update_modified=True)
+            self.reload()
+        else:
+            self.otp_verified = 1
+            self.otp_verified_at = verified_at
+            self.customer_approved = 1
+            self.customer_approved_at = verified_at
+            self.status = "OTP Verified"
+            self.save()
+
+        audit_note = f"In-Store OTP Bypass — {remarks}" if remarks else "In-Store OTP Bypass (no OTP)"
+        log_audit(audit_note, "Buyback Order", self.name)
+        return {"success": True}
+
     def mark_ready_to_pay(self):
         """Move to payment stage."""
         if self.status != "OTP Verified":

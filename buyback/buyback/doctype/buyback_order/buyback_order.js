@@ -69,6 +69,33 @@ frappe.ui.form.on("Buyback Order", {
                     });
                 });
             }, __("Actions"));
+
+            frm.add_custom_button(__("Resend OTP"), () => {
+                frm.call("send_otp").then((r) => {
+                    if (r.message) {
+                        frappe.show_alert({ message: __("OTP resent to {0}", [frm.doc.mobile_no]), indicator: "green" });
+                    }
+                });
+            }, __("Actions"));
+
+            frm.add_custom_button(__("Approve In-Store (Skip OTP)"), () => {
+                frappe.prompt([{
+                    label: __("Remarks"),
+                    fieldname: "remarks",
+                    fieldtype: "Small Text",
+                    description: __("Reason for bypassing OTP — will be logged for audit"),
+                }], (values) => {
+                    frappe.confirm(
+                        __("Confirm: customer is physically present and has approved in-store. OTP will be bypassed and this action will be logged."),
+                        () => {
+                            frm.call("bypass_otp_instore", { remarks: values.remarks }).then(() => {
+                                frappe.show_alert({ message: __("In-store approval recorded — status set to OTP Verified"), indicator: "green" });
+                                frm.reload_doc();
+                            });
+                        }
+                    );
+                }, __("In-Store Approval"));
+            }, __("Actions"));
         }
 
         if (frm.doc.status === "OTP Verified") {
