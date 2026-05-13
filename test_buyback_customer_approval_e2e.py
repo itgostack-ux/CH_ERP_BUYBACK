@@ -42,7 +42,7 @@ def _pick_buyback_assessment():
 
 
 def _ensure_order(assessment_name):
-    from ch_pos.ch_pos.api.pos_api import pos_start_buyback_order
+    from ch_pos.api.pos_api import pos_start_buyback_order
 
     existing = frappe.db.get_value(
         "Buyback Order",
@@ -105,7 +105,7 @@ def run():
         f"Unexpected audit action fallback: {audit.action}"
     )
 
-    from ch_pos.ch_pos.api.pos_api import get_pos_buyback_detail
+    from ch_pos.api.pos_api import get_pos_buyback_detail
 
     detail = get_pos_buyback_detail(assessment_name)
     o = detail.get("order") or {}
