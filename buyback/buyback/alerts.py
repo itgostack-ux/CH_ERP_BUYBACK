@@ -88,9 +88,9 @@ def alert_sla_breach(doctype, docname, sla_type, minutes_taken, target_minutes):
         f"<br>SLA: {sla_type.replace('_', ' ').title()}"
         f"<br>Target: {target_minutes} min | Actual: {minutes_taken:.0f} min"
     )
-
-    # Get store manager and admin users
-    recipients = _get_alert_recipients(doctype, docname, ["Buyback Manager", "Buyback Admin"])
+    # Resolve store from the document for scope-based recipient filtering
+    store = frappe.db.get_value(doctype, docname, "store") if doctype and docname else None
+    recipients = _get_alert_recipients(doctype, docname, ["Buyback Manager", "Buyback Admin"], store=store)
     send_alert(subject, message, recipients, doctype, docname, "Critical", send_whatsapp=True)
 
 
@@ -103,7 +103,8 @@ def alert_high_value_order(docname, final_price, threshold):
         f"₹{flt(final_price):,.0f} (threshold: ₹{flt(threshold):,.0f}). "
         f"<br>Please review and approve."
     )
-    recipients = _get_alert_recipients("Buyback Order", docname, ["Buyback Manager", "Buyback Admin"])
+    store = frappe.db.get_value("Buyback Order", docname, "store")
+    recipients = _get_alert_recipients("Buyback Order", docname, ["Buyback Manager", "Buyback Admin"], store=store)
     send_alert(subject, message, recipients, "Buyback Order", docname, "Warning")
 
 
@@ -126,7 +127,7 @@ def alert_daily_cash_limit(store, total_cash, limit):
         f"₹{flt(total_cash):,.0f} in cash today "
         f"(limit: ₹{flt(limit):,.0f})."
     )
-    recipients = _get_alert_recipients(None, None, ["Buyback Manager", "Buyback Admin"])
+    recipients = _get_alert_recipients(None, None, ["Buyback Manager", "Buyback Admin"], store=store)
     send_alert(subject, message, recipients, alert_type="Warning")
 
 
@@ -138,7 +139,7 @@ def alert_low_conversion(store, conversion_pct, threshold):
         f"<b>{conversion_pct:.1f}%</b> (threshold: {threshold}%). "
         f"<br>Please review operations."
     )
-    recipients = _get_alert_recipients(None, None, ["Buyback Manager", "Buyback Store Manager"])
+    recipients = _get_alert_recipients(None, None, ["Buyback Manager", "Buyback Store Manager"], store=store)
     send_alert(subject, message, recipients, alert_type="Warning")
 
 
@@ -149,7 +150,7 @@ def alert_inspection_backlog(store, pending_count, threshold):
         f"Branch <b>{store}</b> has <b>{pending_count}</b> pending inspections "
         f"(alert threshold: {threshold}). Please clear the backlog."
     )
-    recipients = _get_alert_recipients(None, None, ["Buyback Manager", "Buyback Store Manager"])
+    recipients = _get_alert_recipients(None, None, ["Buyback Manager", "Buyback Store Manager"], store=store)
     send_alert(subject, message, recipients, alert_type="Warning")
 
 
@@ -246,25 +247,43 @@ def _check_inspection_backlogs():
 
 # ─── Helpers ─────────────────────────────────────────────────────────
 
-def _get_alert_recipients(doctype=None, docname=None, roles=None):
-    """Get users with given roles. If doctype/docname given, prefer the doc owner + store users."""
+def _get_alert_recipients(doctype=None, docname=None, roles=None, store=None):
+    """Get alert recipients: role-holders scoped to `store` + optional doc owner.
+
+    When `store` is provided, only users whose CH User Scope includes that store
+    are included — equivalent to SAP S/4HANA plant-based notification scoping
+    and Oracle NetSuite role+subsidiary targeting. Bypass users (Buyback Admin,
+    global auditors) are included regardless of store scope.
+
+    Falls back to unscoped role lookup if notification_router is unavailable.
+    """
     users = set()
 
-    # Doc owner
+    # Document owner always included (Odoo followers-model equivalent)
     if doctype and docname:
         try:
             owner = frappe.db.get_value(doctype, docname, "owner")
-            if owner:
+            if owner and owner not in ("Administrator", "Guest"):
                 users.add(owner)
         except frappe.DoesNotExistError:
             pass
 
-    # Role-based
-    for role in (roles or []):
-        role_users = frappe.get_all("Has Role", filters={"role": role, "parenttype": "User"},
-                                     fields=["parent"], limit=20)
-        for u in role_users:
-            if u.parent and u.parent != "Administrator" and "@" in u.parent:
-                users.add(u.parent)
+    # Role × Scope intersection via notification_router
+    try:
+        from ch_erp15.ch_erp15.notification_router import get_scoped_users
+        role_users = get_scoped_users(roles or [], store=store)
+        users.update(role_users)
+    except Exception:
+        # Fallback: plain role lookup (no scope filter)
+        for role in (roles or []):
+            role_rows = frappe.get_all(
+                "Has Role",
+                filters={"role": role, "parenttype": "User"},
+                pluck="parent",
+                limit=20,
+            )
+            for u in role_rows:
+                if u and u != "Administrator":
+                    users.add(u)
 
-    return list(users)[:10]  # Cap at 10 recipients
+    return list(users)[:15]  # Cap at 15 recipients
