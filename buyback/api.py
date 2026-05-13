@@ -1698,6 +1698,8 @@ def get_customer_questions_for_item(item_code: str) -> list:
             ],
         })
 
+    return result
+
 
 # ── Exchange → Invoice auto-mapping ──────────────────────────────
 
