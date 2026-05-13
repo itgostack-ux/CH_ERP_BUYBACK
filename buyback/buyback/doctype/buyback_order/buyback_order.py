@@ -536,9 +536,17 @@ class BuybackOrder(Document):
 
         if result["valid"]:
             verified_at = now_datetime()
+            approval_method = _normalize_customer_approval_method("OTP")
             updates = {
                 "otp_verified": 1,
                 "otp_verified_at": verified_at,
+                # Successful OTP verification IS customer approval — the customer
+                # received the OTP on their registered mobile and entered it back,
+                # which is a stronger consent than an in-store signature. Without
+                # this, settlement is blocked because customer_approved stays 0.
+                "customer_approved": 1,
+                "customer_approved_at": verified_at,
+                "customer_approval_method": approval_method,
                 "status": "OTP Verified",
             }
 
@@ -550,6 +558,9 @@ class BuybackOrder(Document):
             else:
                 self.otp_verified = 1
                 self.otp_verified_at = verified_at
+                self.customer_approved = 1
+                self.customer_approved_at = verified_at
+                self.customer_approval_method = approval_method
                 self.status = "OTP Verified"
                 self.save()
 
