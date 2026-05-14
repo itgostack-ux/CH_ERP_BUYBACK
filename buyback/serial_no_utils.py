@@ -111,11 +111,44 @@ def sync_buyback_to_lifecycle(
             kwargs["buyback_document"] = order_name
         if price is not None:
             kwargs["buyback_value"] = flt(price)
-        if grade:
-            kwargs["buyback_grade"] = grade
-            # Map buyback grade to stock condition
-            grade_to_condition = {"A": "Refurbished", "B": "Refurbished", "C": "Customer Return", "D": "Customer Return"}
-            kwargs["stock_condition"] = grade_to_condition.get(grade.upper(), "Customer Return") if isinstance(grade, str) else "Customer Return"
+        # ── Grade normalisation ──────────────────────────────────────────────
+        # Buyback Order/Inspection store `condition_grade` as a Link to
+        # `Grade Master` (e.g. "GRD-00003"), but `CH Serial Lifecycle` exposes
+        # `buyback_grade` as a Select with hard-coded options like
+        # "A - Like New", "B - Good", "C - Fair", "D - Poor", "E - Damaged".
+        # Passing the raw link name through triggers the Frappe validation
+        # error "Condition Grade cannot be 'GRD-00003'" reported by store ops.
+        # Resolve the link to the underlying Grade Master.grade_name letter
+        # ("A".. "E") and map it to the lifecycle's Select option string.
+        _LETTER_TO_OPTION = {
+            "A": "A - Like New",
+            "B": "B - Good",
+            "C": "C - Fair",
+            "D": "D - Poor",
+            "E": "E - Damaged",
+        }
+        grade_letter = None
+        if grade and isinstance(grade, str):
+            g = grade.strip()
+            if g:
+                # If it's already a letter or a Select option, keep it.
+                if g.upper() in _LETTER_TO_OPTION:
+                    grade_letter = g.upper()
+                elif g in _LETTER_TO_OPTION.values():
+                    grade_letter = g[0].upper()
+                else:
+                    # Treat as Grade Master link — resolve to grade_name ("A".."E").
+                    gm_name = frappe.db.get_value("Grade Master", g, "grade_name")
+                    if gm_name:
+                        grade_letter = (gm_name or "").strip().upper()[:1]
+        if grade_letter and grade_letter in _LETTER_TO_OPTION:
+            kwargs["buyback_grade"] = _LETTER_TO_OPTION[grade_letter]
+            grade_to_condition = {
+                "A": "Refurbished", "B": "Refurbished",
+                "C": "Customer Return", "D": "Customer Return",
+                "E": "Customer Return",
+            }
+            kwargs["stock_condition"] = grade_to_condition.get(grade_letter, "Customer Return")
         else:
             kwargs["stock_condition"] = "Customer Return"
         update_lifecycle_status(
