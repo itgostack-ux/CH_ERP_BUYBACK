@@ -27,6 +27,7 @@ after_migrate = [
     "buyback.custom_fields.setup_custom_fields",
     "buyback.install.create_reporting_indexes",
     "buyback.install.seed_grade_master",
+    "buyback.print_setup.ensure_print_formats",
     "buyback.setup_workspace.setup",
 ]
 
