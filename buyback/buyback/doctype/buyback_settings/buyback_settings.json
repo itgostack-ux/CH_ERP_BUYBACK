@@ -33,6 +33,7 @@
   "send_email_on_order",
   "accounting_section",
   "buyback_expense_account",
+    "buyback_liability_account",
   "column_break_acct",
   "buyback_stock_account",
   "loyalty_section",
@@ -208,6 +209,13 @@
    "label": "Buyback Expense Account",
    "options": "Account"
   },
+    {
+     "description": "Liability account cleared when buyback value is applied as exchange credit on a new sale.",
+     "fieldname": "buyback_liability_account",
+     "fieldtype": "Link",
+     "label": "Buyback Liability Account",
+     "options": "Account"
+    },
   {
    "fieldname": "column_break_acct",
    "fieldtype": "Column Break"

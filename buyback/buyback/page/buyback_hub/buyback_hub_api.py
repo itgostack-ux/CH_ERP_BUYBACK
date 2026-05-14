@@ -3,17 +3,46 @@
 import frappe
 from frappe.utils import flt, nowdate, get_first_day, cint, getdate
 
+# Import scope-aware filter builder (H6)
+try:
+    from ch_erp15.ch_erp15.scope import intersect_filters
+except ImportError:
+    # Fallback if ch_erp15 not available (unrestricted mode)
+    def intersect_filters(**kwargs):
+        return {
+            "company": kwargs.get("company"),
+            "store": kwargs.get("store"),
+            "allowed_stores": None,
+            "allowed_warehouses": None,
+        }
+
 
 def _build_filters(company=None, store=None, from_date=None, to_date=None):
+    # SECURITY (H6): Enforce user's company/store scope
+    eff = intersect_filters(company=company, store=store)
+    company = eff["company"]
+    store = eff["store"]
+    allowed_stores = eff["allowed_stores"]  # None = unrestricted, [] = blocked, [list] = restricted
+
     prm = {}
     co = ""
+    st = ""
     if company:
         co = " AND bo.company = %(company)s"
         prm["company"] = company
-    st = ""
     if store:
         st = " AND bo.store = %(store)s"
         prm["store"] = store
+    elif allowed_stores is not None:
+        # User has scope restrictions and no explicit store
+        if not allowed_stores:
+            # User has no accessible stores
+            st = " AND 1=0"
+        else:
+            # Restrict to user's allowed stores
+            st_in = "(" + ", ".join(frappe.db.escape(s) for s in allowed_stores) + ")"
+            st = f" AND bo.store IN {st_in}"
+
     from_date = str(getdate(from_date)) if from_date else None
     to_date = str(getdate(to_date)) if to_date else None
     if from_date:

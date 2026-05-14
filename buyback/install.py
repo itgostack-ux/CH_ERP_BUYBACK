@@ -84,6 +84,11 @@ def _create_roles():
             frappe.logger().info(f"Created role: {role_def['role_name']}")
 
 
+def sync_default_settings():
+    """Migration-safe wrapper for default Buyback Settings."""
+    _create_default_settings()
+
+
 def _create_default_settings():
     """Seed Buyback Settings with sensible defaults (if empty)."""
     settings = frappe.get_single("Buyback Settings")
@@ -95,6 +100,24 @@ def _create_default_settings():
         settings.max_otp_attempts = 3
     if not settings.require_manager_approval_above:
         settings.require_manager_approval_above = 50000
+    company = settings.default_company or frappe.defaults.get_global_default("company")
+    if company:
+        if settings.meta.has_field("buyback_liability_account") and not settings.buyback_liability_account:
+            liability_account = frappe.db.get_value(
+                "Account",
+                {"company": company, "account_name": "Device Buyback Liability", "is_group": 0},
+                "name",
+            )
+            if liability_account:
+                settings.buyback_liability_account = liability_account
+
+        expense_root_type = None
+        if settings.buyback_expense_account:
+            expense_root_type = frappe.db.get_value("Account", settings.buyback_expense_account, "root_type")
+        if not settings.buyback_expense_account or expense_root_type != "Expense":
+            default_expense_account = frappe.db.get_value("Company", company, "default_expense_account")
+            if default_expense_account:
+                settings.buyback_expense_account = default_expense_account
     settings.require_otp_for_payment = 1
     settings.enable_audit_log = 1
     settings.save(ignore_permissions=True)

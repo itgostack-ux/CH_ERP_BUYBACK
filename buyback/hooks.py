@@ -25,6 +25,7 @@ web_include_css = "/assets/buyback/css/buyback.css"
 after_install = "buyback.install.after_install"
 after_migrate = [
     "buyback.custom_fields.setup_custom_fields",
+    "buyback.install.sync_default_settings",
     "buyback.install.create_reporting_indexes",
     "buyback.install.seed_grade_master",
     "buyback.print_setup.ensure_print_formats",

@@ -30,6 +30,96 @@ from buyback.exceptions import (
 from buyback.utils import log_audit, validate_indian_phone
 
 
+# ---------------------------------------------------------------------------
+# Token security helpers (used by every guest endpoint that authenticates by
+# `approval_token`).  Centralised so TTL + single-use rules are consistent.
+# ---------------------------------------------------------------------------
+
+# Tokens are valid for this many hours after the order was last updated
+# (creation, or last token regeneration via resend_customer_approval_link).
+APPROVAL_TOKEN_TTL_HOURS = 72
+
+# Status set in which the approval link is still actionable. Anything outside
+# this set rejects the token (closed/paid/rejected orders cannot be replayed).
+_TOKEN_ACTIVE_STATUSES = {
+    "Approved",
+    "Awaiting Customer Approval",
+    "Awaiting OTP",
+    "OTP Verified",
+}
+
+# Statuses where bank/payout details may still be edited via the link.
+# Once customer has approved, payout details are LOCKED to prevent
+# token-replay attacks that re-route money (see C5 in the security audit).
+_PAYOUT_EDITABLE_STATUSES = {
+    "Approved",
+    "Awaiting Customer Approval",
+    "Awaiting OTP",
+}
+
+
+def _mask_phone(phone: str | None) -> str:
+    """Return a masked phone safe to echo back to a guest endpoint."""
+    digits = "".join(c for c in (phone or "") if c.isdigit())
+    if len(digits) < 4:
+        return "****"
+    return f"{'*' * (len(digits) - 4)}{digits[-4:]}"
+
+
+def _resolve_token(token: str, *, require_payout_editable: bool = False) -> str:
+    """Validate `approval_token` and return the order name.
+
+    Raises if:
+      - token is missing / unknown / order cancelled (docstatus == 2)
+      - order has moved past the active customer-approval phase
+      - token TTL (APPROVAL_TOKEN_TTL_HOURS hrs since `modified`) elapsed
+      - require_payout_editable=True and customer has already approved
+        (single-use lock against bank-account hijack)
+    """
+    from frappe.utils import time_diff_in_hours
+
+    if not token:
+        frappe.throw(_("Invalid or expired approval link."), exc=frappe.DoesNotExistError, title=_("API Error"))
+
+    row = frappe.db.get_value(
+        "Buyback Order",
+        {"approval_token": token, "docstatus": ["!=", 2]},
+        ["name", "status", "modified", "customer_approved", "customer_approved_at"],
+        as_dict=True,
+    )
+    if not row:
+        frappe.throw(_("Invalid or expired approval link."), exc=frappe.DoesNotExistError, title=_("API Error"))
+
+    # Status gate — reject terminal / never-active orders
+    if row.status not in _TOKEN_ACTIVE_STATUSES:
+        frappe.throw(_("This approval link is no longer active."), exc=BuybackStatusError, title=_("API Error"))
+
+    # TTL gate
+    try:
+        elapsed = time_diff_in_hours(now_datetime(), row.modified)
+    except Exception:
+        elapsed = 0
+    if elapsed > APPROVAL_TOKEN_TTL_HOURS:
+        frappe.throw(
+            _("This approval link has expired. Please request a fresh link from the store."),
+            exc=BuybackStatusError,
+            title=_("Link Expired"),
+        )
+
+    # Single-use payout lock — once the customer has approved, payout details
+    # cannot be changed via the public link (bank-account-hijack defence).
+    if require_payout_editable:
+        if row.status not in _PAYOUT_EDITABLE_STATUSES or row.customer_approved:
+            frappe.throw(
+                _("Payout details are locked once the customer has approved. "
+                  "Please visit the store to make changes."),
+                exc=BuybackStatusError,
+                title=_("Payout Locked"),
+            )
+
+    return row.name
+
+
 @contextmanager
 def _as_system_user():
     """Temporarily set session user to Administrator for guest API calls.
@@ -322,11 +412,7 @@ def customer_approve_via_token(token: str, method: str = "SMS Link") -> dict:
 
     Used from the customer-facing approval page.
     """
-    order_name = frappe.db.get_value(
-        "Buyback Order", {"approval_token": token, "docstatus": ["!=", 2]}, "name"
-    )
-    if not order_name:
-        frappe.throw(_("Invalid or expired approval link."), exc=frappe.DoesNotExistError, title=_("API Error"))
+    order_name = _resolve_token(token)
 
     doc = frappe.get_doc("Buyback Order", order_name)
     doc.flags.ignore_permissions = True
@@ -447,11 +533,7 @@ def save_customer_payout_preference(
     This captures customer payout preference for the accounts team before
     payment processing.
     """
-    order_name = frappe.db.get_value(
-        "Buyback Order", {"approval_token": token, "docstatus": ["!=", 2]}, "name"
-    )
-    if not order_name:
-        frappe.throw(_("Invalid or expired approval link."), exc=frappe.DoesNotExistError, title=_("API Error"))
+    order_name = _resolve_token(token, require_payout_editable=True)
 
     doc = frappe.get_doc("Buyback Order", order_name)
     allowed_status = {"Approved", "Awaiting Customer Approval", "Awaiting OTP", "OTP Verified"}
@@ -554,19 +636,28 @@ def select_settlement_type(
 
 
 @frappe.whitelist(allow_guest=True)
+@rate_limit(limit=3, seconds=300, methods=["POST"], ip_based=True)
 def send_otp(order_name: str = None, token: str = None) -> dict:
     """Send OTP for buyback order confirmation.
 
     Accepts either order_name (for logged-in users) or token (for guest approval page).
+    Tightened from 5/300s to 3/300s to throttle spam to the customer's phone.
+    Per-order cap below prevents multi-IP bypass.
     """
     if token:
-        order_name = frappe.db.get_value(
-            "Buyback Order", {"approval_token": token, "docstatus": ["!=", 2]}, "name"
-        )
-        if not order_name:
-            frappe.throw(_("Invalid or expired approval link."))
+        order_name = _resolve_token(token)
     elif not order_name:
         frappe.throw(_("order_name or token is required."))
+
+    # Per-order send cap (defends against multi-IP rate-limit bypass).
+    send_key = f"otp_send:{order_name}"
+    sent = int(frappe.cache().get_value(send_key) or 0)
+    if sent >= 5:
+        frappe.throw(
+            _("OTP send limit reached for this order. Please contact the store."),
+            frappe.PermissionError,
+            title=_("Rate Limit Exceeded"),
+        )
 
     doc = frappe.get_doc("Buyback Order", order_name)
     if not token:
@@ -574,29 +665,43 @@ def send_otp(order_name: str = None, token: str = None) -> dict:
     doc.flags.ignore_permissions = True
     with _as_system_user():
         doc.send_otp()
-    return {"status": "sent", "message": _("OTP sent to {0}").format(doc.mobile_no)}
+
+    frappe.cache().set_value(send_key, sent + 1, expires_in_sec=3600)
+    # NEVER echo the full mobile number — leaks PII to anyone with a token.
+    return {"status": "sent", "message": _("OTP sent to {0}").format(_mask_phone(doc.mobile_no))}
 
 
 @frappe.whitelist(allow_guest=True)
+@rate_limit(limit=10, seconds=300, methods=["POST"], ip_based=True)
 def verify_otp(order_name: str = None, otp_code: str = "", token: str = None) -> dict:
     """Verify customer OTP for a buyback order.
 
     Accepts either order_name (for logged-in users) or token (for guest approval page).
-    Rate-limited to 5 attempts per order per 15 minutes to prevent brute-force.
+    Two-tier rate limit:
+      - Per (order, IP) : 5 attempts / 15 min  (defeats single-host brute force)
+      - Per order       : 20 attempts / 15 min (defeats multi-IP brute force)
     """
     if token:
-        order_name = frappe.db.get_value(
-            "Buyback Order", {"approval_token": token, "docstatus": ["!=", 2]}, "name"
-        )
-        if not order_name:
-            frappe.throw(_("Invalid or expired approval link."))
+        order_name = _resolve_token(token)
     elif not order_name:
         frappe.throw(_("order_name or token is required."))
 
-    # Rate limiting: max 5 OTP attempts per order in a 15-minute window
-    cache_key = f"otp_attempts:{order_name}"
-    attempts = frappe.cache().get_value(cache_key) or 0
-    if int(attempts) >= 5:
+    source_ip = frappe.local.request.remote_addr if frappe.local.request else "unknown"
+
+    # Per-order+IP attempt counter — 5 per 15 min
+    ip_key = f"otp_attempts:{order_name}:{source_ip}"
+    ip_attempts = int(frappe.cache().get_value(ip_key) or 0)
+    if ip_attempts >= 5:
+        frappe.throw(
+            _("Too many OTP attempts from this IP. Please wait 15 minutes."),
+            frappe.PermissionError,
+            title=_("Rate Limit Exceeded"),
+        )
+
+    # Per-order global counter — 20 per 15 min (defeats multi-IP attacker)
+    order_key = f"otp_attempts:{order_name}"
+    order_attempts = int(frappe.cache().get_value(order_key) or 0)
+    if order_attempts >= 20:
         frappe.throw(
             _("Too many OTP attempts for this order. "
               "Please wait 15 minutes before trying again."),
@@ -612,11 +717,13 @@ def verify_otp(order_name: str = None, otp_code: str = "", token: str = None) ->
         result = doc.verify_otp(otp_code)
 
     if result.get("valid"):
-        # Clear counter on successful verification
-        frappe.cache().delete_value(cache_key)
+        # Clear counters on successful verification
+        frappe.cache().delete_value(ip_key)
+        frappe.cache().delete_value(order_key)
     else:
-        # Increment attempt counter; expire after 15 minutes
-        frappe.cache().set_value(cache_key, int(attempts) + 1, expires_in_sec=900)
+        # Increment both counters
+        frappe.cache().set_value(ip_key, ip_attempts + 1, expires_in_sec=900)
+        frappe.cache().set_value(order_key, order_attempts + 1, expires_in_sec=900)
 
     return result
 
