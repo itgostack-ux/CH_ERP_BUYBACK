@@ -41,7 +41,12 @@
   "loyalty_program",
   "column_break_loyalty",
   "loyalty_points_per_100",
-  "loyalty_point_expiry_days"
+  "loyalty_point_expiry_days",
+  "logistics_section",
+  "buyback_warehouse",
+  "auto_create_pickup_request",
+  "column_break_logistics",
+  "pickup_notify_role"
  ],
  "fields": [
   {
@@ -265,6 +270,36 @@
    "label": "Point Expiry (Days)",
    "depends_on": "enable_loyalty_points",
    "description": "Days after which earned loyalty points expire"
+  },
+  {
+   "fieldname": "logistics_section",
+   "fieldtype": "Section Break",
+   "label": "Logistics & Pickup"
+  },
+  {
+   "fieldname": "buyback_warehouse",
+   "fieldtype": "Link",
+   "label": "Buyback Bin Warehouse",
+   "options": "Warehouse",
+   "description": "Central buyback bin (e.g. Buyback Bin - BMPL). Bought-back devices are auto-routed here from the store via a Material Transfer Material Request."
+  },
+  {
+   "default": "1",
+   "fieldname": "auto_create_pickup_request",
+   "fieldtype": "Check",
+   "label": "Auto-Create Pickup Material Request",
+   "description": "When a Buyback Order is paid, auto-create a Material Transfer Material Request from the store warehouse to the Buyback Bin so delivery staff can pick the device up."
+  },
+  {
+   "fieldname": "column_break_logistics",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "pickup_notify_role",
+   "fieldtype": "Link",
+   "label": "Notify Pickup Role",
+   "options": "Role",
+   "description": "Users with this role get a Notification + ToDo when a buyback pickup Material Request is created. Defaults to Stock Manager when blank."
   }
  ],
  "index_web_pages_for_search": 0,

@@ -14,7 +14,7 @@ add_to_apps_screen = [
 		"name": "buyback",
 		"logo": "/assets/buyback/icon.svg",
 		"title": "BuyBack",
-		"route": "/desk/buyback",
+		"route": "/BuyBack",
 	}
 ]
 

@@ -189,6 +189,26 @@ CUSTOM_FIELDS = {
             "description": _("Allow retail sales at this store/warehouse"),
         },
     ],
+    # ──────────────────────────────────────────────────────────────
+    # Material Request — buyback pickup linkage
+    # Auto-created Material Transfer requests that move bought-back devices
+    # from store warehouses to the central Buyback Bin warehouse.
+    # ──────────────────────────────────────────────────────────────
+    "Material Request": [
+        {
+            "fieldname": "custom_buyback_order",
+            "label": _("Buyback Order"),
+            "fieldtype": "Link",
+            "options": "Buyback Order",
+            "insert_after": "set_warehouse",
+            "read_only": 1,
+            "in_standard_filter": 1,
+            "description": _(
+                "Set when this Material Request is auto-created to pick up a "
+                "bought-back device from a store and route it to the Buyback Bin."
+            ),
+        },
+    ],
 }
 
 

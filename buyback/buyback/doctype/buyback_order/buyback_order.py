@@ -908,6 +908,15 @@ class BuybackOrder(Document):
                 "journal_entry": self.journal_entry,
                 "stock_entry": self.stock_entry,
             }, update_modified=False)
+            # Auto-create Material Transfer Material Request from store →
+            # central Buyback Bin so delivery staff pick the device up.
+            # Failures must NOT roll back JE/SE (logistics is downstream).
+            try:
+                self._create_pickup_request()
+            except Exception:
+                frappe.log_error(
+                    title=_("Buyback Order {0}: pickup MR creation failed").format(self.name),
+                )
         except Exception:
             frappe.log_error(
                 title=_("Buyback Order {0}: JE/SE creation failed").format(self.name),
@@ -1082,3 +1091,135 @@ class BuybackOrder(Document):
         se.flags.ignore_permissions = True
         se.submit()
         self.stock_entry = se.name
+
+    # ──────────────────────────────────────────────────────────────
+    # Pickup logistics: route bought-back device from store to Buyback Bin
+    # ──────────────────────────────────────────────────────────────
+    def _create_pickup_request(self):
+        """Create a Material Transfer MR from `self.store` → Buyback Bin.
+
+        Idempotent: skips when a Material Request already exists for this
+        Buyback Order. Notifies users with the configured pickup role.
+        Silently skips when settings are not yet configured (logged for ops).
+        """
+        settings = frappe.get_single("Buyback Settings")
+        if not cint(getattr(settings, "auto_create_pickup_request", 1)):
+            return
+        target_wh = getattr(settings, "buyback_warehouse", None)
+        if not target_wh:
+            frappe.logger("buyback").info(
+                f"Buyback Settings.buyback_warehouse not configured — "
+                f"skipping pickup MR for {self.name}"
+            )
+            return
+        source_wh = self.store
+        if not source_wh:
+            frappe.logger("buyback").warning(
+                f"Buyback Order {self.name} has no store warehouse — skipping pickup MR"
+            )
+            return
+        if source_wh == target_wh:
+            # Already at the buyback bin — nothing to transfer
+            return
+
+        # Idempotency: did we already create a pickup MR for this order?
+        existing = frappe.db.get_value(
+            "Material Request",
+            {"custom_buyback_order": self.name, "docstatus": ["<", 2]},
+            "name",
+        )
+        if existing:
+            return
+
+        is_stock_item = frappe.db.get_value("Item", self.item, "is_stock_item")
+        if not is_stock_item:
+            return
+
+        from frappe.utils import nowdate, add_days
+        mr = frappe.get_doc({
+            "doctype": "Material Request",
+            "material_request_type": "Material Transfer",
+            "company": self.company,
+            "transaction_date": nowdate(),
+            "schedule_date": add_days(nowdate(), 1),
+            "set_warehouse": target_wh,
+            "custom_buyback_order": self.name,
+            "items": [
+                {
+                    "item_code": self.item,
+                    "qty": 1,
+                    "schedule_date": add_days(nowdate(), 1),
+                    "warehouse": target_wh,
+                    "from_warehouse": source_wh,
+                    "uom": frappe.db.get_value("Item", self.item, "stock_uom"),
+                    "stock_uom": frappe.db.get_value("Item", self.item, "stock_uom"),
+                    "description": (
+                        f"Pickup of bought-back device {self.imei_serial or self.item} "
+                        f"from {source_wh} → {target_wh} (Buyback Order {self.name})"
+                    ),
+                },
+            ],
+        })
+        mr.insert(ignore_permissions=True)
+        mr.flags.ignore_permissions = True
+        mr.submit()
+
+        self._notify_pickup_role(mr.name, source_wh, target_wh, settings)
+
+    def _notify_pickup_role(self, mr_name, source_wh, target_wh, settings):
+        """Create ToDo + Notification Log for users with the pickup role."""
+        role = getattr(settings, "pickup_notify_role", None) or "Stock Manager"
+        users = frappe.get_all(
+            "Has Role",
+            filters={"role": role, "parenttype": "User"},
+            pluck="parent",
+        )
+        # Filter to enabled, non-system users
+        users = [
+            u for u in set(users)
+            if u not in ("Administrator", "Guest")
+            and frappe.db.get_value("User", u, "enabled")
+        ]
+        if not users:
+            return
+
+        subject = _("Buyback Pickup Required: {0}").format(self.name)
+        message = _(
+            "Buyback Order {0} is paid. Please pick up device {1} from "
+            "{2} and deliver to {3}. Material Request: {4}"
+        ).format(
+            self.name,
+            self.imei_serial or self.item,
+            source_wh,
+            target_wh,
+            mr_name,
+        )
+
+        for user in users:
+            try:
+                # ToDo for the action queue
+                todo = frappe.get_doc({
+                    "doctype": "ToDo",
+                    "allocated_to": user,
+                    "reference_type": "Material Request",
+                    "reference_name": mr_name,
+                    "description": message,
+                    "priority": "Medium",
+                })
+                todo.insert(ignore_permissions=True)
+
+                # Notification Log for the bell-icon feed
+                notif = frappe.get_doc({
+                    "doctype": "Notification Log",
+                    "for_user": user,
+                    "type": "Alert",
+                    "document_type": "Material Request",
+                    "document_name": mr_name,
+                    "subject": subject,
+                    "email_content": message,
+                })
+                notif.insert(ignore_permissions=True)
+            except Exception:
+                frappe.log_error(
+                    title=f"Buyback pickup notify failed for {user} / {self.name}"
+                )
