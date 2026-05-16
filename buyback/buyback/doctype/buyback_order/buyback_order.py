@@ -1054,8 +1054,15 @@ class BuybackOrder(Document):
 
         settings = frappe.get_single("Buyback Settings")
 
-        # Determine target warehouse: store IS the warehouse now (no indirection)
-        target_warehouse = self.store if self.store else None
+        # Determine target warehouse: store's Buyback bin (created by ensure_store_bins).
+        # Falls back to the store base warehouse if the bin doesn't exist yet.
+        target_warehouse = None
+        if self.store:
+            target_warehouse = frappe.db.get_value(
+                "Warehouse",
+                {"parent_warehouse": self.store, "ch_bin_type": "Buyback", "company": self.company},
+                "name",
+            ) or self.store
         if not target_warehouse:
             target_warehouse = frappe.db.get_value(
                 "Company", self.company or settings.default_company, "default_warehouse"
@@ -1112,7 +1119,13 @@ class BuybackOrder(Document):
                 f"skipping pickup MR for {self.name}"
             )
             return
-        source_wh = self.store
+        source_wh = frappe.db.get_value(
+            "Warehouse",
+            {"parent_warehouse": self.store, "ch_bin_type": "Buyback", "company": self.company},
+            "name",
+        ) if self.store else None
+        if not source_wh:
+            source_wh = self.store
         if not source_wh:
             frappe.logger("buyback").warning(
                 f"Buyback Order {self.name} has no store warehouse — skipping pickup MR"
