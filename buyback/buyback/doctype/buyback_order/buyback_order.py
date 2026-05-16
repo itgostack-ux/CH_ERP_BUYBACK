@@ -1149,6 +1149,13 @@ class BuybackOrder(Document):
             return
 
         from frappe.utils import nowdate, add_days
+        # Pre-capture the bought-back device's IMEI on the MR row so the
+        # pickup MR is already "scanned" at creation time. Logistics staff
+        # only need to verify on hand-over instead of re-typing the IMEI.
+        # The custom_serial_no / custom_scanned_qty fields are owned by
+        # ch_erp15 (Material Request Item) and are mirrored into Stock
+        # Entry Detail.serial_no on fulfilment.
+        imei = (self.imei_serial or "").strip()
         mr = frappe.get_doc({
             "doctype": "Material Request",
             "material_request_type": "Material Transfer",
@@ -1166,8 +1173,10 @@ class BuybackOrder(Document):
                     "from_warehouse": source_wh,
                     "uom": frappe.db.get_value("Item", self.item, "stock_uom"),
                     "stock_uom": frappe.db.get_value("Item", self.item, "stock_uom"),
+                    "custom_serial_no": imei,
+                    "custom_scanned_qty": 1 if imei else 0,
                     "description": (
-                        f"Pickup of bought-back device {self.imei_serial or self.item} "
+                        f"Pickup of bought-back device {imei or self.item} "
                         f"from {source_wh} → {target_wh} (Buyback Order {self.name})"
                     ),
                 },
