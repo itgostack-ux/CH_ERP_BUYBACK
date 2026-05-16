@@ -207,11 +207,18 @@ def _ensure_buyback_lifecycle_exists(imei: str):
         return
 
     from frappe.utils import now_datetime as _now
+    warehouse = frappe.db.get_value("Serial No", imei, "warehouse") if frappe.db.exists("Serial No", imei) else None
+    store_name = frappe.db.get_value("CH Store", {"warehouse": warehouse}, "name") if warehouse else None
+
     lc = frappe.new_doc("CH Serial Lifecycle")
     lc.serial_no = imei
     lc.item_code = item_code
     lc.lifecycle_status = "In Stock"
     lc.stock_condition = "Customer Return"
+    lc.current_warehouse = warehouse or ""
+    lc.current_store = store_name or ""
+    if warehouse:
+        lc.current_company = frappe.db.get_value("Warehouse", warehouse, "company") or ""
     lc.append("lifecycle_log", {
         "log_timestamp": _now(),
         "from_status": "",
