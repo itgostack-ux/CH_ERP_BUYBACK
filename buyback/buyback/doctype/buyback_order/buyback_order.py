@@ -1169,11 +1169,18 @@ class BuybackOrder(Document):
     def _notify_pickup_role(self, mr_name, source_wh, target_wh, settings):
         """Create ToDo + Notification Log for users with the pickup role."""
         role = getattr(settings, "pickup_notify_role", None) or "Stock Manager"
-        users = frappe.get_all(
-            "Has Role",
-            filters={"role": role, "parenttype": "User"},
-            pluck="parent",
-        )
+        users = []
+        # Prefer role × store scope intersection so branch alerts don't
+        # notify unrelated users from other stores.
+        try:
+            from ch_erp15.ch_erp15.notification_router import get_scoped_users
+            users = get_scoped_users([role], store=self.store)
+        except Exception:
+            users = frappe.get_all(
+                "Has Role",
+                filters={"role": role, "parenttype": "User"},
+                pluck="parent",
+            )
         # Filter to enabled, non-system users
         users = [
             u for u in set(users)

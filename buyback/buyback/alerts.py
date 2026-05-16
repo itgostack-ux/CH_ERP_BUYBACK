@@ -274,7 +274,11 @@ def _get_alert_recipients(doctype=None, docname=None, roles=None, store=None):
         role_users = get_scoped_users(roles or [], store=store)
         users.update(role_users)
     except Exception:
-        # Fallback: plain role lookup (no scope filter)
+        # SECURITY: never broadcast store-scoped alerts to all role users.
+        if store:
+            return list(users)[:15]
+
+        # Non-store alerts may fallback to plain role lookup.
         for role in (roles or []):
             role_rows = frappe.get_all(
                 "Has Role",
