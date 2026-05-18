@@ -25,6 +25,7 @@
   "item_name",
   "brand",
   "column_break_device",
+  "serial_no",
   "imei_serial",
   "condition_grade",
   "warranty_status",
@@ -276,9 +277,20 @@
    "fieldtype": "Column Break"
   },
   {
+   "fieldname": "serial_no",
+   "fieldtype": "Data",
+   "label": "Serial No / IMEI",
+   "in_standard_filter": 1,
+   "search_index": 1,
+   "description": "Canonical device identifier. Accepts a real IMEI (15 digits) for SIM-enabled devices or any non-IMEI Serial No. Kept in sync (bidirectionally) with the legacy 'imei_serial' field on validate for backward compatibility."
+  },
+  {
    "fieldname": "imei_serial",
    "fieldtype": "Data",
-   "label": "IMEI / Serial No"
+   "label": "IMEI / Serial No (legacy)",
+   "read_only": 1,
+   "hidden": 1,
+   "description": "DEPRECATED — mirror of serial_no maintained for backward compatibility with reports, hooks, and integrations that still read this field. New code MUST use 'serial_no'."
   },
   {
    "fieldname": "condition_grade",

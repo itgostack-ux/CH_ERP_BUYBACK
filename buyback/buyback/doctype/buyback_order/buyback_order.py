@@ -67,7 +67,37 @@ class BuybackOrder(Document):
         )[0][0] or 0
         self.order_id = last + 1
 
+    def _sync_serial_no_aliases(self):
+        """Keep `serial_no` (new canonical) and `imei_serial` (legacy) in lock-step.
+
+        - If only one side is populated, copy it to the other.
+        - If both are populated and disagree, `serial_no` (new canonical) wins
+          and overwrites `imei_serial` — newer code paths set this field.
+        - Whitespace is stripped on both sides so trailing spaces never cause
+          a mirror drift.
+
+        Backward-compatible additive rename: existing call sites that read
+        `self.imei_serial` continue to work unchanged because this method
+        guarantees both fields hold the same value at save time.
+        """
+        new_val = (self.serial_no or "").strip() or None
+        old_val = (self.imei_serial or "").strip() or None
+
+        if new_val and old_val and new_val != old_val:
+            # Disagreement → new field wins. Log so we can audit accidental
+            # writes to the legacy field after rename.
+            frappe.logger().info(
+                f"Buyback Order {self.name or '<new>'}: serial_no/imei_serial "
+                f"diverged ('{new_val}' vs '{old_val}') — keeping serial_no."
+            )
+            self.imei_serial = new_val
+        elif new_val and not old_val:
+            self.imei_serial = new_val
+        elif old_val and not new_val:
+            self.serial_no = old_val
+
     def validate(self):
+        self._sync_serial_no_aliases()
         self._ensure_mobile_no()
         if self.mobile_no:
             self.mobile_no = validate_indian_phone(self.mobile_no, "Mobile No")
