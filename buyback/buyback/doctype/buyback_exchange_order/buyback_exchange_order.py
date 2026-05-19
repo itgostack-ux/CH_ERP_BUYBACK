@@ -42,6 +42,7 @@ class BuybackExchangeOrder(Document):
     def on_submit(self):
         if self.status == "Draft":
             self.status = "New Device Delivered"
+            self.db_set("status", "New Device Delivered", notify=True)
         log_audit("Exchange Created", "Buyback Exchange Order", self.name,
                   new_value={"buyback_amount": self.buyback_amount,
                              "new_device_price": self.new_device_price,
