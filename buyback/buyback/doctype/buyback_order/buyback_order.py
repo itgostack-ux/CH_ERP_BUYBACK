@@ -928,7 +928,12 @@ class BuybackOrder(Document):
 
     def _create_accounting_entries(self):
         """Create JE + SE atomically — called when status transitions to Paid."""
-        _prev_user = frappe.session.user
+        _prev_user = (frappe.session.user or "").strip()
+        restore_user = (
+            _prev_user
+            if _prev_user and _prev_user != "None" and frappe.db.exists("User", _prev_user)
+            else "Guest"
+        )
         try:
             frappe.set_user("Administrator")
             self._create_journal_entry()
@@ -953,7 +958,7 @@ class BuybackOrder(Document):
             )
             raise
         finally:
-            frappe.set_user(_prev_user)
+            frappe.set_user(restore_user)
 
     def _update_serial_no_bought_back(self):
         """Mark Serial No as 'Bought Back' and add timeline comment on close."""
@@ -1143,6 +1148,11 @@ class BuybackOrder(Document):
         if not cint(getattr(settings, "auto_create_pickup_request", 1)):
             return
         target_wh = getattr(settings, "buyback_warehouse", None)
+        if target_wh and cint(frappe.db.get_value("Warehouse", target_wh, "disabled")):
+            frappe.logger("buyback").warning(
+                f"Configured Buyback Settings.buyback_warehouse is disabled ({target_wh}) for {self.name}; skipping pickup MR"
+            )
+            target_wh = None
         if not target_wh:
             frappe.logger("buyback").info(
                 f"Buyback Settings.buyback_warehouse not configured — "

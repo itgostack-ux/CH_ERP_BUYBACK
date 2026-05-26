@@ -130,13 +130,19 @@ def _as_system_user():
     user so .save() / workflow transitions succeed, then restores the
     original user.
     """
-    prev = frappe.session.user
-    if not prev or prev == "Guest":
+    prev = (frappe.session.user or "").strip()
+    restore_user = (
+        prev
+        if prev and prev != "None" and frappe.db.exists("User", prev)
+        else "Guest"
+    )
+
+    if not prev or prev in {"Guest", "None"} or not frappe.db.exists("User", prev):
         frappe.set_user("Administrator")
     try:
         yield
     finally:
-        frappe.set_user(prev or "Guest")
+        frappe.set_user(restore_user)
 
 
 # ── Step 1: Get Estimate ─────────────────────────────────────────
