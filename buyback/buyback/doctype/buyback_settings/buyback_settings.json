@@ -284,11 +284,11 @@
    "description": "Central buyback bin (e.g. Buyback Bin - BMPL). Bought-back devices are auto-routed here from the store via a Material Transfer Material Request."
   },
   {
-   "default": "1",
+   "default": "0",
    "fieldname": "auto_create_pickup_request",
    "fieldtype": "Check",
    "label": "Auto-Create Pickup Material Request",
-   "description": "When a Buyback Order is paid, auto-create a Material Transfer Material Request from the store warehouse to the Buyback Bin so delivery staff can pick the device up."
+   "description": "DEFAULT OFF (logistics redesign): store staff raise the pickup Material Request manually from the Buyback Order. Enable only if you want the legacy auto-creation behaviour."
   },
   {
    "fieldname": "column_break_logistics",

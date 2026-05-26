@@ -126,6 +126,36 @@ frappe.ui.form.on("Buyback Order", {
                     buyback_amount: frm.doc.final_price,
                 });
             }, __("Actions"));
+
+            // Logistics Phase 1: pickup MR is now manual. Show the button
+            // only when SE exists and no open pickup MR is already linked.
+            if (frm.doc.stock_entry) {
+                frappe.db.get_value(
+                    "Material Request",
+                    { custom_buyback_order: frm.doc.name, docstatus: ["<", 2] },
+                    "name"
+                ).then((r) => {
+                    const existing = r && r.message && r.message.name;
+                    if (existing) {
+                        frm.add_custom_button(__("View Pickup MR ({0})", [existing]), () => {
+                            frappe.set_route("Form", "Material Request", existing);
+                        }, __("Logistics"));
+                    } else {
+                        frm.add_custom_button(__("Create Pickup Transfer Request"), () => {
+                            frappe.confirm(
+                                __("Raise a Material Transfer Request from this store's Buyback Bin to the central Buyback Bin so logistics can pick up the device?"),
+                                () => {
+                                    frm.call("create_pickup_request_now").then((res) => {
+                                        if (res && res.message) {
+                                            frm.reload_doc();
+                                        }
+                                    });
+                                }
+                            );
+                        }, __("Logistics"));
+                    }
+                });
+            }
         }
 
         const colors = {

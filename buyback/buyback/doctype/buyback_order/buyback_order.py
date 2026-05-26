@@ -1137,15 +1137,20 @@ class BuybackOrder(Document):
     # ──────────────────────────────────────────────────────────────
     # Pickup logistics: route bought-back device from store to Buyback Bin
     # ──────────────────────────────────────────────────────────────
-    def _create_pickup_request(self):
+    def _create_pickup_request(self, force: bool = False):
         """Create a Material Transfer MR from `self.store` → Buyback Bin.
 
         Idempotent: skips when a Material Request already exists for this
         Buyback Order. Notifies users with the configured pickup role.
         Silently skips when settings are not yet configured (logged for ops).
+
+        Args:
+            force: When True, bypass the ``auto_create_pickup_request`` flag.
+                   Used by the manual "Create Pickup Transfer Request" action
+                   on the Buyback Order form.
         """
         settings = frappe.get_single("Buyback Settings")
-        if not cint(getattr(settings, "auto_create_pickup_request", 1)):
+        if not force and not cint(getattr(settings, "auto_create_pickup_request", 0)):
             return
         target_wh = getattr(settings, "buyback_warehouse", None)
         if target_wh and cint(frappe.db.get_value("Warehouse", target_wh, "disabled")):
@@ -1227,6 +1232,48 @@ class BuybackOrder(Document):
         mr.submit()
 
         self._notify_pickup_role(mr.name, source_wh, target_wh, settings)
+        return mr.name
+
+    @frappe.whitelist()
+    def create_pickup_request_now(self):
+        """User-initiated pickup MR creation (Logistics redesign Phase 1).
+
+        Called from the "Create Pickup Transfer Request" button on the
+        Buyback Order form. Bypasses ``Buyback Settings.auto_create_pickup_request``
+        (which now defaults to OFF) but otherwise reuses the same idempotent
+        logic, so accidentally clicking twice will not create duplicates.
+
+        Returns the Material Request name, or None when nothing was created
+        (e.g. order not yet Paid, item not stock, MR already exists).
+        """
+        if self.status != "Paid":
+            frappe.throw(
+                _("Pickup Transfer Request can only be raised after the Buyback Order is Paid."),
+                title=_("Buyback Order: Not Paid"),
+            )
+        if not self.stock_entry:
+            frappe.throw(
+                _("Buyback Stock Entry must exist before raising a pickup. Mark order Paid first."),
+                title=_("Buyback Order: No Stock Entry"),
+            )
+        mr_name = self._create_pickup_request(force=True)
+        if mr_name:
+            frappe.msgprint(
+                _("Pickup Material Request {0} created.").format(
+                    frappe.utils.get_link_to_form("Material Request", mr_name)
+                ),
+                indicator="green",
+                alert=True,
+            )
+        else:
+            frappe.msgprint(
+                _("No pickup request was created. A request may already exist, "
+                  "the item may not be a stock item, or the Buyback Bin warehouse "
+                  "is not configured in Buyback Settings."),
+                indicator="orange",
+                alert=True,
+            )
+        return mr_name
 
     def _notify_pickup_role(self, mr_name, source_wh, target_wh, settings):
         """Create ToDo + Notification Log for users with the pickup role."""
