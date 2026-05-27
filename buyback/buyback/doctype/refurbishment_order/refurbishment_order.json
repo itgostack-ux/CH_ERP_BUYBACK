@@ -1,0 +1,52 @@
+{
+ "allow_import": 1,
+ "actions": [],
+ "autoname": "naming_series:",
+ "creation": "2026-05-27 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "naming_series", "company", "customer", "customer_name", "column_break_1", "status", "physical_condition", "section_invoices", "original_invoice", "return_invoice", "service_request", "section_item", "item_code", "item_name", "serial_no", "qty", "source_warehouse", "column_break_2", "target_warehouse", "grade", "expected_resale_type", "suggested_resale_price", "section_reason", "return_reason", "return_remarks", "section_result", "resulting_disposition", "resulting_stock_entry"
+ ],
+ "fields": [
+  {"fieldname": "naming_series", "fieldtype": "Select", "label": "Series", "options": "RFO-.YYYY.-.#####", "default": "RFO-.YYYY.-.#####", "hidden": 1, "reqd": 1},
+  {"fieldname": "company", "fieldtype": "Link", "label": "Company", "options": "Company", "reqd": 1, "in_list_view": 1},
+  {"fieldname": "customer", "fieldtype": "Link", "label": "Customer", "options": "Customer", "in_list_view": 1},
+  {"fieldname": "customer_name", "fieldtype": "Data", "label": "Customer Name", "read_only": 1},
+  {"fieldname": "column_break_1", "fieldtype": "Column Break"},
+  {"fieldname": "status", "fieldtype": "Select", "label": "Status", "options": "Received\nDiagnosed\nRepaired\nGraded\nRestocked\nCancelled", "default": "Received", "in_list_view": 1, "in_standard_filter": 1},
+  {"fieldname": "physical_condition", "fieldtype": "Select", "label": "Physical Condition", "options": "Resalable\nDamaged\nRefurbish Required\nDead on Arrival", "default": "Damaged"},
+  {"fieldname": "section_invoices", "fieldtype": "Section Break", "label": "Source Documents"},
+  {"fieldname": "original_invoice", "fieldtype": "Link", "label": "Original Invoice", "options": "Sales Invoice"},
+  {"fieldname": "return_invoice", "fieldtype": "Link", "label": "Return Invoice", "options": "Sales Invoice", "in_list_view": 1},
+  {"fieldname": "service_request", "fieldtype": "Link", "label": "GoFix Service Request", "options": "Service Request"},
+  {"fieldname": "section_item", "fieldtype": "Section Break", "label": "Unit"},
+  {"fieldname": "item_code", "fieldtype": "Link", "label": "Item Code", "options": "Item", "reqd": 1, "in_list_view": 1},
+  {"fieldname": "item_name", "fieldtype": "Data", "label": "Item Name", "read_only": 1},
+  {"fieldname": "serial_no", "fieldtype": "Data", "label": "IMEI / Serial No", "in_list_view": 1},
+  {"fieldname": "qty", "fieldtype": "Float", "label": "Qty", "default": "1", "reqd": 1},
+  {"fieldname": "source_warehouse", "fieldtype": "Link", "label": "Source Warehouse", "options": "Warehouse"},
+  {"fieldname": "column_break_2", "fieldtype": "Column Break"},
+  {"fieldname": "target_warehouse", "fieldtype": "Link", "label": "Target Warehouse", "options": "Warehouse"},
+  {"fieldname": "grade", "fieldtype": "Link", "label": "Grade", "options": "Grade Master"},
+  {"fieldname": "expected_resale_type", "fieldtype": "Select", "label": "Expected Resale Type", "options": "Refurbished\nPre-Owned"},
+  {"fieldname": "suggested_resale_price", "fieldtype": "Currency", "label": "Suggested Resale Price", "read_only": 1},
+  {"fieldname": "section_reason", "fieldtype": "Section Break", "label": "Return Context"},
+  {"fieldname": "return_reason", "fieldtype": "Data", "label": "Return Reason"},
+  {"fieldname": "return_remarks", "fieldtype": "Small Text", "label": "Return Remarks"},
+  {"fieldname": "section_result", "fieldtype": "Section Break", "label": "Result"},
+  {"fieldname": "resulting_disposition", "fieldtype": "Link", "label": "Resulting Disposition", "options": "CH Buyback Disposition", "read_only": 1},
+  {"fieldname": "resulting_stock_entry", "fieldtype": "Link", "label": "Resulting Stock Entry", "options": "Stock Entry", "read_only": 1}
+ ],
+ "module": "BuyBack",
+ "name": "Refurbishment Order",
+ "permissions": [
+  {"role": "System Manager", "read": 1, "write": 1, "create": 1, "delete": 1},
+  {"role": "Buyback Manager", "read": 1, "write": 1, "create": 1},
+  {"role": "Buyback Store Manager", "read": 1, "write": 1, "create": 1},
+  {"role": "Stock Manager", "read": 1, "write": 1}
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "track_changes": 1
+}

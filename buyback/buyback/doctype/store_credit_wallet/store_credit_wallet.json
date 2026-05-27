@@ -1,0 +1,40 @@
+{
+ "allow_import": 1,
+ "actions": [],
+ "autoname": "naming_series:",
+ "creation": "2026-05-27 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "naming_series", "wallet_key", "customer", "company", "column_break_1", "status", "current_balance", "section_break_1", "last_voucher", "last_reference_invoice", "column_break_2", "last_credit_amount", "last_credit_at", "notes"
+ ],
+ "fields": [
+  {"fieldname": "naming_series", "fieldtype": "Select", "label": "Series", "options": "SCW-.YYYY.-.#####", "default": "SCW-.YYYY.-.#####", "hidden": 1, "reqd": 1},
+  {"fieldname": "wallet_key", "fieldtype": "Data", "label": "Wallet Key", "hidden": 1, "read_only": 1, "unique": 1},
+  {"fieldname": "customer", "fieldtype": "Link", "label": "Customer", "options": "Customer", "reqd": 1, "in_list_view": 1, "in_standard_filter": 1},
+  {"fieldname": "company", "fieldtype": "Link", "label": "Company", "options": "Company", "reqd": 1, "in_list_view": 1, "in_standard_filter": 1},
+  {"fieldname": "column_break_1", "fieldtype": "Column Break"},
+  {"fieldname": "status", "fieldtype": "Select", "label": "Status", "options": "Active\nFrozen\nClosed", "default": "Active", "in_list_view": 1},
+  {"fieldname": "current_balance", "fieldtype": "Currency", "label": "Current Balance", "read_only": 1, "in_list_view": 1},
+  {"fieldname": "section_break_1", "fieldtype": "Section Break", "label": "Last Credit"},
+  {"fieldname": "last_voucher", "fieldtype": "Link", "label": "Last Voucher", "options": "CH Voucher", "read_only": 1},
+  {"fieldname": "last_reference_invoice", "fieldtype": "Link", "label": "Last Return Invoice", "options": "Sales Invoice", "read_only": 1},
+  {"fieldname": "column_break_2", "fieldtype": "Column Break"},
+  {"fieldname": "last_credit_amount", "fieldtype": "Currency", "label": "Last Credit Amount", "read_only": 1},
+  {"fieldname": "last_credit_at", "fieldtype": "Datetime", "label": "Last Credit At", "read_only": 1},
+  {"fieldname": "notes", "fieldtype": "Small Text", "label": "Notes"}
+ ],
+ "is_submittable": 0,
+ "links": [],
+ "module": "BuyBack",
+ "name": "Store Credit Wallet",
+ "permissions": [
+  {"role": "System Manager", "read": 1, "write": 1, "create": 1, "delete": 1},
+  {"role": "Buyback Manager", "read": 1, "write": 1, "create": 1},
+  {"role": "Buyback Store Manager", "read": 1, "write": 1, "create": 1},
+  {"role": "Accounts Manager", "read": 1}
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "track_changes": 1
+}

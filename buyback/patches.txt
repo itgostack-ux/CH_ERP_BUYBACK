@@ -12,3 +12,4 @@ buyback.patches.fix_customer_approval_and_payout_fields
 buyback.patches.backfill_question_applicable_categories
 buyback.patches.backfill_buyback_order_serial_no
 buyback.patches.disable_auto_pickup_request
+buyback.patches.phase4_return_closed_loop

@@ -1,0 +1,21 @@
+{
+ "add_total_row": 0,
+ "columns": [],
+ "creation": "2026-05-27 00:00:00.000000",
+ "disabled": 0,
+ "doctype": "Report",
+ "is_standard": "Yes",
+ "module": "BuyBack",
+ "name": "Refurb Pipeline",
+ "owner": "Administrator",
+ "prepared_report": 0,
+ "ref_doctype": "Refurbishment Order",
+ "report_name": "Refurb Pipeline",
+ "report_type": "Script Report",
+ "roles": [
+  {"role": "System Manager"},
+  {"role": "Buyback Manager"},
+  {"role": "Buyback Store Manager"},
+  {"role": "Stock Manager"}
+ ]
+}
