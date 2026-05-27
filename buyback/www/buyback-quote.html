@@ -1,0 +1,354 @@
+{% extends "templates/web.html" %}
+
+{% block page_content %}
+<div class="gg-quote-page">
+  <section class="gg-hero">
+    <div>
+      <p class="gg-eyebrow">GoGizmo Buyback</p>
+      <h1>Get an instant buyback quote before you visit the store.</h1>
+      <p class="gg-subtitle">This page reuses the live buyback pricing engine already used by store teams. Pick your model, grade, and warranty status to see the current estimate.</p>
+    </div>
+    <div class="gg-hero-card">
+      <div class="gg-chip">Phase 5</div>
+      <h3>What you can do here</h3>
+      <ul>
+        <li>Search device models from the current item catalog</li>
+        <li>See the estimated buyback value instantly</li>
+        <li>Leave your phone number and create a web assessment</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="gg-shell">
+    <div class="gg-panel">
+      <h2>1. Find your device</h2>
+      <div class="gg-search-row">
+        <input id="item-search" type="text" class="form-control" placeholder="Search by brand, item name, or code" value="{{ prefill_item_code }}">
+        <button class="btn btn-primary" onclick="searchItems()">Search</button>
+      </div>
+      <div id="selected-item" class="gg-selected-item empty">No device selected yet.</div>
+      <div id="item-results" class="gg-results"></div>
+    </div>
+
+    <div class="gg-panel">
+      <h2>2. Tell us the condition</h2>
+      <div class="gg-grid two">
+        <div>
+          <label>Condition grade</label>
+          <select id="grade" class="form-control"></select>
+        </div>
+        <div>
+          <label>Warranty status</label>
+          <select id="warranty-status" class="form-control">
+            <option value="">Select warranty</option>
+            <option value="In Warranty">In Warranty</option>
+            <option value="Out of Warranty">Out of Warranty</option>
+          </select>
+        </div>
+        <div>
+          <label>Device age</label>
+          <select id="device-age" class="form-control">
+            <option value="">Select age</option>
+            <option value="0-3 Months">0-3 Months</option>
+            <option value="4-6 Months">4-6 Months</option>
+            <option value="7-11 Months">7-11 Months</option>
+            <option value="12+ Months">12+ Months</option>
+          </select>
+        </div>
+        <div>
+          <label>IMEI / Serial (optional)</label>
+          <input id="imei-serial" type="text" class="form-control" placeholder="Optional IMEI or serial number">
+        </div>
+      </div>
+      <div class="gg-actions">
+        <button class="btn btn-dark" onclick="getEstimate()">Get estimate</button>
+      </div>
+      <div id="estimate-box" class="gg-estimate empty">Select your device and enter the condition details to see an estimate.</div>
+    </div>
+
+    <div class="gg-panel">
+      <h2>3. Save this quote</h2>
+      <div class="gg-grid two">
+        <div>
+          <label>Your name</label>
+          <input id="customer-name" type="text" class="form-control" placeholder="Customer name">
+        </div>
+        <div>
+          <label>Mobile number</label>
+          <input id="mobile-no" type="text" class="form-control" placeholder="10-digit mobile number" value="{{ prefill_mobile_no }}">
+        </div>
+        <div class="gg-span-2">
+          <label>Notes for the team</label>
+          <textarea id="remarks" class="form-control" rows="3" placeholder="Damage notes, accessories included, preferred visit time"></textarea>
+        </div>
+      </div>
+      <div class="gg-actions">
+        <button class="btn btn-success" onclick="submitQuoteRequest()">Create web assessment</button>
+      </div>
+      <div id="quote-message" class="gg-feedback"></div>
+    </div>
+  </section>
+</div>
+
+<style>
+  .gg-quote-page {
+    --ink: #14213d;
+    --accent: #ff7a00;
+    --accent-soft: #ffe6cf;
+    --mist: #fff7f0;
+    --line: #ecd5bf;
+    --card: #ffffff;
+    --ok: #0f766e;
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 32px 16px 56px;
+    color: var(--ink);
+  }
+  .gg-hero {
+    display: grid;
+    grid-template-columns: 1.6fr 1fr;
+    gap: 24px;
+    align-items: stretch;
+    margin-bottom: 24px;
+  }
+  .gg-hero h1 {
+    font-size: clamp(2.2rem, 5vw, 4rem);
+    line-height: 1;
+    margin: 0 0 14px;
+    letter-spacing: -0.04em;
+  }
+  .gg-eyebrow {
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--accent);
+    margin-bottom: 12px;
+  }
+  .gg-subtitle {
+    max-width: 720px;
+    color: #445;
+    font-size: 1.05rem;
+  }
+  .gg-hero-card,
+  .gg-panel {
+    background: linear-gradient(180deg, var(--card), #fff7ef);
+    border: 1px solid var(--line);
+    border-radius: 24px;
+    padding: 24px;
+    box-shadow: 0 20px 40px rgba(20, 33, 61, 0.08);
+  }
+  .gg-hero-card {
+    background: radial-gradient(circle at top right, #ffd7ab, #fff 58%);
+  }
+  .gg-chip {
+    display: inline-flex;
+    padding: 6px 12px;
+    border-radius: 999px;
+    background: var(--ink);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 700;
+    margin-bottom: 16px;
+  }
+  .gg-shell {
+    display: grid;
+    gap: 20px;
+  }
+  .gg-search-row,
+  .gg-actions {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    margin-top: 12px;
+  }
+  .gg-grid {
+    display: grid;
+    gap: 16px;
+  }
+  .gg-grid.two {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .gg-span-2 {
+    grid-column: span 2;
+  }
+  .gg-results {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 14px;
+    margin-top: 18px;
+  }
+  .gg-item-card {
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    padding: 16px;
+    background: #fff;
+    cursor: pointer;
+    transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+  }
+  .gg-item-card:hover,
+  .gg-item-card.active {
+    transform: translateY(-2px);
+    border-color: var(--accent);
+    box-shadow: 0 14px 28px rgba(20, 33, 61, 0.08);
+  }
+  .gg-selected-item,
+  .gg-estimate,
+  .gg-feedback {
+    margin-top: 18px;
+    border-radius: 18px;
+    padding: 18px;
+    background: var(--mist);
+    border: 1px solid var(--line);
+  }
+  .gg-selected-item.empty,
+  .gg-estimate.empty {
+    color: #6b7280;
+    background: #fff;
+  }
+  .gg-estimate strong {
+    font-size: 2rem;
+    color: var(--ok);
+    display: block;
+  }
+  .gg-feedback.success {
+    background: #ecfdf5;
+    border-color: #a7f3d0;
+    color: #065f46;
+  }
+  .gg-feedback.error {
+    background: #fff1f2;
+    border-color: #fecdd3;
+    color: #9f1239;
+  }
+  @media (max-width: 768px) {
+    .gg-hero,
+    .gg-grid.two {
+      grid-template-columns: 1fr;
+    }
+    .gg-span-2 {
+      grid-column: span 1;
+    }
+    .gg-search-row,
+    .gg-actions {
+      flex-direction: column;
+      align-items: stretch;
+    }
+  }
+</style>
+
+<script>
+  const state = {
+    selectedItem: null,
+    estimate: null,
+    grades: []
+  };
+
+  function apiCall(method, args) {
+    return new Promise((resolve, reject) => {
+      frappe.call({
+        method,
+        args,
+        callback: (r) => resolve(r.message || r),
+        error: reject
+      });
+    });
+  }
+
+  async function loadGrades() {
+    const grades = await apiCall('buyback.public_portal_api.get_quote_grades');
+    state.grades = grades || [];
+    const select = document.getElementById('grade');
+    select.innerHTML = '';
+    state.grades.forEach((row) => {
+      const option = document.createElement('option');
+      option.value = row.name;
+      option.textContent = `${row.grade_name}${row.description ? ' - ' + row.description : ''}`;
+      select.appendChild(option);
+    });
+  }
+
+  async function searchItems() {
+    const query = (document.getElementById('item-search').value || '').trim();
+    const results = await apiCall('buyback.public_portal_api.search_buyback_items', { query, limit: 12 });
+    const container = document.getElementById('item-results');
+    container.innerHTML = '';
+    if (!results || !results.length) {
+      container.innerHTML = '<div class="gg-feedback error">No matching devices were found.</div>';
+      return;
+    }
+    results.forEach((row) => {
+      const card = document.createElement('button');
+      card.type = 'button';
+      card.className = 'gg-item-card';
+      card.innerHTML = `<strong>${frappe.utils.escape_html(row.item_name || row.item_code)}</strong><div>${frappe.utils.escape_html(row.brand || 'Unbranded')}</div><small>${frappe.utils.escape_html(row.item_code)}</small>`;
+      card.onclick = () => selectItem(row, card);
+      container.appendChild(card);
+    });
+  }
+
+  function selectItem(row, element) {
+    state.selectedItem = row;
+    document.querySelectorAll('.gg-item-card').forEach((card) => card.classList.remove('active'));
+    element.classList.add('active');
+    document.getElementById('selected-item').className = 'gg-selected-item';
+    document.getElementById('selected-item').innerHTML = `<strong>${frappe.utils.escape_html(row.item_name || row.item_code)}</strong><br>${frappe.utils.escape_html(row.brand || '')} <span style="color:#6b7280">${frappe.utils.escape_html(row.item_code)}</span>`;
+  }
+
+  async function getEstimate() {
+    if (!state.selectedItem) {
+      frappe.msgprint('Select a device first.');
+      return;
+    }
+    const estimate = await apiCall('buyback.public_portal_api.get_public_quote_estimate', {
+      item_code: state.selectedItem.item_code || state.selectedItem.name,
+      grade: document.getElementById('grade').value,
+      warranty_status: document.getElementById('warranty-status').value,
+      device_age_months: document.getElementById('device-age').value
+    });
+    state.estimate = estimate;
+    const box = document.getElementById('estimate-box');
+    box.className = 'gg-estimate';
+    box.innerHTML = `<span>Estimated buyback value</span><strong>INR ${frappe.format(estimate.estimated_price || 0, { fieldtype: 'Currency' })}</strong><div>Base price: INR ${frappe.format(estimate.base_price || 0, { fieldtype: 'Currency' })}</div><div>Grade: ${frappe.utils.escape_html((estimate.grade || {}).label || '')}</div>`;
+  }
+
+  async function submitQuoteRequest() {
+    if (!state.selectedItem) {
+      frappe.msgprint('Select a device first.');
+      return;
+    }
+    if (!state.estimate) {
+      await getEstimate();
+    }
+
+    const message = document.getElementById('quote-message');
+    message.className = 'gg-feedback';
+    message.textContent = 'Saving your web assessment...';
+
+    try {
+      const result = await apiCall('buyback.public_portal_api.submit_public_quote_request', {
+        customer_name: document.getElementById('customer-name').value,
+        mobile_no: document.getElementById('mobile-no').value,
+        item_code: state.selectedItem.item_code || state.selectedItem.name,
+        grade: document.getElementById('grade').value,
+        warranty_status: document.getElementById('warranty-status').value,
+        device_age_months: document.getElementById('device-age').value,
+        imei_serial: document.getElementById('imei-serial').value,
+        remarks: document.getElementById('remarks').value
+      });
+      message.className = 'gg-feedback success';
+      message.innerHTML = `<strong>Assessment created.</strong><br>Reference: ${frappe.utils.escape_html(result.name)}<br>Quoted value: INR ${frappe.format(result.quoted_price || 0, { fieldtype: 'Currency' })}${result.expires_on ? '<br>Valid until: ' + frappe.utils.escape_html(result.expires_on) : ''}`;
+    } catch (error) {
+      message.className = 'gg-feedback error';
+      message.textContent = error?.message || 'Could not save the assessment.';
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', async () => {
+    await loadGrades();
+    if ((document.getElementById('item-search').value || '').trim()) {
+      searchItems();
+    }
+  });
+</script>
+{% endblock %}
