@@ -1134,6 +1134,20 @@ class BuybackOrder(Document):
         se.submit()
         self.stock_entry = se.name
 
+        # Tag the serial as Buyback-bin so POS search excludes it from selling.
+        if self.imei_serial:
+            try:
+                from ch_erp15.ch_erp15.ch_erp15.stock_bin_api import move_to_bin
+                move_to_bin(
+                    self.imei_serial,
+                    "Buyback",
+                    reason=f"Received via Buyback Order {self.name}",
+                    reference_doctype="Buyback Order",
+                    reference_name=self.name,
+                )
+            except Exception:
+                frappe.log_error(frappe.get_traceback(), f"Buyback bin tag failed for {self.imei_serial}")
+
     # ──────────────────────────────────────────────────────────────
     # Pickup logistics: route bought-back device from store to Buyback Bin
     # ──────────────────────────────────────────────────────────────
