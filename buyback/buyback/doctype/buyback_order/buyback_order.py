@@ -1137,7 +1137,7 @@ class BuybackOrder(Document):
         # Tag the serial as Buyback-bin so POS search excludes it from selling.
         if self.imei_serial:
             try:
-                from ch_erp15.ch_erp15.ch_erp15.stock_bin_api import move_to_bin
+                from ch_erp15.ch_erp15.stock_bin_api import move_to_bin
                 move_to_bin(
                     self.imei_serial,
                     "Buyback",
