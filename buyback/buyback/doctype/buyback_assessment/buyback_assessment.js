@@ -330,14 +330,7 @@ function buyback_recalculate_estimate(frm) {
 				// Update price
 				frm.set_value("estimated_price", est.estimated_price || 0);
 
-				// Flash indicator
-				if (est.estimated_price) {
-					frappe.show_alert({
-						message: __("Grade {0} — Estimated: ₹{1} (Base: ₹{2}, Deductions: ₹{3})",
-							[est.grade, fmt_money(est.estimated_price), fmt_money(est.base_price), fmt_money(est.total_deductions)]),
-						indicator: "green",
-					}, 5);
-				}
+				// Intentionally avoid toast notifications; only update fields on the form.
 			},
 		});
 	}, 500);
