@@ -256,8 +256,18 @@ class BuybackOrder(Document):
             except Exception:
                 frappe.log_error(title=f"Auto OTP dispatch failed for {self.name}")
 
-        # Safety net: create JE + SE if somehow on_submit missed it
-        if status == "Paid" and not self.journal_entry and not self.stock_entry:
+        previous = self.get_doc_before_save()
+        previous_status = (getattr(previous, "workflow_state", None) or getattr(previous, "status", None) or "") if previous else ""
+
+        # Safety net: create JE + SE only on the transition into Paid.
+        # A later edit to an already-paid order (for example payout-preference
+        # capture from the approval link) must not replay accounting.
+        if (
+            status == "Paid"
+            and previous_status != "Paid"
+            and not self.journal_entry
+            and not self.stock_entry
+        ):
             self._create_accounting_entries()
 
         # Update serial lifecycle on Paid (don't wait for Closed)
@@ -1067,6 +1077,12 @@ class BuybackOrder(Document):
         if not expense_account:
             frappe.logger("buyback").warning(
                 f"No buyback_expense_account configured — skipping JE for {self.name}"
+            )
+            return
+
+        if flt(self.final_price) <= 0:
+            frappe.logger("buyback").warning(
+                f"Buyback Order {self.name} has non-positive final_price — skipping JE"
             )
             return
 
