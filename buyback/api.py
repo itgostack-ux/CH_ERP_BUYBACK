@@ -845,16 +845,84 @@ def record_payment(
     amount: float | str,
     transaction_reference: str | None = None,
 ) -> dict:
-    """Record a payment against a buyback order."""
+    """Record a payment against a buyback order.
+
+    Hardened for go-live:
+      • amount must be > 0 (rejects zero/negative early with a clear error)
+      • payment_method is mandatory
+      • transaction_reference is mandatory for non-Cash modes (idempotency
+        anchor + bank reconciliation hook)
+      • parent doc is locked with SELECT … FOR UPDATE before append + save
+        so concurrent record_payment calls cannot double-credit (P0-5)
+      • duplicate (method, reference) pairs are rejected as idempotency
+        keys — replaying the same gateway callback / button click cannot
+        create a second payout row
+    """
+    amt = flt(amount)
+    if amt <= 0:
+        frappe.throw(
+            _("Payment amount must be greater than zero."),
+            exc=BuybackValidationError,
+            title=_("Invalid Payment"),
+        )
+    method = (payment_method or "").strip()
+    if not method:
+        frappe.throw(
+            _("Payment method is required."),
+            exc=BuybackValidationError,
+            title=_("Invalid Payment"),
+        )
+    ref = (transaction_reference or "").strip()
+    mode_type = (frappe.db.get_value("Mode of Payment", method, "type") or "").strip()
+    if mode_type != "Cash" and not ref:
+        frappe.throw(
+            _("Transaction reference is required for non-cash payment mode {0}.").format(
+                frappe.bold(method)
+            ),
+            exc=BuybackValidationError,
+        )
+
+    # ── Concurrency guard ─────────────────────────────────────────
+    # SELECT … FOR UPDATE serialises concurrent record_payment calls on
+    # the same Buyback Order so two staff (or two retried clicks) cannot
+    # post the same payment twice.
+    locked = frappe.db.get_value(
+        "Buyback Order",
+        {"name": order_name},
+        "name",
+        for_update=True,
+    )
+    if not locked:
+        frappe.throw(
+            _("Buyback Order {0} not found.").format(order_name),
+            exc=frappe.DoesNotExistError,
+        )
+
     doc = frappe.get_doc("Buyback Order", order_name)
     doc.check_permission("write")
+
+    # ── Idempotency on (method, reference) ───────────────────────
+    if ref:
+        for existing in (doc.payments or []):
+            if (existing.payment_method or "").strip() == method and (
+                existing.transaction_reference or ""
+            ).strip() == ref:
+                # Same reference already recorded → return existing state
+                # instead of double-posting. Safe replay.
+                return {
+                    "name": doc.name,
+                    "total_paid": doc.total_paid,
+                    "payment_status": doc.payment_status,
+                    "status": doc.status,
+                    "duplicate": True,
+                }
 
     doc.append(
         "payments",
         {
-            "payment_method": payment_method,
-            "amount": flt(amount),
-            "transaction_reference": transaction_reference,
+            "payment_method": method,
+            "amount": amt,
+            "transaction_reference": ref or None,
             "payment_date": frappe.utils.now_datetime(),
         },
     )

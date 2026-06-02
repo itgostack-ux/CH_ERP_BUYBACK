@@ -347,23 +347,47 @@ class BuybackOrder(Document):
             self.payment_status = "Overpaid"
 
     def _validate_payment_rows(self):
-        for row in self.payments or []:
+        """Validate populated payment rows.
+
+        Rows that are entirely blank (zero amount AND no method AND no
+        reference) are silently dropped — they come from JS placeholder
+        appends or interrupted prior runs and would otherwise block
+        every subsequent save with a misleading "amount must be > 0".
+        """
+        kept = []
+        for row in (self.payments or []):
             amount = flt(row.amount)
+            method = (row.payment_method or "").strip()
+            ref = (row.transaction_reference or "").strip()
+            # Truly blank row → drop on the fly. mutating doc.payments
+            # is safe before save persists the child table.
+            if amount == 0 and not method and not ref:
+                continue
+            kept.append(row)
+
             if amount <= 0:
                 frappe.throw(_("Payment row #{0}: amount must be greater than zero.").format(row.idx), title=_("Buyback Order Error"))
-            if not row.payment_method:
+            if not method:
                 frappe.throw(_("Payment row #{0}: payment method is required.").format(row.idx), title=_("Buyback Order Error"))
             if not row.payment_date:
                 frappe.throw(_("Payment row #{0}: payment date is required.").format(row.idx), title=_("Buyback Order Error"))
 
-            mode_type = (frappe.db.get_value("Mode of Payment", row.payment_method, "type") or "").strip()
+            mode_type = (frappe.db.get_value("Mode of Payment", method, "type") or "").strip()
             requires_reference = mode_type != "Cash"
-            if requires_reference and not (row.transaction_reference or "").strip():
+            if requires_reference and not ref:
                 frappe.throw(
                     _("Payment row #{0}: transaction reference is required for {1}.").format(
-                        row.idx, frappe.bold(row.payment_method)
+                        row.idx, frappe.bold(method)
                     )
                 )
+
+        # Re-index the surviving rows so idx stays contiguous; only
+        # reassign when we actually dropped something to avoid touching
+        # the doc unnecessarily.
+        if len(kept) != len(self.payments or []):
+            self.payments = kept
+            for i, row in enumerate(self.payments, start=1):
+                row.idx = i
 
     def _validate_paid_status_consistency(self):
         if self.payment_status == "Overpaid":
@@ -1024,6 +1048,20 @@ class BuybackOrder(Document):
         Dr: Buyback Expense Account
         Cr: Buyback Payable / Cash / Bank
         """
+        _pmode = (self.get("payout_mode") or self.get("payment_mode") or "Cash").lower()
+        if any(x in _pmode for x in ("bank", "transfer", "neft", "imps", "rtgs")):
+            try:
+                from ch_payments.bank_payments.api import create_bank_payment_request
+                _def_profile = frappe.db.get_single_value("Buyback Settings", "default_bank_profile") or ""
+                _bpr = create_bank_payment_request("Buyback Order", self.name, _def_profile)
+                if _bpr:
+                    self.db_set("custom_bank_payment_request", _bpr)
+                    frappe.msgprint(frappe._("Bank Payment Request {0} created. Finance to approve.").format(_bpr), indicator="green")
+            except Exception:
+                frappe.log_error(frappe.get_traceback(), f"BPR creation failed for Buyback Order {self.name}")
+                frappe.msgprint(frappe._("Could not auto-create BPR. Create manually from Bank Payments."), indicator="orange")
+            return  # Do not create JE for bank transfers
+
         settings = frappe.get_single("Buyback Settings")
         expense_account = settings.buyback_expense_account
         if not expense_account:

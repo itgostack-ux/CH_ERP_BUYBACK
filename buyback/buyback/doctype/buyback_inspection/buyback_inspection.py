@@ -213,6 +213,15 @@ class BuybackInspection(Document):
     @frappe.whitelist()
     def complete_inspection(self):
         """Complete the inspection with results."""
+        # Concurrency guard (P0-5): take a row-level lock on this
+        # inspection (and its parent assessment) so that two
+        # near-simultaneous "complete inspection" calls (double-click
+        # or replay) serialise rather than racing.
+        frappe.db.get_value("Buyback Inspection", self.name, "name", for_update=True)
+        if self.buyback_assessment:
+            frappe.db.get_value("Buyback Assessment", self.buyback_assessment, "name", for_update=True)
+        # Reload self under the lock so we see committed state.
+        self.reload()
         if self.status != "In Progress":
             frappe.throw(_("Can only complete an In Progress inspection."), exc=BuybackStatusError, title=_("Buyback Inspection Error"))
         if not self.condition_grade:

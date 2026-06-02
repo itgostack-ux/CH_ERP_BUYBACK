@@ -2,6 +2,7 @@ import json
 
 import frappe
 from frappe import _
+from frappe.rate_limiter import rate_limit
 from frappe.utils import cint, flt
 
 from buyback.api import get_estimate
@@ -35,6 +36,7 @@ def _resolve_grade(grade: str | None) -> tuple[str, str]:
 
 
 @frappe.whitelist(allow_guest=True)
+@rate_limit(limit=120, seconds=60, ip_based=True)
 def search_buyback_items(query: str = "", limit: int = 12) -> list[dict]:
     limit = max(1, min(cint(limit or 12), 20))
     filters = {"disabled": 0, "is_sales_item": 1}
@@ -62,6 +64,7 @@ def search_buyback_items(query: str = "", limit: int = 12) -> list[dict]:
 
 
 @frappe.whitelist(allow_guest=True)
+@rate_limit(limit=60, seconds=60, ip_based=True)
 def get_quote_grades() -> list[dict]:
     return frappe.get_all(
         "Grade Master",
@@ -71,6 +74,7 @@ def get_quote_grades() -> list[dict]:
 
 
 @frappe.whitelist(allow_guest=True)
+@rate_limit(limit=120, seconds=60, ip_based=True)
 def get_public_quote_estimate(
     item_code: str,
     grade: str | None = None,
@@ -112,6 +116,7 @@ def get_public_quote_estimate(
 
 
 @frappe.whitelist(allow_guest=True)
+@rate_limit(limit=10, seconds=300, methods=["POST"], ip_based=True)
 def submit_public_quote_request(
     customer_name: str,
     mobile_no: str,
