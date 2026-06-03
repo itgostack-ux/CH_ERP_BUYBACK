@@ -46,6 +46,20 @@ class BuybackAssessment(Document):
             self._fill_response_impacts()
         if self.diagnostic_tests or self.responses:
             self._calculate_estimate()
+        # P2-10: Block submission with unanswered diagnostic responses so the
+        # inspector cannot grade a device with a partial question bank.
+        if self.responses and self.status in ("Submitted", "Inspected", "Quoted"):
+            unanswered = [r for r in self.responses if not (r.get("answer") or "").strip()]
+            if unanswered:
+                missing = ", ".join(
+                    (r.get("question_text") or r.get("question_code") or r.get("name") or "")
+                    for r in unanswered[:5]
+                )
+                frappe.throw(
+                    _("All diagnostic questions must be answered before submission. "
+                      "Unanswered: {0}").format(missing),
+                    title=_("Incomplete Question Bank"),
+                )
         # Default estimated_grade to "A" (best condition) if still unset
         if not self.estimated_grade:
             self.estimated_grade = frappe.db.get_value(
