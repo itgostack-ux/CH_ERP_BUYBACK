@@ -2168,5 +2168,3 @@ def apply_exchange_to_invoice(
             "Exchange credit ₹{0} applied to invoice {1}."
         ).format(buyback_amount, sales_invoice),
     }
-
-    return result
