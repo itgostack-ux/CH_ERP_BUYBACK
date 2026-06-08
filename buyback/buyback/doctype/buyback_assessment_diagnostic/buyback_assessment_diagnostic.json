@@ -50,7 +50,8 @@
    "default": "0",
    "fieldname": "depreciation_percent",
    "fieldtype": "Percent",
-   "in_list_view": 1,
+    "in_list_view": 0,
+    "hidden": 1,
    "label": "Depreciation %",
    "read_only": 1,
    "description": "Auto-filled from Question Bank option matching the result"

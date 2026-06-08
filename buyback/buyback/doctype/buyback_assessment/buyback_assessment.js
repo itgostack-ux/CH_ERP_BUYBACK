@@ -124,6 +124,10 @@ frappe.ui.form.on("Buyback Assessment", {
 
 		// Hide "Add row" buttons — rows are auto-loaded from item diagnostics/questions
 		frm.fields_dict.diagnostic_tests.grid.cannot_add_rows = true;
+		frm.fields_dict.diagnostic_tests.grid.cannot_delete_rows = true;
+		frm.fields_dict.diagnostic_tests.grid.update_docfield_property(
+			"depreciation_percent", "hidden", 1
+		);
 		frm.fields_dict.diagnostic_tests.grid.refresh();
 		frm.fields_dict.responses.grid.cannot_add_rows = true;
 		frm.fields_dict.responses.grid.refresh();
