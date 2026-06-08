@@ -42,7 +42,7 @@
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Result",
-   "options": "\nPass\nFail\nPartial",
+    "options": "\nYes\nNo",
    "reqd": 1,
    "description": "Automated test result from mobile app"
   },

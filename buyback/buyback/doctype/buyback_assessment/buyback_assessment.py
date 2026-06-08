@@ -252,8 +252,8 @@ class BuybackAssessment(Document):
     def _fill_diagnostic_impacts(self):
         """Look up depreciation_percent from Question Bank options for each diagnostic test.
 
-        Automated tests store results as Pass/Fail/Partial which map to
-        option_value in the Question Bank options table.
+        Automated tests now use Yes/No in UI, but legacy Question Bank rows
+        may still store Pass/Fail/Partial option values.
         """
         category = self.get("item_group") or self.get("category")
         for d in self.diagnostic_tests:
@@ -269,11 +269,7 @@ class BuybackAssessment(Document):
             if not qname:
                 continue
 
-            impact = frappe.db.get_value(
-                "Buyback Question Option",
-                {"parent": qname, "option_value": d.result},
-                "price_impact_percent",
-            )
+            impact = _get_diagnostic_option_impact(qname, d.result)
             if impact is not None:
                 d.depreciation_percent = abs(impact)
 
@@ -325,6 +321,30 @@ class BuybackAssessment(Document):
             self.estimated_price = result.get("estimated_price", 0)
         except (ValueError, KeyError, frappe.ValidationError, frappe.DoesNotExistError):
             frappe.log_error(title=f"Assessment pricing failed: {self.name}")
+
+
+def _get_diagnostic_option_impact(question_name: str, result_value: str):
+    """Resolve diagnostic option impact with Yes/No <-> Pass/Fail compatibility."""
+    raw = (result_value or "").strip()
+    if not raw:
+        return None
+
+    candidates = [raw]
+    token = raw.lower()
+    if token == "yes":
+        candidates.extend(["Pass", "pass"])
+    elif token == "no":
+        candidates.extend(["Fail", "fail", "Partial", "partial"])
+
+    for val in candidates:
+        impact = frappe.db.get_value(
+            "Buyback Question Option",
+            {"parent": question_name, "option_value": val},
+            "price_impact_percent",
+        )
+        if impact is not None:
+            return impact
+    return None
 
     # ------------------------------------------------------------------
     # Status transitions

@@ -1587,7 +1587,72 @@ def get_question_options(question_name: str) -> list:
         order_by="idx asc",
         limit_page_length=50,
     )
+
+    # TC_058: Automated test flows should display Yes/No (not Pass/Fail/Partial)
+    # while staying compatible with existing Question Bank data.
+    diagnosis_type = frappe.db.get_value(
+        "Buyback Question Bank", question_name, "diagnosis_type"
+    )
+    if diagnosis_type == "Automated Test":
+        return _normalize_automated_test_options(options)
+
     return options
+
+
+def _normalize_automated_test_options(options: list[dict]) -> list[dict]:
+    """Normalize automated-test options to Yes/No.
+
+    Legacy Question Bank rows may still store Pass/Fail/Partial values.
+    Map these to Yes/No for UI while preserving price impact behavior.
+    """
+    if not options:
+        return []
+
+    by_value = {
+        (o.get("option_value") or "").strip().lower(): {
+            "option_value": o.get("option_value"),
+            "option_label": o.get("option_label"),
+            "price_impact_percent": flt(o.get("price_impact_percent") or 0),
+        }
+        for o in options
+    }
+
+    # Keep explicit Yes/No if already configured.
+    if "yes" in by_value and "no" in by_value:
+        return [
+            {
+                "option_value": "Yes",
+                "option_label": by_value["yes"].get("option_label") or "Yes",
+                "price_impact_percent": by_value["yes"].get("price_impact_percent") or 0,
+            },
+            {
+                "option_value": "No",
+                "option_label": by_value["no"].get("option_label") or "No",
+                "price_impact_percent": by_value["no"].get("price_impact_percent") or 0,
+            },
+        ]
+
+    # Legacy fallback: Pass -> Yes, Fail/Partial -> No.
+    yes_impact = by_value.get("pass", {}).get("price_impact_percent", 0)
+    no_candidates = []
+    if "fail" in by_value:
+        no_candidates.append(by_value["fail"].get("price_impact_percent", 0))
+    if "partial" in by_value:
+        no_candidates.append(by_value["partial"].get("price_impact_percent", 0))
+    no_impact = min(no_candidates) if no_candidates else 0
+
+    return [
+        {
+            "option_value": "Yes",
+            "option_label": "Yes",
+            "price_impact_percent": yes_impact,
+        },
+        {
+            "option_value": "No",
+            "option_label": "No",
+            "price_impact_percent": no_impact,
+        },
+    ]
 
 
 # ── Reference Price Lookup ────────────────────────────────────────
@@ -1679,9 +1744,19 @@ def _auto_determine_grade(diagnostic_tests: list) -> str:
     if not results:
         return "A"
 
-    total = len(results)
-    fail_count = sum(1 for r in results if r == "Fail")
-    partial_count = sum(1 for r in results if r == "Partial")
+    normalized = []
+    for r in results:
+        token = str(r).strip().lower()
+        if token == "yes":
+            normalized.append("pass")
+        elif token == "no":
+            normalized.append("fail")
+        else:
+            normalized.append(token)
+
+    total = len(normalized)
+    fail_count = sum(1 for r in normalized if r == "fail")
+    partial_count = sum(1 for r in normalized if r == "partial")
 
     if fail_count == 0 and partial_count == 0:
         return "A"
@@ -1805,17 +1880,18 @@ def get_diagnostic_tests_for_item(item_code: str) -> list:
             fields=["option_value", "option_label", "price_impact_percent"],
             order_by="idx asc",
         )
+        normalized_options = _normalize_automated_test_options(options)
         result.append({
             "name": t.name,
             "test_code": t.question_code,
             "test_name": t.question_text,
             "options": [
                 {
-                    "value": o.option_value,
-                    "label": o.option_label or o.option_value,
-                    "impact": o.price_impact_percent or 0,
+                    "value": o.get("option_value"),
+                    "label": o.get("option_label") or o.get("option_value"),
+                    "impact": o.get("price_impact_percent") or 0,
                 }
-                for o in options
+                for o in normalized_options
             ],
         })
 

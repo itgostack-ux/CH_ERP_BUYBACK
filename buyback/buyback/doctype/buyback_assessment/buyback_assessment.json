@@ -260,8 +260,8 @@
    "fieldtype": "Section Break",
    "label": "Automated Diagnostic Tests"
   },
-  {
-   "description": "Automated test results from mobile app \u2014 each test produces Pass/Fail/Partial",
+    {
+     "description": "Automated test results from mobile app \u2014 each test produces Yes/No",
    "fieldname": "diagnostic_tests",
    "fieldtype": "Table",
    "label": "Diagnostic Tests",
