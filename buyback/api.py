@@ -1488,6 +1488,14 @@ def get_buyback_approval_details(token: str) -> dict:
         "customer_bank_name": order.customer_bank_name,
         "customer_payout_notes": order.customer_payout_notes,
         "customer_payout_updated_at": str(order.customer_payout_updated_at) if order.customer_payout_updated_at else "",
+        "customer_photo": order.customer_photo,
+        "customer_id_type": order.customer_id_type,
+        "customer_id_number": order.customer_id_number,
+        "customer_id_front": order.customer_id_front,
+        "customer_id_back": order.customer_id_back,
+        "kyc_verified": order.kyc_verified,
+        "kyc_verified_by": order.kyc_verified_by,
+        "kyc_verified_at": str(order.kyc_verified_at) if order.kyc_verified_at else "",
     }
 
 

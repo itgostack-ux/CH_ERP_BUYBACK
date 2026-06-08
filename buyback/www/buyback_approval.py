@@ -76,5 +76,12 @@ def get_context(context):
         "customer_bank_ifsc": order.customer_bank_ifsc,
         "customer_bank_name": order.customer_bank_name,
         "customer_payout_notes": order.customer_payout_notes,
+        "customer_photo": order.customer_photo,
+        "customer_id_type": order.customer_id_type,
+        "customer_id_number": order.customer_id_number,
+        "customer_id_front": order.customer_id_front,
+        "customer_id_back": order.customer_id_back,
+        "kyc_verified": order.kyc_verified,
+        "kyc_verified_at": order.kyc_verified_at,
     }
     context.no_cache = 1
