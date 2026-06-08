@@ -171,7 +171,7 @@
    "fieldname": "iw_0_6_section",
    "fieldtype": "Section Break",
    "hidden": 1,
-   "label": "In Warranty 0\u20136 Months"
+   "label": "In Warranty 4\u20136 Months"
   },
   {
    "fieldname": "a_grade_iw_0_6",
@@ -206,7 +206,7 @@
    "fieldname": "iw_6_11_section",
    "fieldtype": "Section Break",
    "hidden": 1,
-   "label": "In Warranty 6\u201311 Months"
+   "label": "In Warranty 7\u201311 Months"
   },
   {
    "fieldname": "a_grade_iw_6_11",

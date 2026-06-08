@@ -44,7 +44,7 @@ class BuybackAssessment(Document):
             self._fill_diagnostic_impacts()
         if self.responses:
             self._fill_response_impacts()
-        if self.diagnostic_tests or self.responses:
+        if self.item:
             self._calculate_estimate()
         # P2-10: Block submission with unanswered diagnostic responses so the
         # inspector cannot grade a device with a partial question bank.
@@ -60,8 +60,8 @@ class BuybackAssessment(Document):
                       "Unanswered: {0}").format(missing),
                     title=_("Incomplete Question Bank"),
                 )
-        # Default estimated_grade to "A" (best condition) if still unset
-        if not self.estimated_grade:
+        # When no item is set yet, default grade to "A" so the field isn't blank
+        if not self.item and not self.estimated_grade:
             self.estimated_grade = frappe.db.get_value(
                 "Grade Master", {"grade_name": "A"}, "name"
             )
@@ -289,13 +289,21 @@ class BuybackAssessment(Document):
                     "depreciation_percent": d.depreciation_percent,
                 })
 
-            grade_letter = _auto_determine_grade(diagnostic_data)
-            grade = frappe.db.get_value(
-                "Grade Master", {"grade_name": grade_letter}, "name"
-            )
-            if not grade:
-                frappe.log_error(f"Grade Master missing for grade '{grade_letter}'. Create A/B/C/D records in Grade Master.", "Buyback Grade Missing")
-            self.estimated_grade = grade or None
+            if diagnostic_data:
+                # Grade is determined by test results — overwrite any manual setting
+                grade_letter = _auto_determine_grade(diagnostic_data)
+                grade = frappe.db.get_value(
+                    "Grade Master", {"grade_name": grade_letter}, "name"
+                )
+                if not grade:
+                    frappe.log_error(f"Grade Master missing for grade '{grade_letter}'. Create A/B/C/D records in Grade Master.", "Buyback Grade Missing")
+                self.estimated_grade = grade or None
+            # When no diagnostics exist, preserve any manually-set grade.
+            # Default to "A" only if grade is still unset.
+            if not self.estimated_grade:
+                self.estimated_grade = frappe.db.get_value(
+                    "Grade Master", {"grade_name": "A"}, "name"
+                )
 
             responses_data = []
             for r in (self.responses or []):
