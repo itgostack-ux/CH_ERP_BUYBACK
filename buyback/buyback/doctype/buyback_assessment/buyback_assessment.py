@@ -44,7 +44,7 @@ class BuybackAssessment(Document):
             self._fill_diagnostic_impacts()
         if self.responses:
             self._fill_response_impacts()
-        if self.item:
+        if self.diagnostic_tests or self.responses:
             self._calculate_estimate()
         # P2-10: Block submission with unanswered diagnostic responses so the
         # inspector cannot grade a device with a partial question bank.
@@ -60,8 +60,8 @@ class BuybackAssessment(Document):
                       "Unanswered: {0}").format(missing),
                     title=_("Incomplete Question Bank"),
                 )
-        # When no item is set yet, default grade to "A" so the field isn't blank
-        if not self.item and not self.estimated_grade:
+        # Default estimated_grade to "A" (best condition) if still unset
+        if not self.estimated_grade:
             self.estimated_grade = frappe.db.get_value(
                 "Grade Master", {"grade_name": "A"}, "name"
             )
@@ -252,8 +252,8 @@ class BuybackAssessment(Document):
     def _fill_diagnostic_impacts(self):
         """Look up depreciation_percent from Question Bank options for each diagnostic test.
 
-        Automated tests now use Yes/No in UI, but legacy Question Bank rows
-        may still store Pass/Fail/Partial option values.
+        Automated tests store results as Pass/Fail/Partial which map to
+        option_value in the Question Bank options table.
         """
         category = self.get("item_group") or self.get("category")
         for d in self.diagnostic_tests:
@@ -269,7 +269,11 @@ class BuybackAssessment(Document):
             if not qname:
                 continue
 
-            impact = _get_diagnostic_option_impact(qname, d.result)
+            impact = frappe.db.get_value(
+                "Buyback Question Option",
+                {"parent": qname, "option_value": d.result},
+                "price_impact_percent",
+            )
             if impact is not None:
                 d.depreciation_percent = abs(impact)
 
@@ -289,21 +293,13 @@ class BuybackAssessment(Document):
                     "depreciation_percent": d.depreciation_percent,
                 })
 
-            if diagnostic_data:
-                # Grade is determined by test results — overwrite any manual setting
-                grade_letter = _auto_determine_grade(diagnostic_data)
-                grade = frappe.db.get_value(
-                    "Grade Master", {"grade_name": grade_letter}, "name"
-                )
-                if not grade:
-                    frappe.log_error(f"Grade Master missing for grade '{grade_letter}'. Create A/B/C/D records in Grade Master.", "Buyback Grade Missing")
-                self.estimated_grade = grade or None
-            # When no diagnostics exist, preserve any manually-set grade.
-            # Default to "A" only if grade is still unset.
-            if not self.estimated_grade:
-                self.estimated_grade = frappe.db.get_value(
-                    "Grade Master", {"grade_name": "A"}, "name"
-                )
+            grade_letter = _auto_determine_grade(diagnostic_data)
+            grade = frappe.db.get_value(
+                "Grade Master", {"grade_name": grade_letter}, "name"
+            )
+            if not grade:
+                frappe.log_error(f"Grade Master missing for grade '{grade_letter}'. Create A/B/C/D records in Grade Master.", "Buyback Grade Missing")
+            self.estimated_grade = grade or None
 
             responses_data = []
             for r in (self.responses or []):
@@ -329,30 +325,6 @@ class BuybackAssessment(Document):
             self.estimated_price = result.get("estimated_price", 0)
         except (ValueError, KeyError, frappe.ValidationError, frappe.DoesNotExistError):
             frappe.log_error(title=f"Assessment pricing failed: {self.name}")
-
-
-def _get_diagnostic_option_impact(question_name: str, result_value: str):
-    """Resolve diagnostic option impact with Yes/No <-> Pass/Fail compatibility."""
-    raw = (result_value or "").strip()
-    if not raw:
-        return None
-
-    candidates = [raw]
-    token = raw.lower()
-    if token == "yes":
-        candidates.extend(["Pass", "pass"])
-    elif token == "no":
-        candidates.extend(["Fail", "fail", "Partial", "partial"])
-
-    for val in candidates:
-        impact = frappe.db.get_value(
-            "Buyback Question Option",
-            {"parent": question_name, "option_value": val},
-            "price_impact_percent",
-        )
-        if impact is not None:
-            return impact
-    return None
 
     # ------------------------------------------------------------------
     # Status transitions
