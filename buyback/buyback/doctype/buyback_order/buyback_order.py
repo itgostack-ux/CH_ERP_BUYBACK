@@ -1122,6 +1122,7 @@ class BuybackOrder(Document):
                 },
             ],
         })
+        je.flags.ch_system_generated_je = True
         je.insert(ignore_permissions=True)
         je.flags.ignore_permissions = True
         je.submit()
