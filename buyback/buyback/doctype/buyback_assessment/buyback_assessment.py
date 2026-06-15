@@ -49,7 +49,7 @@ class BuybackAssessment(Document):
         # P2-10: Block submission with unanswered diagnostic responses so the
         # inspector cannot grade a device with a partial question bank.
         if self.responses and self.status in ("Submitted", "Inspected", "Quoted"):
-            unanswered = [r for r in self.responses if not (r.get("answer") or "").strip()]
+            unanswered = [r for r in self.responses if not (r.get("answer_value") or "").strip()]
             if unanswered:
                 missing = ", ".join(
                     (r.get("question_text") or r.get("question_code") or r.get("name") or "")
