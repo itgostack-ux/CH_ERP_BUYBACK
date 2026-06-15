@@ -454,8 +454,13 @@ class BuybackOrder(Document):
                 store_warehouse=self.store,
                 customer=self.customer,
             )
-        except (ImportError, frappe.ValidationError):
-            frappe.log_error(title="Exchange Value Override exception creation failed")
+        except Exception:
+            # This audit exception is best-effort only and must never block
+            # Buyback Order save.
+            frappe.log_error(
+                frappe.get_traceback(),
+                title="Exchange Value Override exception creation failed",
+            )
 
     def approve(self, remarks=None):
         """Manager approves the order."""
@@ -780,8 +785,11 @@ class BuybackOrder(Document):
                     store_warehouse=self.store,
                     customer=self.customer,
                 )
-        except (ImportError, frappe.ValidationError):
-            frappe.log_error(title="Replacement Without Finance exception creation failed")
+        except Exception:
+            frappe.log_error(
+                frappe.get_traceback(),
+                title="Replacement Without Finance exception creation failed",
+            )
 
         frappe.throw(
             _("Cannot close Buyback Order {0} — missing: {1}.<br><br>"
