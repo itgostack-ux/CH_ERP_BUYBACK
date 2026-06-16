@@ -1,6 +1,6 @@
 {
- "allow_import": 1,
  "actions": [],
+ "allow_import": 1,
  "autoname": "naming_series:",
  "creation": "2026-03-06 10:00:00",
  "doctype": "DocType",
@@ -134,22 +134,20 @@
    "read_only": 1
   },
   {
+   "fetch_from": "customer.ch_customer_id",
    "fieldname": "ch_customer_id",
    "fieldtype": "Int",
+   "in_standard_filter": 1,
    "label": "Customer ID",
-   "fetch_from": "customer.ch_customer_id",
    "read_only": 1,
-   "search_index": 1,
-   "no_copy": 0,
-   "in_standard_filter": 1
+   "search_index": 1
   },
   {
+   "fetch_from": "customer.ch_membership_id",
    "fieldname": "ch_membership_id",
    "fieldtype": "Data",
    "label": "Membership ID",
-   "fetch_from": "customer.ch_membership_id",
-   "read_only": 1,
-   "no_copy": 0
+   "read_only": 1
   },
   {
    "fetch_from": "customer.mobile_no",
@@ -228,20 +226,23 @@
   {
    "fieldname": "imei_serial",
    "fieldtype": "Data",
-   "label": "IMEI / Serial No"
+   "label": "IMEI / Serial No",
+   "reqd": 1
   },
   {
    "description": "Age bracket \u2014 pricing varies by bracket",
    "fieldname": "device_age_months",
    "fieldtype": "Select",
    "label": "Device Age",
-   "options": "\n0-3 Months\n4-6 Months\n7-11 Months\n12+ Months"
+   "options": "\n0-3 Months\n4-6 Months\n7-11 Months\n12+ Months",
+   "reqd": 1
   },
   {
    "fieldname": "warranty_status",
    "fieldtype": "Select",
    "label": "Warranty Status",
-   "options": "\nIn Warranty\nOut of Warranty"
+   "options": "\nIn Warranty\nOut of Warranty",
+   "read_only": 1
   },
   {
    "depends_on": "eval:doc.item",
@@ -260,8 +261,8 @@
    "fieldtype": "Section Break",
    "label": "Automated Diagnostic Tests"
   },
-    {
-     "description": "Automated test results from mobile app \u2014 each test produces Yes/No",
+  {
+   "description": "Automated test results from mobile app \u2014 each test produces Yes/No",
    "fieldname": "diagnostic_tests",
    "fieldtype": "Table",
    "label": "Diagnostic Tests",
@@ -363,7 +364,7 @@
   },
   {
    "allow_on_submit": 1,
-   "default": 0,
+   "default": "0",
    "description": "Set when customer taps 'Sell Now' in the mobile app or kiosk",
    "fieldname": "customer_interested",
    "fieldtype": "Check",
@@ -405,7 +406,7 @@
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-03-14 14:39:26.049215",
+ "modified": "2026-06-16 13:34:39.924490",
  "modified_by": "Administrator",
  "module": "BuyBack",
  "name": "Buyback Assessment",

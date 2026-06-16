@@ -323,6 +323,12 @@ class BuybackAssessment(Document):
             )
 
             self.estimated_price = result.get("estimated_price", 0)
+            final_grade_letter = result.get("grade_letter") or "A"
+            final_grade_id = frappe.db.get_value(
+                "Grade Master", {"grade_name": final_grade_letter}, "name"
+            )
+            if final_grade_id:
+                self.estimated_grade = final_grade_id
         except (ValueError, KeyError, frappe.ValidationError, frappe.DoesNotExistError):
             frappe.log_error(title=f"Assessment pricing failed: {self.name}")
 

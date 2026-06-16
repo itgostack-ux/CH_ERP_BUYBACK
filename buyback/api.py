@@ -1625,7 +1625,6 @@ def _normalize_automated_test_options(options: list[dict]) -> list[dict]:
         for o in options
     }
 
-    # Keep explicit Yes/No if already configured.
     if "yes" in by_value and "no" in by_value:
         return [
             {
@@ -1640,14 +1639,16 @@ def _normalize_automated_test_options(options: list[dict]) -> list[dict]:
             },
         ]
 
-    # Legacy fallback: Pass -> Yes, Fail/Partial -> No.
-    yes_impact = by_value.get("pass", {}).get("price_impact_percent", 0)
-    no_candidates = []
-    if "fail" in by_value:
-        no_candidates.append(by_value["fail"].get("price_impact_percent", 0))
-    if "partial" in by_value:
-        no_candidates.append(by_value["partial"].get("price_impact_percent", 0))
-    no_impact = min(no_candidates) if no_candidates else 0
+    #updated
+    # Legacy Pass/Fail/Partial — FIXED mapping
+    # Yes = defect exists → use Fail (or Partial) impact
+    # No  = no defect    → use Pass impact (usually 0)
+    fail_impact = by_value.get("fail", {}).get("price_impact_percent", 0)
+    partial_impact = by_value.get("partial", {}).get("price_impact_percent", 0)
+    pass_impact = by_value.get("pass", {}).get("price_impact_percent", 0)
+
+    yes_impact = max(fail_impact, partial_impact) if (fail_impact or partial_impact) else 0
+    no_impact = pass_impact
 
     return [
         {
@@ -1693,6 +1694,92 @@ def get_reference_prices(item_code: str) -> dict:
 
 # ── Live Estimate Calculator ─────────────────────────────────────
 
+# @frappe.whitelist()
+# def calculate_live_estimate(
+#     item_code: str,
+#     warranty_status: str = None,
+#     device_age_months: str = None,
+#     diagnostic_tests: str = None,
+#     responses: str = None,
+#     brand: str = None,
+#     item_group: str = None,
+# ) -> dict:
+#     """Calculate estimated price and auto-determine grade from diagnostic results.
+
+#     Called live from the Assessment form as the user fills in answers.
+#     Returns grade + price breakdown so the form can update without a full save.
+#     """
+#     import json
+#     from frappe.utils import flt
+
+#     diag_data = json.loads(diagnostic_tests or "[]")
+#     resp_data = json.loads(responses or "[]")
+
+#     # ── Auto-determine grade from diagnostic results ──────────
+#     grade = _auto_determine_grade(diag_data)
+#     grade_id = frappe.db.get_value("Grade Master", {"grade_name": grade}, "name") or ""
+
+#     from buyback.buyback.pricing.engine import calculate_estimated_price
+
+#     result = calculate_estimated_price(
+#         item_code=item_code,
+#         grade=grade_id,
+#         warranty_status=warranty_status,
+#         device_age_months=device_age_months,
+#         responses=resp_data,
+#         diagnostic_tests=diag_data,
+#         brand=brand,
+#         item_group=item_group,
+#     )
+
+#     result["grade"] = grade
+#     result["grade_id"] = grade_id
+#     return result
+
+
+# def _auto_determine_grade(diagnostic_tests: list) -> str:
+#     """Determine device grade based on diagnostic test results.
+
+#     Grade rules:
+#         A  – all tests Pass (or no tests)
+#         B  – all Pass or Partial, at most 2 Partial, zero Fail
+#         C  – some Fail but fewer than half
+#         D  – half or more Fail
+#     """
+#     if not diagnostic_tests:
+#         return "A"
+
+#     results = [d.get("result", "") for d in diagnostic_tests if d.get("result")]
+#     if not results:
+#         return "A"
+
+#     normalized = []
+#     for r in results:
+#         token = str(r).strip().lower()
+#         if token == "yes":
+#             normalized.append("pass")
+#         elif token == "no":
+#             normalized.append("fail")
+#         else:
+#             normalized.append(token)
+
+#     total = len(normalized)
+#     fail_count = sum(1 for r in normalized if r == "fail")
+#     partial_count = sum(1 for r in normalized if r == "partial")
+
+#     if fail_count == 0 and partial_count == 0:
+#         return "A"
+#     elif fail_count == 0 and partial_count <= 2:
+#         return "B"
+#     elif fail_count < total / 2:
+#         return "C"
+#     else:
+#         return "D"
+
+
+
+
+#update calculate_live_estimate
 @frappe.whitelist()
 def calculate_live_estimate(
     item_code: str,
@@ -1703,26 +1790,22 @@ def calculate_live_estimate(
     brand: str = None,
     item_group: str = None,
 ) -> dict:
-    """Calculate estimated price and auto-determine grade from diagnostic results.
-
-    Called live from the Assessment form as the user fills in answers.
-    Returns grade + price breakdown so the form can update without a full save.
-    """
+    """Calculate estimated price + grade from price position in Ready Reckoner."""
     import json
-    from frappe.utils import flt
 
     diag_data = json.loads(diagnostic_tests or "[]")
     resp_data = json.loads(responses or "[]")
 
-    # ── Auto-determine grade from diagnostic results ──────────
-    grade = _auto_determine_grade(diag_data)
-    grade_id = frappe.db.get_value("Grade Master", {"grade_name": grade}, "name") or ""
+    # Provisional Grade A for base lookup (engine always starts from A)
+    provisional_grade_id = frappe.db.get_value(
+        "Grade Master", {"grade_name": "A"}, "name"
+    ) or ""
 
     from buyback.buyback.pricing.engine import calculate_estimated_price
 
     result = calculate_estimated_price(
         item_code=item_code,
-        grade=grade_id,
+        grade=provisional_grade_id,
         warranty_status=warranty_status,
         device_age_months=device_age_months,
         responses=resp_data,
@@ -1731,49 +1814,21 @@ def calculate_live_estimate(
         item_group=item_group,
     )
 
-    result["grade"] = grade
-    result["grade_id"] = grade_id
+    final_grade = result.get("grade_letter") or "A"
+    final_grade_id = frappe.db.get_value(
+        "Grade Master", {"grade_name": final_grade}, "name"
+    ) or ""
+
+    result["grade"] = final_grade
+    result["grade_id"] = final_grade_id
     return result
 
 
-def _auto_determine_grade(diagnostic_tests: list) -> str:
-    """Determine device grade based on diagnostic test results.
+#updated Auto determine grade :
 
-    Grade rules:
-        A  – all tests Pass (or no tests)
-        B  – all Pass or Partial, at most 2 Partial, zero Fail
-        C  – some Fail but fewer than half
-        D  – half or more Fail
-    """
-    if not diagnostic_tests:
-        return "A"
-
-    results = [d.get("result", "") for d in diagnostic_tests if d.get("result")]
-    if not results:
-        return "A"
-
-    normalized = []
-    for r in results:
-        token = str(r).strip().lower()
-        if token == "yes":
-            normalized.append("pass")
-        elif token == "no":
-            normalized.append("fail")
-        else:
-            normalized.append(token)
-
-    total = len(normalized)
-    fail_count = sum(1 for r in normalized if r == "fail")
-    partial_count = sum(1 for r in normalized if r == "partial")
-
-    if fail_count == 0 and partial_count == 0:
-        return "A"
-    elif fail_count == 0 and partial_count <= 2:
-        return "B"
-    elif fail_count < total / 2:
-        return "C"
-    else:
-        return "D"
+def _auto_determine_grade(diagnostic_tests: list, device_age_months: str = None) -> str:
+    """Deprecated. Returns provisional 'A'. Real grade comes from engine."""
+    return "A"
 
 
 # ── Item Question Map Helper ──────────────────────────────────────

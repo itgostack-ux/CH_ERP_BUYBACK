@@ -163,7 +163,21 @@ frappe.ui.form.on("Buyback Assessment", {
 		buyback_load_diagnostic_tests(frm);
 		buyback_load_customer_questions(frm);
 	},
-	device_age_months(frm) { buyback_render_price_cards(frm); buyback_recalculate_estimate(frm); },
+	
+	device_age_months(frm) {
+    const age = frm.doc.device_age_months;
+    
+    if (!age || age.trim() === "") {
+        frm.set_value("warranty_status", null);
+    } else if (age === "12+ Months") {
+        frm.set_value("warranty_status", "Out of Warranty");
+    } else {
+        frm.set_value("warranty_status", "In Warranty");
+    }
+    buyback_render_price_cards(frm);
+    buyback_recalculate_estimate(frm);
+	},
+
 	warranty_status(frm) { buyback_render_price_cards(frm); buyback_recalculate_estimate(frm); },
 });
 
@@ -260,14 +274,56 @@ frappe.ui.form.on("Buyback Assessment Diagnostic", {
 		});
 	},
 
+	// result(frm, cdt, cdn) {
+	// 	const row = locals[cdt][cdn];
+	// 	if (!row.result || !row.test) return;
+
+	// 	// Try local cache first (set by buyback_load_diagnostic_tests or test handler)
+	// 	if (row._impact_map && row._impact_map.hasOwnProperty(row.result)) {
+	// 		frappe.model.set_value(cdt, cdn, "depreciation_percent",
+	// 			row._impact_map[row.result]
+	// 		).then(() => buyback_recalculate_estimate(frm));
+	// 		return;
+	// 	}
+
+	// 	// Fallback: fetch from server
+	// 	frappe.call({
+	// 		method: "buyback.api.get_question_options",
+	// 		args: { question_name: row.test },
+	// 		callback(r) {
+	// 			if (!r.message) return;
+	// 			const opt = r.message.find(o => o.option_value === row.result);
+	// 			if (opt) {
+	// 				frappe.model.set_value(cdt, cdn, "depreciation_percent",
+	// 					Math.abs(opt.price_impact_percent || 0)
+	// 				).then(() => buyback_recalculate_estimate(frm));
+	// 			}
+	// 		},
+	// 	});
+	// },
+
+	
+	//updated code:
+
 	result(frm, cdt, cdn) {
 		const row = locals[cdt][cdn];
 		if (!row.result || !row.test) return;
 
-		// Try local cache first (set by buyback_load_diagnostic_tests or test handler)
-		if (row._impact_map && row._impact_map.hasOwnProperty(row.result)) {
+		//User selected a LABEL (Yes/No)  convert to VALUE (Pass/Fail)
+		let actual_value = row.result;
+		if (row._label_to_value && row._label_to_value.hasOwnProperty(row.result)) {
+			actual_value = row._label_to_value[row.result];
+			// Silently update the row to store the canonical value
+			if (actual_value !== row.result) {
+				frappe.model.set_value(cdt, cdn, "result", actual_value);
+				return; // set_value will re-trigger this handler with correct value
+			}
+		}
+
+		// Now lookup impact using the value
+		if (row._impact_map && row._impact_map.hasOwnProperty(actual_value)) {
 			frappe.model.set_value(cdt, cdn, "depreciation_percent",
-				row._impact_map[row.result]
+				row._impact_map[actual_value]
 			).then(() => buyback_recalculate_estimate(frm));
 			return;
 		}
@@ -278,7 +334,7 @@ frappe.ui.form.on("Buyback Assessment Diagnostic", {
 			args: { question_name: row.test },
 			callback(r) {
 				if (!r.message) return;
-				const opt = r.message.find(o => o.option_value === row.result);
+				const opt = r.message.find(o => o.option_value === actual_value);
 				if (opt) {
 					frappe.model.set_value(cdt, cdn, "depreciation_percent",
 						Math.abs(opt.price_impact_percent || 0)
@@ -382,6 +438,49 @@ function buyback_load_diagnostic_tests(frm) {
 	// Don't overwrite if tests already exist (e.g. editing a saved doc)
 	if (frm.doc.diagnostic_tests && frm.doc.diagnostic_tests.length) return;
 
+	// frappe.call({
+	// 	method: "buyback.api.get_diagnostic_tests_for_item",
+	// 	args: { item_code: frm.doc.item },
+	// 	callback(r) {
+	// 		if (!r.message || !r.message.length) return;
+
+	// 		// Clear existing empty rows
+	// 		frm.clear_table("diagnostic_tests");
+
+	// 		r.message.forEach(test => {
+	// 			const row = frm.add_child("diagnostic_tests");
+	// 			row.test = test.name;
+	// 			row.test_code = test.test_code;
+	// 			row.test_name = test.test_name;
+
+	// 			// Pre-build impact map so result change sets depreciation live
+	// 			row._impact_map = {};
+	// 			if (test.options && test.options.length) {
+	// 				test.options.forEach(o => {
+	// 					row._impact_map[o.value] = Math.abs(o.impact || 0);
+	// 				});
+	// 			}
+	// 		});
+
+	// 		frm.refresh_field("diagnostic_tests");
+
+	// 		// Update result Select options for all rows
+	// 		if (r.message.length && r.message[0].options && r.message[0].options.length) {
+	// 			const opts = r.message[0].options.map(o => o.value);
+	// 			frm.fields_dict.diagnostic_tests.grid.update_docfield_property(
+	// 				"result", "options", "\n" + opts.join("\n")
+	// 			);
+	// 		}
+
+	// 		frappe.show_alert({
+	// 			message: __("{0} diagnostic tests loaded", [r.message.length]),
+	// 			indicator: "blue",
+	// 		});
+	// 	},
+	// });
+
+
+	//updated
 	frappe.call({
 		method: "buyback.api.get_diagnostic_tests_for_item",
 		args: { item_code: frm.doc.item },
@@ -398,23 +497,25 @@ function buyback_load_diagnostic_tests(frm) {
 				row.test_name = test.test_name;
 
 				// Pre-build impact map so result change sets depreciation live
-				row._impact_map = {};
-				if (test.options && test.options.length) {
-					test.options.forEach(o => {
-						row._impact_map[o.value] = Math.abs(o.impact || 0);
-					});
-				}
-			});
+                row._impact_map = {};
+                row._label_to_value = {};
+                if (test.options && test.options.length) {
+                    test.options.forEach(o => {
+                        row._impact_map[o.value] = Math.abs(o.impact || 0);
+                        row._label_to_value[o.label || o.value] = o.value;
+                    });
+                }
+            });
 
 			frm.refresh_field("diagnostic_tests");
 
 			// Update result Select options for all rows
-			if (r.message.length && r.message[0].options && r.message[0].options.length) {
-				const opts = r.message[0].options.map(o => o.value);
-				frm.fields_dict.diagnostic_tests.grid.update_docfield_property(
-					"result", "options", "\n" + opts.join("\n")
-				);
-			}
+            if (r.message.length && r.message[0].options && r.message[0].options.length) {
+                const opts = r.message[0].options.map(o => o.label || o.value);
+                frm.fields_dict.diagnostic_tests.grid.update_docfield_property(
+                    "result", "options", "\n" + opts.join("\n")
+                );
+            }
 
 			frappe.show_alert({
 				message: __("{0} diagnostic tests loaded", [r.message.length]),
