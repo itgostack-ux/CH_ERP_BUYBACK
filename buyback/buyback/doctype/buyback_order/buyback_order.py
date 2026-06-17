@@ -273,10 +273,12 @@ class BuybackOrder(Document):
         # Update serial lifecycle on Paid (don't wait for Closed)
         if status == "Paid":
             self._update_serial_no_bought_back()
+            self._ensure_exchange_order_exists()
 
         if status == "Closed":
             # ── Hard block: no replacement dispatch without finance (#13) ──
             self._block_close_without_finance()
+            self._ensure_exchange_order_exists()
             # Award loyalty points (once)
             if not self.loyalty_points_earned:
                 self._award_loyalty_points()
@@ -307,6 +309,7 @@ class BuybackOrder(Document):
         if self.status == "Paid":
             # Workflow brought us directly to Paid — create accounting entries
             self._create_accounting_entries()
+            self._ensure_exchange_order_exists()
             update_serial_buyback_status(
                 self.imei_serial,
                 status="Bought Back",
@@ -330,6 +333,61 @@ class BuybackOrder(Document):
         self.status = "Cancelled"
         log_audit("Order Cancelled", "Buyback Order", self.name,
                   new_value={"status": "Cancelled"})
+
+    def _ensure_exchange_order_exists(self):
+        """Create Buyback Exchange Order once for Exchange settlements.
+
+        This is intentionally idempotent and non-blocking for core payment/close
+        flow: when mandatory exchange fields are missing, we log and return so
+        staff can fix data without breaking accounting closure.
+        """
+        if self.settlement_type != "Exchange":
+            return None
+
+        existing = frappe.db.get_value(
+            "Buyback Exchange Order",
+            {"buyback_order": self.name, "docstatus": ["<", 2]},
+            "name",
+        )
+        if existing:
+            return existing
+
+        missing = []
+        for field in ("customer", "mobile_no", "store", "item", "new_item"):
+            if not self.get(field):
+                missing.append(field)
+        if missing:
+            frappe.log_error(
+                title=_("Buyback Order {0}: Exchange creation skipped (missing fields)").format(self.name),
+                message=", ".join(missing),
+            )
+            return None
+
+        exchange = frappe.get_doc({
+            "doctype": "Buyback Exchange Order",
+            "buyback_order": self.name,
+            "customer": self.customer,
+            "mobile_no": self.mobile_no,
+            "store": self.store,
+            "old_item": self.item,
+            "old_imei_serial": self.imei_serial,
+            "old_condition_grade": self.condition_grade,
+            "buyback_amount": flt(self.final_price),
+            "new_item": self.new_item,
+            "new_imei_serial": self.new_item_imei,
+            "new_device_price": flt(self.new_device_price),
+            "exchange_discount": 0,
+        })
+        exchange.insert(ignore_permissions=True)
+        exchange.submit()
+
+        log_audit(
+            "Exchange Auto-Created",
+            "Buyback Order",
+            self.name,
+            new_value={"exchange_order": exchange.name, "status": exchange.status},
+        )
+        return exchange.name
 
     def _cancel_linked_entry(self, doctype, name):
         """Cancel a linked JE or SE if it exists and is submitted."""

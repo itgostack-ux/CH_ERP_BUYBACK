@@ -23,6 +23,14 @@ class BuybackExchangeOrder(Document):
             self.mobile_no = validate_indian_phone(self.mobile_no, "Mobile No")
         self._sync_customer_id()
         self._calculate_amount_to_pay()
+        self._sync_workflow_state()
+
+    def _sync_workflow_state(self):
+        """Keep workflow_state aligned when status is changed via server actions."""
+        if not self.meta.has_field("workflow_state"):
+            return
+        if self.status and self.workflow_state != self.status:
+            self.workflow_state = self.status
 
     def _sync_customer_id(self):
         """Populate ch_customer_id / ch_membership_id from Customer master."""
@@ -42,7 +50,10 @@ class BuybackExchangeOrder(Document):
     def on_submit(self):
         if self.status == "Draft":
             self.status = "New Device Delivered"
-            self.db_set("status", "New Device Delivered", notify=True)
+            updates = {"status": "New Device Delivered"}
+            if self.meta.has_field("workflow_state"):
+                updates["workflow_state"] = "New Device Delivered"
+            self.db_set(updates, notify=True)
         log_audit("Exchange Created", "Buyback Exchange Order", self.name,
                   new_value={"buyback_amount": self.buyback_amount,
                              "new_device_price": self.new_device_price,
@@ -59,7 +70,10 @@ class BuybackExchangeOrder(Document):
             )
 
     def on_cancel(self):
-        self.status = "Cancelled"
+        updates = {"status": "Cancelled"}
+        if self.meta.has_field("workflow_state"):
+            updates["workflow_state"] = "Cancelled"
+        self.db_set(updates, notify=True)
 
     def _calculate_amount_to_pay(self):
         """Calculate: new_device_price - buyback_amount - exchange_discount."""
