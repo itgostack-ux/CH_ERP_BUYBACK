@@ -121,6 +121,9 @@ def _setup_workspace():
         "Buyback Order",
         "Buyback Exchange Order",
         "Buyback Audit Log",
+        "Buyback SLA Log",
+        "Refurbishment Order",
+        "Store Credit Wallet",
     ]:
         ws.append("links", {
             "type": "Link",
@@ -139,6 +142,7 @@ def _setup_workspace():
         "Grade Master",
         "Buyback IMEI Blacklist",
         "Buyback Question Bank",
+        "Buyback Question Category",
         "Buyback Item Question Map",
         "Buyback Checklist Template",
         "Buyback Pricing Rule",
@@ -158,6 +162,7 @@ def _setup_workspace():
     for dt in [
         "Buyback Settings",
         "Buyback SLA Settings",
+        "Buyback QA Test Run",
     ]:
         ws.append("links", {
             "type": "Link",
@@ -283,16 +288,21 @@ def _setup_sidebar():
         {"label": "Inspections", "link_type": "DocType", "link_to": "Buyback Inspection", "child": 1},
         {"label": "Orders", "link_type": "DocType", "link_to": "Buyback Order", "child": 1},
         {"label": "Exchange Orders", "link_type": "DocType", "link_to": "Buyback Exchange Order", "child": 1},
+        {"label": "Refurbishment Orders", "link_type": "DocType", "link_to": "Refurbishment Order", "child": 1},
+        {"label": "Store Credit Wallet", "link_type": "DocType", "link_to": "Store Credit Wallet", "child": 1},
         {"type": "Section Break", "label": "Reports & Audit", "indent": 1, "keep_closed": 0},
         {"label": "Daily Ops Queue", "link_type": "Report", "link_to": "Daily Ops Queue", "child": 1},
         {"label": "Settlement Register", "link_type": "Report", "link_to": "Settlement Register", "child": 1},
         {"label": "SLA Breach Report", "link_type": "Report", "link_to": "SLA Breach Report", "child": 1},
         {"label": "Audit Log", "link_type": "DocType", "link_to": "Buyback Audit Log", "child": 1},
+        {"label": "SLA Log", "link_type": "DocType", "link_to": "Buyback SLA Log", "child": 1},
         {"type": "Section Break", "label": "Setup", "indent": 1, "keep_closed": 1},
         {"label": "Price Master", "link_type": "DocType", "link_to": "Buyback Price Master", "child": 1},
         {"label": "Grade Master", "link_type": "DocType", "link_to": "Grade Master", "child": 1},
+        {"label": "Question Category", "link_type": "DocType", "link_to": "Buyback Question Category", "child": 1},
         {"label": "Settings", "link_type": "DocType", "link_to": "Buyback Settings", "child": 1},
         {"label": "SLA Settings", "link_type": "DocType", "link_to": "Buyback SLA Settings", "child": 1},
+        {"label": "QA Test Runs", "link_type": "DocType", "link_to": "Buyback QA Test Run", "child": 1},
     ]
     for row in rows:
         link_type = row.get("link_type", "DocType")

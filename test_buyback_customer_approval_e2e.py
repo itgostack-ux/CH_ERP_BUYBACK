@@ -31,6 +31,16 @@ def _pick_buyback_assessment():
         SELECT name
         FROM `tabBuyback Assessment`
         WHERE docstatus < 2
+          AND NOT EXISTS (
+              SELECT 1
+              FROM `tabBuyback Order` o
+              WHERE o.buyback_assessment = `tabBuyback Assessment`.name
+                AND o.docstatus != 2
+                AND (
+                    o.status IN ('Paid', 'Closed')
+                    OR COALESCE(o.customer_approved, 0) = 1
+                )
+          )
         ORDER BY modified DESC
         LIMIT 1
         """,

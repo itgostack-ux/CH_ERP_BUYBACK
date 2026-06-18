@@ -8,7 +8,7 @@
  "doctype": "Workspace",
  "for_user": "",
  "hide_custom": 0,
- "icon": "assets",
+ "icon": "retail",
  "idx": 0,
  "is_hidden": 0,
  "label": "BuyBack",
@@ -75,6 +75,36 @@
   {
    "hidden": 0,
    "is_query_report": 0,
+   "label": "Buyback SLA Log",
+   "link_count": 0,
+   "link_to": "Buyback SLA Log",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Refurbishment Order",
+   "link_count": 0,
+   "link_to": "Refurbishment Order",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Store Credit Wallet",
+   "link_count": 0,
+   "link_to": "Store Credit Wallet",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
    "label": "Masters",
    "link_count": 0,
    "link_type": "DocType",
@@ -117,6 +147,16 @@
    "label": "Buyback Question Bank",
    "link_count": 0,
    "link_to": "Buyback Question Bank",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Buyback Question Category",
+   "link_count": 0,
+   "link_to": "Buyback Question Category",
    "link_type": "DocType",
    "onboard": 0,
    "type": "Link"
@@ -176,6 +216,16 @@
    "label": "Buyback SLA Settings",
    "link_count": 0,
    "link_to": "Buyback SLA Settings",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Buyback QA Test Run",
+   "link_count": 0,
+   "link_to": "Buyback QA Test Run",
    "link_type": "DocType",
    "onboard": 0,
    "type": "Link"
@@ -554,7 +604,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-05-11 12:06:15.282709",
+ "modified": "2026-06-18 17:06:46.767096",
  "modified_by": "Administrator",
  "module": "BuyBack",
  "name": "BuyBack",
@@ -612,6 +662,5 @@
   }
  ],
  "title": "BuyBack",
- "type": "Workspace",
- "indicator_color": "orange"
+ "type": "Workspace"
 }
