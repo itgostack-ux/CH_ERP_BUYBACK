@@ -12,6 +12,7 @@
   "session_id",
   "column_break_meta",
   "status",
+  "kyc_id_front",
   "customer_section",
   "customer",
   "customer_name",
@@ -233,23 +234,20 @@
   {
    "fieldname": "imei_serial",
    "fieldtype": "Data",
-   "label": "IMEI / Serial No",
-   "reqd": 1
+   "label": "IMEI / Serial No"
   },
   {
    "description": "Age bracket \u2014 pricing varies by bracket",
    "fieldname": "device_age_months",
    "fieldtype": "Select",
    "label": "Device Age",
-   "options": "\n0-3 Months\n4-6 Months\n7-11 Months\n12+ Months",
-   "reqd": 1
+   "options": "\n0-3 Months\n4-6 Months\n7-11 Months\n12+ Months"
   },
   {
    "fieldname": "warranty_status",
    "fieldtype": "Select",
    "label": "Warranty Status",
-   "options": "\nIn Warranty\nOut of Warranty",
-   "read_only": 1
+   "options": "\nIn Warranty\nOut of Warranty"
   },
   {
    "fieldname": "imei_validation_section",
@@ -455,12 +453,18 @@
    "print_hide": 1,
    "read_only": 1,
    "search_index": 1
+  },
+  {
+   "fieldname": "kyc_id_front",
+   "fieldtype": "Attach",
+   "label": "KYC Id Front",
+   "read_only": 1
   }
  ],
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-06-16 13:34:39.924490",
+ "modified": "2026-06-18 15:26:14.481166",
  "modified_by": "Administrator",
  "module": "BuyBack",
  "name": "Buyback Assessment",
