@@ -30,6 +30,13 @@
   "imei_serial",
   "device_age_months",
   "warranty_status",
+  "imei_validation_section",
+  "imei_validation_status",
+  "imei_validation_checked_by",
+  "column_break_imei_validation",
+  "imei_validation_checked_at",
+  "imei_validation_screenshot",
+  "imei_validation_remarks",
   "price_cards_section",
   "price_cards_html",
   "diagnostic_tests_section",
@@ -243,6 +250,53 @@
    "label": "Warranty Status",
    "options": "\nIn Warranty\nOut of Warranty",
    "read_only": 1
+  },
+  {
+   "fieldname": "imei_validation_section",
+   "fieldtype": "Section Break",
+   "label": "IMEI / Sanchar Saathi Validation",
+   "description": "Optional at this stage, but recommended before inspection — catching a blacklisted/stolen device here avoids wasting inspector time. Carried forward to the Buyback Order automatically if completed here."
+  },
+  {
+   "allow_on_submit": 1,
+   "default": "Pending",
+   "fieldname": "imei_validation_status",
+   "fieldtype": "Select",
+   "label": "Validation Status",
+   "options": "Pending\nVerified Clean\nBlacklisted\nDuplicate IMEI\nAlready In Use\nCould Not Verify",
+   "in_list_view": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "imei_validation_checked_by",
+   "fieldtype": "Link",
+   "label": "Checked By",
+   "options": "User",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_imei_validation",
+   "fieldtype": "Column Break"
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "imei_validation_checked_at",
+   "fieldtype": "Datetime",
+   "label": "Checked At",
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "imei_validation_screenshot",
+   "fieldtype": "Attach Image",
+   "label": "Sanchar Saathi Screenshot",
+   "description": "Screenshot of the IMEI lookup result from ceir.sancharsaathi.gov.in (Know Your Mobile / KYM SMS 14422)."
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "imei_validation_remarks",
+   "fieldtype": "Small Text",
+   "label": "Validation Remarks"
   },
   {
    "depends_on": "eval:doc.item",

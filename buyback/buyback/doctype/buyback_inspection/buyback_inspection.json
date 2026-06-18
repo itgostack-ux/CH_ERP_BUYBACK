@@ -36,6 +36,10 @@
   "column_break_grade",
   "post_inspection_grade",
   "grade_changed_reason",
+  "lock_clearance_section",
+  "account_lock_cleared",
+  "column_break_lock",
+  "account_lock_check_notes",
   "inspection_diagnostics_section",
   "inspection_diagnostics",
   "inspection_responses_section",
@@ -319,6 +323,29 @@
    "label": "Grade Change Reason",
    "depends_on": "eval:doc.pre_inspection_grade !== doc.post_inspection_grade",
    "mandatory_depends_on": "eval:doc.pre_inspection_grade && doc.post_inspection_grade && doc.pre_inspection_grade !== doc.post_inspection_grade"
+  },
+  {
+   "fieldname": "lock_clearance_section",
+   "fieldtype": "Section Break",
+   "label": "Account / Device Lock Clearance",
+   "description": "Confirm the device has been factory-reset and signed out of the previous owner's account (Google FRP for Android, iCloud Find My iPhone for iOS) before grading is finalised — a locked device is unsellable inventory even if the IMEI is clean."
+  },
+  {
+   "default": "0",
+   "fieldname": "account_lock_cleared",
+   "fieldtype": "Check",
+   "label": "FRP / iCloud Lock Cleared (Factory Reset Confirmed)",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "column_break_lock",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "account_lock_check_notes",
+   "fieldtype": "Small Text",
+   "label": "Notes",
+   "description": "e.g. customer signed out in-store, or reason if not cleared"
   },
   {
    "fieldname": "inspection_diagnostics_section",

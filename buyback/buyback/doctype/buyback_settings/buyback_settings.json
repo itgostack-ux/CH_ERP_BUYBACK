@@ -19,6 +19,7 @@
   "max_buyback_amount",
   "approval_section",
   "require_manager_approval_above",
+  "require_ownership_proof_above",
   "require_otp_verification",
   "column_break_approval",
   "auto_expire_quotes",
@@ -136,6 +137,13 @@
    "fieldtype": "Currency",
    "label": "Require Manager Approval Above",
    "description": "Orders above this amount need manager approval"
+  },
+  {
+   "default": "25000",
+   "fieldname": "require_ownership_proof_above",
+   "fieldtype": "Currency",
+   "label": "Require Ownership Proof Above",
+   "description": "Orders above this amount need a purchase invoice / ownership document, not just buyer ID (KYC proves who the seller is, not that they own this device). Set to 0 to never require it."
   },
   {
    "default": "1",

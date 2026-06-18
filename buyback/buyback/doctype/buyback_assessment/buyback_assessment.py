@@ -355,6 +355,79 @@ class BuybackAssessment(Document):
         self.save()
         log_audit("Assessment Submitted", "Buyback Assessment", self.name)
 
+    @frappe.whitelist()
+    def submit_imei_validation(self, status: str, screenshot: str | None = None, remarks: str | None = None) -> dict:
+        """Record the manual Sanchar Saathi (CEIR) IMEI check result at intake.
+
+        Optional at this stage (the hard gate is `create_inspection()` below
+        and, redundantly, the Buyback Order gate) — doing it here means the
+        store doesn't waste an inspector's time grading a device that turns
+        out to be reported lost/stolen nationally. If a Buyback Order is
+        later created from this assessment, the result is carried forward
+        automatically so staff don't have to repeat the check.
+        """
+        allowed = {"Verified Clean", "Blacklisted", "Duplicate IMEI", "Already In Use", "Could Not Verify"}
+        status = (status or "").strip()
+        if status not in allowed:
+            frappe.throw(
+                _("Invalid validation status: {0}. Allowed: {1}").format(
+                    status, ", ".join(sorted(allowed))
+                ),
+                exc=BuybackStatusError,
+            )
+
+        bad_outcomes = {"Blacklisted", "Duplicate IMEI", "Already In Use"}
+        if status in bad_outcomes or status == "Verified Clean":
+            if not screenshot:
+                frappe.throw(
+                    _("A screenshot of the Sanchar Saathi result is required for status {0}.").format(status),
+                    exc=BuybackStatusError,
+                )
+        elif status == "Could Not Verify" and not (remarks or "").strip():
+            frappe.throw(
+                _("Remarks are required when the portal could not be checked (e.g. portal down, no response)."),
+                exc=BuybackStatusError,
+            )
+
+        self.imei_validation_status = status
+        self.imei_validation_checked_by = frappe.session.user
+        self.imei_validation_checked_at = now_datetime()
+        if screenshot:
+            self.imei_validation_screenshot = screenshot
+        if remarks is not None:
+            self.imei_validation_remarks = remarks
+        self.flags.ignore_mandatory = True
+        self.save()
+
+        audit_action = "IMEI Validation Completed" if status == "Verified Clean" else "IMEI Validation Failed"
+        log_audit(audit_action, "Buyback Assessment", self.name,
+                  new_value={"status": status, "checked_by": self.imei_validation_checked_by})
+
+        result = {
+            "name": self.name,
+            "imei_validation_status": status,
+            "blocked": status != "Verified Clean",
+            "status": self.status,
+        }
+
+        if status in bad_outcomes:
+            # Definitive national-registry hit — cancel outright, same severity
+            # as the internal blacklist check, so no inspection effort follows.
+            self.cancel_assessment()
+            log_audit("Assessment Cancelled", "Buyback Assessment", self.name,
+                      new_value={"reason": f"IMEI {status} on Sanchar Saathi"})
+            result["status"] = self.status
+            result["message"] = _(
+                "Device flagged as '{0}' on the Sanchar Saathi national registry. "
+                "This assessment has been cancelled."
+            ).format(status)
+        elif status == "Could Not Verify":
+            result["message"] = _("Could not verify on Sanchar Saathi. Please retry the check before proceeding.")
+        else:
+            result["message"] = _("IMEI verified clean. You may proceed with inspection.")
+
+        return result
+
     def create_inspection(self, checklist_template=None):
         """Create a Buyback Inspection directly from this assessment.
 
@@ -368,6 +441,15 @@ class BuybackAssessment(Document):
         if self.status not in ("Draft", "Submitted"):
             frappe.throw(
                 _("Can only create inspection from a Draft or Submitted assessment."),
+                exc=BuybackStatusError,
+            )
+
+        if self.imei_validation_status != "Verified Clean" or not self.imei_validation_screenshot:
+            frappe.throw(
+                _("Sanchar Saathi IMEI validation must be completed (status = 'Verified Clean', "
+                  "with screenshot) before inspection can start. Current status: {0}.").format(
+                    self.imei_validation_status or "Pending"
+                ),
                 exc=BuybackStatusError,
             )
 

@@ -197,6 +197,19 @@ def submit_assessment(assessment_name: str) -> dict:
 
 
 @frappe.whitelist()
+def submit_assessment_imei_validation(assessment_name: str, status: str, screenshot: str | None = None,
+                                       remarks: str | None = None) -> dict:
+    """Record the manual Sanchar Saathi (CEIR) IMEI check at assessment/intake stage.
+
+    Optional here, but recommended before inspection starts — see
+    BuybackAssessment.create_inspection() which hard-gates on this.
+    """
+    doc = frappe.get_doc("Buyback Assessment", assessment_name)
+    doc.check_permission("write")
+    return doc.submit_imei_validation(status=status, screenshot=screenshot, remarks=remarks)
+
+
+@frappe.whitelist()
 def create_inspection_from_assessment(
     assessment_name: str,
     checklist_template: str | None = None,
@@ -319,6 +332,53 @@ def complete_inspection(
 # ── Step 5: Create Order ─────────────────────────────────────────
 
 
+def _carry_forward_imei_validation(buyback_assessment: str | None, order_doc) -> None:
+    """Copy a 'Verified Clean' Sanchar Saathi check from Assessment to a new Order.
+
+    Staff who already did the IMEI check at intake (Buyback Assessment)
+    shouldn't have to repeat it when the Buyback Order is created from
+    that assessment — only carry forward a clean result; anything else
+    (Pending/Could Not Verify) still requires a fresh check at Order stage,
+    and a bad result would already have cancelled the assessment, so a new
+    order couldn't be created from it anyway.
+    """
+    if not buyback_assessment:
+        return
+    row = frappe.db.get_value(
+        "Buyback Assessment", buyback_assessment,
+        ["imei_validation_status", "imei_validation_screenshot",
+         "imei_validation_checked_by", "imei_validation_checked_at", "imei_validation_remarks"],
+        as_dict=True,
+    )
+    if row and row.imei_validation_status == "Verified Clean":
+        order_doc.imei_validation_status = row.imei_validation_status
+        order_doc.imei_validation_screenshot = row.imei_validation_screenshot
+        order_doc.imei_validation_checked_by = row.imei_validation_checked_by
+        order_doc.imei_validation_checked_at = row.imei_validation_checked_at
+        order_doc.imei_validation_remarks = row.imei_validation_remarks
+
+
+def _carry_forward_lock_clearance(buyback_inspection: str | None, order_doc) -> None:
+    """Copy FRP/iCloud lock-clearance from a completed Inspection to a new Order.
+
+    `complete_inspection()` already hard-requires `account_lock_cleared` to
+    be set, so if an Inspection is linked, this is always available — carry
+    it forward so staff aren't asked twice. Walk-in orders with no
+    Inspection record leave this unset, and the Order-level gate
+    (`_validate_lock_clearance_before_kyc`) requires it directly.
+    """
+    if not buyback_inspection:
+        return
+    row = frappe.db.get_value(
+        "Buyback Inspection", buyback_inspection,
+        ["account_lock_cleared", "account_lock_check_notes"],
+        as_dict=True,
+    )
+    if row and row.account_lock_cleared:
+        order_doc.account_lock_cleared = row.account_lock_cleared
+        order_doc.account_lock_check_notes = row.account_lock_check_notes
+
+
 @frappe.whitelist()
 def create_order(
     customer: str,
@@ -353,6 +413,8 @@ def create_order(
             "brand": brand,
         }
     )
+    _carry_forward_imei_validation(buyback_assessment, doc)
+    _carry_forward_lock_clearance(buyback_inspection, doc)
     doc.insert()
     doc.submit()
 
@@ -1184,6 +1246,22 @@ def get_inspections_by_phone(mobile_no: str) -> list[dict]:
         ],
         order_by="creation desc",
     )
+
+
+@frappe.whitelist()
+def submit_imei_validation(order_name: str, status: str, screenshot: str | None = None,
+                            remarks: str | None = None) -> dict:
+    """Record the manual Sanchar Saathi (CEIR) IMEI check result for a Buyback Order.
+
+    There is no public API for the government CEIR registry, so store staff
+    log into ceir.sancharsaathi.gov.in themselves, check the device IMEI, and
+    upload a screenshot of the result here. Must be status="Verified Clean"
+    before customer approval, KYC, or OTP can proceed — enforced server-side
+    in BuybackOrder._validate_imei_check_before_kyc().
+    """
+    doc = frappe.get_doc("Buyback Order", order_name)
+    doc.check_permission("write")
+    return doc.submit_imei_validation(status=status, screenshot=screenshot, remarks=remarks)
 
 
 @frappe.whitelist()

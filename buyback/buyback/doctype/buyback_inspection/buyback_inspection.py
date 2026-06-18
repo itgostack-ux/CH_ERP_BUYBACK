@@ -227,6 +227,17 @@ class BuybackInspection(Document):
         if not self.condition_grade:
             frappe.throw(_("Final Condition Grade is required to complete inspection."), title=_("Buyback Inspection Error"))
 
+        # Hard block: a device still signed into the previous owner's Google/
+        # Apple account is unsellable inventory even with a clean IMEI and a
+        # good grade — confirm factory reset / lock clearance before grading
+        # can be finalised, mirroring Cashify's intake process.
+        if not self.account_lock_cleared:
+            frappe.throw(
+                _("Confirm 'FRP / iCloud Lock Cleared' before completing inspection — a device "
+                  "still signed into the previous owner's account cannot be resold."),
+                title=_("Account Lock Not Cleared"),
+            )
+
         # Hard block: refuse to complete inspection when no base price is configured
         # in the Buyback Pricing Master for this item/grade. We must not present
         # a \u20b90 buyback offer to the customer.

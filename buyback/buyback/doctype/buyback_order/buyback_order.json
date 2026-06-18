@@ -87,6 +87,22 @@
   "journal_entry",
   "column_break_acct",
   "stock_entry",
+  "imei_validation_section",
+  "imei_validation_status",
+  "imei_validation_checked_by",
+  "column_break_imei_validation",
+  "imei_validation_checked_at",
+  "imei_validation_screenshot",
+  "imei_validation_remarks",
+  "lock_clearance_section",
+  "account_lock_cleared",
+  "column_break_lock",
+  "account_lock_check_notes",
+  "ownership_proof_section",
+  "ownership_proof_type",
+  "ownership_proof_remarks",
+  "column_break_ownership",
+  "ownership_proof_document",
   "kyc_section",
   "customer_photo",
   "customer_id_type",
@@ -338,6 +354,7 @@
    "description": "Amount to be paid to customer"
   },
   {
+   "allow_on_submit": 1,
    "default": "0",
    "fieldname": "approved_price",
    "fieldtype": "Currency",
@@ -401,6 +418,7 @@
    "read_only": 1
   },
   {
+   "allow_on_submit": 1,
    "fieldname": "approved_by",
    "fieldtype": "Link",
    "label": "Approved By",
@@ -412,12 +430,14 @@
    "fieldtype": "Column Break"
   },
   {
+   "allow_on_submit": 1,
    "fieldname": "approval_date",
    "fieldtype": "Datetime",
    "label": "Approval Date",
    "read_only": 1
   },
   {
+   "allow_on_submit": 1,
    "fieldname": "approval_remarks",
    "fieldtype": "Small Text",
    "label": "Approval Remarks"
@@ -693,6 +713,110 @@
    "options": "Sales Invoice",
    "read_only": 1,
    "depends_on": "eval:doc.settlement_type=='Exchange'"
+  },
+  {
+   "fieldname": "imei_validation_section",
+   "fieldtype": "Section Break",
+   "label": "IMEI / Sanchar Saathi Validation",
+   "description": "Government CEIR (Sanchar Saathi 'Know Your Mobile') registry check — confirms the device is not reported lost/stolen/blacklisted nationally. Staff check the IMEI manually at ceir.sancharsaathi.gov.in and upload proof. Must be Verified Clean before customer KYC or OTP can proceed."
+  },
+  {
+   "allow_on_submit": 1,
+   "default": "Pending",
+   "fieldname": "imei_validation_status",
+   "fieldtype": "Select",
+   "label": "Validation Status",
+   "options": "Pending\nVerified Clean\nBlacklisted\nDuplicate IMEI\nAlready In Use\nCould Not Verify",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "reqd": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "imei_validation_checked_by",
+   "fieldtype": "Link",
+   "label": "Checked By",
+   "options": "User",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_imei_validation",
+   "fieldtype": "Column Break"
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "imei_validation_checked_at",
+   "fieldtype": "Datetime",
+   "label": "Checked At",
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "imei_validation_screenshot",
+   "fieldtype": "Attach Image",
+   "label": "Sanchar Saathi Screenshot",
+   "description": "Screenshot of the IMEI lookup result from ceir.sancharsaathi.gov.in (Know Your Mobile / KYM SMS 14422). Required proof before customer KYC/OTP can proceed."
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "imei_validation_remarks",
+   "fieldtype": "Small Text",
+   "label": "Validation Remarks"
+  },
+  {
+   "fieldname": "lock_clearance_section",
+   "fieldtype": "Section Break",
+   "label": "Account / Device Lock Clearance",
+   "description": "Confirm the device is factory-reset and signed out of the previous owner's account (Google FRP / iCloud Find My iPhone). Auto-filled from Buyback Inspection when one exists; required directly here for walk-in orders that skip inspection."
+  },
+  {
+   "allow_on_submit": 1,
+   "default": "0",
+   "fieldname": "account_lock_cleared",
+   "fieldtype": "Check",
+   "label": "FRP / iCloud Lock Cleared (Factory Reset Confirmed)"
+  },
+  {
+   "fieldname": "column_break_lock",
+   "fieldtype": "Column Break"
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "account_lock_check_notes",
+   "fieldtype": "Small Text",
+   "label": "Notes"
+  },
+  {
+   "fieldname": "ownership_proof_section",
+   "fieldtype": "Section Break",
+   "label": "Ownership / Purchase Proof",
+   "description": "KYC proves who the seller is, not that they own this device. Required above the threshold set in Buyback Settings."
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "ownership_proof_type",
+   "fieldtype": "Select",
+   "label": "Proof Type",
+   "options": "\nPurchase Invoice\nOriginal Box / Bill\nInsurance Document\nNot Available"
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "ownership_proof_remarks",
+   "fieldtype": "Small Text",
+   "label": "Remarks",
+   "description": "Required if 'Not Available' — explain why (e.g. gifted, inherited, old purchase)",
+   "depends_on": "eval:doc.ownership_proof_type === 'Not Available'"
+  },
+  {
+   "fieldname": "column_break_ownership",
+   "fieldtype": "Column Break"
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "ownership_proof_document",
+   "fieldtype": "Attach",
+   "label": "Proof Document",
+   "depends_on": "eval:doc.ownership_proof_type && doc.ownership_proof_type !== 'Not Available'"
   },
   {
    "fieldname": "kyc_section",

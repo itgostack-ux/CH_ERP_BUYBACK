@@ -112,6 +112,9 @@ class BuybackOrder(Document):
         self._validate_payment_rows()
         self._validate_paid_status_consistency()
         self._check_approval_requirement()
+        self._validate_imei_check_before_kyc()
+        self._validate_lock_clearance_before_kyc()
+        self._validate_ownership_proof_threshold()
         self._validate_kyc_for_otp_stage()
         self._check_exchange_value_override()
 
@@ -133,6 +136,16 @@ class BuybackOrder(Document):
     def before_update_after_submit(self):
         self._calculate_payment_totals()
         self._validate_payment_rows()
+        # Field updates on an already-submitted doc go through update_after_submit,
+        # NOT validate() — Frappe's _validate() only calls run_method("validate")
+        # when self._action == "save". By the time status reaches "Awaiting OTP"
+        # the order is already submitted (on_submit fires at order creation), so
+        # this is the hook that actually fires for send_otp()/customer_approve()
+        # transitioning a submitted doc. Without it here, the gate added to
+        # validate() is silently never enforced on the real-world path.
+        self._validate_imei_check_before_kyc()
+        self._validate_lock_clearance_before_kyc()
+        self._validate_ownership_proof_threshold()
 
     def _check_imei_blacklist(self):
         if self.imei_serial:
@@ -635,6 +648,13 @@ class BuybackOrder(Document):
                 exc=BuybackStatusError,
             )
 
+        # Check BEFORE dispatching — _dispatch_otp() sends a real WhatsApp/
+        # email message. Without this, the gate inside save()/validate()
+        # would still block the status transition, but only AFTER a live
+        # OTP was already sent to the customer for a transaction that
+        # can't proceed.
+        self._require_pre_otp_gates_clear(_("OTP can be sent"))
+
         otp_code = self._dispatch_otp()
         self.flags.otp_just_dispatched = True
         self.status = "Awaiting OTP"
@@ -753,6 +773,7 @@ class BuybackOrder(Document):
                 _("OTP bypass is only applicable when status is 'Awaiting OTP' or 'Approved'."),
                 exc=BuybackStatusError,
             )
+        self._require_pre_otp_gates_clear(_("OTP can be bypassed"))
 
         verified_at = now_datetime()
         updates = {
@@ -859,6 +880,270 @@ class BuybackOrder(Document):
             title=_("Finance Closure Required"),
             exc=BuybackStatusError,
         )
+
+    def _validate_imei_check_before_kyc(self):
+        """Require a completed Sanchar Saathi (CEIR) IMEI check before customer-facing stages.
+
+        This is a different signal from `_check_imei_blacklist()` — that only
+        catches devices OUR own stores have flagged before. The national CEIR
+        registry catches a device reported lost/stolen anywhere in India, on
+        its very first attempt at any store. Sanchar Saathi has no public API,
+        so staff must log into ceir.sancharsaathi.gov.in themselves, look up
+        the IMEI, and upload a screenshot of the result via
+        `submit_imei_validation()` before the order can move toward customer
+        approval, KYC collection, or OTP.
+
+        Runs in validate() — fires on the transition INTO any gated status,
+        same idempotent "only check on transition" pattern as
+        `_validate_kyc_for_otp_stage()`.
+        """
+        gated_statuses = (
+            "Awaiting Customer Approval", "Customer Approved", "Awaiting OTP",
+            "OTP Verified", "Ready to Pay", "Paid", "Closed",
+        )
+        status = self.status or self.workflow_state
+        if status not in gated_statuses:
+            return
+        prev_status = None
+        if hasattr(self, "_doc_before_save") and self._doc_before_save:
+            prev_status = self._doc_before_save.status
+        if prev_status in gated_statuses:
+            return  # already past this gate
+
+        if self.imei_validation_status != "Verified Clean" or not self.imei_validation_screenshot:
+            frappe.throw(
+                _("Sanchar Saathi IMEI validation must be completed (checked at "
+                  "ceir.sancharsaathi.gov.in, status = 'Verified Clean', with "
+                  "screenshot uploaded) before customer approval, KYC, or OTP "
+                  "can proceed. Current validation status: {0}.").format(
+                    self.imei_validation_status or "Pending"
+                ),
+                exc=BuybackStatusError,
+            )
+
+    def _validate_ownership_proof_threshold(self):
+        """Require purchase/ownership proof above a configurable price threshold.
+
+        KYC proves who the seller is, not that they own this specific device.
+        A clean IMEI + verified ID doesn't rule out a borrowed/unreported-stolen
+        phone. Below the threshold this is optional (most second-hand phones
+        won't have an original invoice); above it, staff must either attach a
+        document or record why one isn't available.
+        """
+        gated_statuses = (
+            "Awaiting Customer Approval", "Customer Approved", "Awaiting OTP",
+            "OTP Verified", "Ready to Pay", "Paid", "Closed",
+        )
+        status = self.status or self.workflow_state
+        if status not in gated_statuses:
+            return
+        prev_status = None
+        if hasattr(self, "_doc_before_save") and self._doc_before_save:
+            prev_status = self._doc_before_save.status
+        if prev_status in gated_statuses:
+            return  # already past this gate
+
+        threshold = flt(frappe.db.get_single_value("Buyback Settings", "require_ownership_proof_above"))
+        if threshold <= 0 or flt(self.final_price) <= threshold:
+            return
+
+        if not self.ownership_proof_type:
+            frappe.throw(
+                _("Ownership/purchase proof is required for buybacks above ₹{0} "
+                  "(this device: ₹{1}). Attach a Purchase Invoice/Original Box-Bill/"
+                  "Insurance Document, or select 'Not Available' with a reason.").format(
+                    threshold, flt(self.final_price)
+                ),
+                exc=BuybackStatusError,
+            )
+        if self.ownership_proof_type == "Not Available" and not (self.ownership_proof_remarks or "").strip():
+            frappe.throw(
+                _("Please explain why ownership proof is not available."),
+                exc=BuybackStatusError,
+            )
+        if self.ownership_proof_type != "Not Available" and not self.ownership_proof_document:
+            frappe.throw(
+                _("Please attach the {0} document, or select 'Not Available' with a reason.").format(
+                    self.ownership_proof_type
+                ),
+                exc=BuybackStatusError,
+            )
+
+    def _validate_lock_clearance_before_kyc(self):
+        """Require FRP/iCloud account-lock clearance before customer-facing stages.
+
+        Normally set on `Buyback Inspection` and carried forward here when an
+        inspection exists (see `pos_complete_inspection`/`create_order`). The
+        walk-in path (`pos_start_buyback_order` direct from a Buyback
+        Assessment with no Inspection record) never goes through Inspection
+        at all, so this field/gate also exists directly on Buyback Order —
+        otherwise a walk-in buyback could pay for a device still locked to
+        the previous owner's account, making it unsellable.
+        """
+        gated_statuses = (
+            "Awaiting Customer Approval", "Customer Approved", "Awaiting OTP",
+            "OTP Verified", "Ready to Pay", "Paid", "Closed",
+        )
+        status = self.status or self.workflow_state
+        if status not in gated_statuses:
+            return
+        prev_status = None
+        if hasattr(self, "_doc_before_save") and self._doc_before_save:
+            prev_status = self._doc_before_save.status
+        if prev_status in gated_statuses:
+            return  # already past this gate
+
+        if not self.account_lock_cleared:
+            frappe.throw(
+                _("Confirm 'FRP / iCloud Lock Cleared' before customer approval, KYC, or OTP "
+                  "can proceed — a device still signed into the previous owner's account "
+                  "cannot be resold."),
+                exc=BuybackStatusError,
+            )
+
+    def _require_pre_otp_gates_clear(self, action: str):
+        """Hard guard called BEFORE any side-effecting action (e.g. dispatching
+        a real OTP) that the validate()/before_update_after_submit() gates
+        would otherwise only catch AFTER the side effect already happened.
+
+        Also covers `bypass_otp_instore()`'s db_set() path for already-
+        submitted orders, which skips validate() entirely — without this
+        explicit check, a stolen-device gate could be bypassed via that
+        shortcut. Checks the IMEI gate, lock-clearance, and the
+        ownership-proof threshold so none can be bypassed via the same
+        shortcuts.
+        """
+        if self.imei_validation_status != "Verified Clean" or not self.imei_validation_screenshot:
+            frappe.throw(
+                _("Sanchar Saathi IMEI validation must be completed and "
+                  "verified clean (with screenshot) before {0}.").format(action),
+                exc=BuybackStatusError,
+            )
+
+        if not self.account_lock_cleared:
+            frappe.throw(
+                _("Confirm 'FRP / iCloud Lock Cleared' before {0}.").format(action),
+                exc=BuybackStatusError,
+            )
+
+        threshold = flt(frappe.db.get_single_value("Buyback Settings", "require_ownership_proof_above"))
+        if threshold > 0 and flt(self.final_price) > threshold:
+            if not self.ownership_proof_type:
+                frappe.throw(
+                    _("Ownership/purchase proof is required for buybacks above ₹{0} "
+                      "before {1}.").format(threshold, action),
+                    exc=BuybackStatusError,
+                )
+            if self.ownership_proof_type == "Not Available" and not (self.ownership_proof_remarks or "").strip():
+                frappe.throw(
+                    _("Please explain why ownership proof is not available, before {0}.").format(action),
+                    exc=BuybackStatusError,
+                )
+            if self.ownership_proof_type != "Not Available" and not self.ownership_proof_document:
+                frappe.throw(
+                    _("Please attach the {0} document before {1}, or select 'Not Available' with a reason.").format(
+                        self.ownership_proof_type, action
+                    ),
+                    exc=BuybackStatusError,
+                )
+
+    @frappe.whitelist()
+    def submit_imei_validation(self, status: str, screenshot: str | None = None, remarks: str | None = None) -> dict:
+        """Record the manual Sanchar Saathi (CEIR) IMEI check result.
+
+        Staff perform the lookup themselves on ceir.sancharsaathi.gov.in
+        (dial *#06# for IMEI, or SMS "KYM <imei>" to 14422) since there is
+        no public API to call automatically, then report the result here
+        with a screenshot as proof.
+
+        status: "Verified Clean" | "Blacklisted" | "Duplicate IMEI" |
+                "Already In Use" | "Could Not Verify"
+        Only "Verified Clean" unlocks customer approval/KYC/OTP. The three
+        "bad" outcomes auto-reject the order outright — a device reported
+        lost/stolen nationally must not proceed any further. "Could Not
+        Verify" leaves the order blocked at its current stage for retry
+        (e.g. portal was down) without rejecting it.
+        """
+        allowed = {"Verified Clean", "Blacklisted", "Duplicate IMEI", "Already In Use", "Could Not Verify"}
+        status = (status or "").strip()
+        if status not in allowed:
+            frappe.throw(
+                _("Invalid validation status: {0}. Allowed: {1}").format(
+                    status, ", ".join(sorted(allowed))
+                ),
+                exc=BuybackStatusError,
+            )
+
+        bad_outcomes = {"Blacklisted", "Duplicate IMEI", "Already In Use"}
+        if status in bad_outcomes or status == "Verified Clean":
+            if not screenshot:
+                frappe.throw(
+                    _("A screenshot of the Sanchar Saathi result is required for status {0}.").format(status),
+                    exc=BuybackStatusError,
+                )
+        elif status == "Could Not Verify" and not (remarks or "").strip():
+            frappe.throw(
+                _("Remarks are required when the portal could not be checked (e.g. portal down, no response)."),
+                exc=BuybackStatusError,
+            )
+
+        checked_at = now_datetime()
+        checked_by = frappe.session.user
+        updates = {
+            "imei_validation_status": status,
+            "imei_validation_checked_by": checked_by,
+            "imei_validation_checked_at": checked_at,
+        }
+        if screenshot:
+            updates["imei_validation_screenshot"] = screenshot
+        if remarks is not None:
+            updates["imei_validation_remarks"] = remarks
+
+        if self.docstatus == 1:
+            self.db_set(updates, update_modified=True)
+            self.reload()
+        else:
+            self.update(updates)
+            self.save()
+
+        audit_action = "IMEI Validation Completed" if status == "Verified Clean" else "IMEI Validation Failed"
+        log_audit(audit_action, "Buyback Order", self.name,
+                  new_value={"status": status, "checked_by": checked_by})
+
+        blocked = status != "Verified Clean"
+        result = {
+            "name": self.name,
+            "imei_validation_status": status,
+            "blocked": blocked,
+            "order_status": self.status,
+        }
+
+        if status in bad_outcomes:
+            # Definitive national-registry hit — reject outright, do not
+            # leave the order sitting in limbo for staff to "fix" later.
+            self.db_set("status", "Rejected", update_modified=True)
+            self.db_set(
+                "approval_remarks",
+                f"Auto-rejected: Sanchar Saathi IMEI check = {status}"
+                + (f" — {remarks}" if remarks else ""),
+                update_modified=False,
+            )
+            self.reload()
+            log_audit("Order Rejected", "Buyback Order", self.name,
+                      new_value={"reason": f"IMEI {status} on Sanchar Saathi"})
+            result["order_status"] = self.status
+            result["message"] = _(
+                "Device flagged as '{0}' on the Sanchar Saathi national registry. "
+                "This order has been rejected and cannot proceed."
+            ).format(status)
+        elif status == "Could Not Verify":
+            result["message"] = _(
+                "Could not verify on Sanchar Saathi. Please retry the check before proceeding."
+            )
+        else:
+            result["message"] = _("IMEI verified clean. You may proceed with customer approval / KYC / OTP.")
+
+        return result
 
     def _validate_kyc_for_otp_stage(self):
         """Ensure mandatory KYC fields and device photos are filled before OTP stage.
