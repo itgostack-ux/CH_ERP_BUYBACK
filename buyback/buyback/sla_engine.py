@@ -198,40 +198,49 @@ def _evaluate_inspection_slas():
 
 
 def _fire_sla_alert(doctype, name, sla_type, minutes_taken):
-    """Create an alert for SLA breach."""
+    """Create an alert for SLA breach.
+
+    Notification scoping (was: broadcast to doc.owner, causing toast spam to
+    whichever Cashier/Sales Exec first created the order — see Audit
+    Finding 2026-06-19 "SLA toast pile-up"):
+
+      → User-facing notification (in-app bell + realtime toast + optional
+        WhatsApp) is delegated to `alerts.alert_sla_breach()`, which resolves
+        recipients through `notification_router.get_scoped_users()` and
+        filters by:
+            - Roles: Buyback Manager, Buyback Store Manager, Buyback Admin
+              ("respective store / Buyback Team / manager / executives").
+            - Store: only users whose CH User Scope covers the order's
+              store get the toast. Bypass users (National Head, COO, etc.)
+              see all stores. Mirrors SAP S/4HANA plant-based notification
+              scoping and Oracle NetSuite role+subsidiary targeting.
+            - Doc owner is added as a follower (Odoo followers-model
+              equivalent) so the original creator still gets the alert.
+
+      → Audit logging (Buyback Audit Log + Buyback SLA Log) stays here
+        — it is recipient-independent and must run on every breach.
+
+      → 1-hour de-dup cache stays here.
+    """
     alert_key = f"sla_breach_{doctype}_{name}_{sla_type}"
 
     # Avoid duplicate alerts in same hour
     if frappe.cache.get_value(alert_key):
         return
 
-    doc = frappe.get_doc(doctype, name)
-    ctx = _get_company_zone_location_context(doc)
-    url = get_url_to_form(doctype, name)
-
-    message = (
-        f"⚠️ SLA Breach: {sla_type.replace('_', ' ').title()} — "
-        f"{doctype} {name}. "
-        f"Company: {ctx['company']} | Zone: {ctx['zone']} | Location: {ctx['location']}. "
-        f"Time elapsed: {minutes_taken:.0f} min. "
-        f"<a href='{url}'>View</a>"
-    )
-
-    # ERPNext notification
-    try:
-        frappe.publish_realtime(
-            "msgprint",
-            {"message": message, "indicator": "red"},
-            user=doc.owner,
-        )
-    except Exception:
-        pass
-
-    # Log to audit
+    # Always log the breach (audit), even if recipient resolution fails.
     try:
         _log_sla_breach(doctype, name, sla_type, minutes_taken)
     except Exception:
         frappe.log_error(title="SLA breach logging failed")
+
+    # Dispatch user-facing notification through the scoped path.
+    target_minutes = DEFAULT_SLAS.get(sla_type, 0)
+    try:
+        from buyback.buyback.alerts import alert_sla_breach
+        alert_sla_breach(doctype, name, sla_type, minutes_taken, target_minutes)
+    except Exception:
+        frappe.log_error(title=f"SLA breach notification failed for {doctype} {name}")
 
     # Set cache to prevent re-alert for 1 hour
     frappe.cache.set_value(alert_key, 1, expires_in_sec=3600)

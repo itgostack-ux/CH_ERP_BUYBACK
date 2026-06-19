@@ -90,7 +90,12 @@ def alert_sla_breach(doctype, docname, sla_type, minutes_taken, target_minutes):
     )
     # Resolve store from the document for scope-based recipient filtering
     store = frappe.db.get_value(doctype, docname, "store") if doctype and docname else None
-    recipients = _get_alert_recipients(doctype, docname, ["Buyback Manager", "Buyback Admin"], store=store)
+    recipients = _get_alert_recipients(
+        doctype,
+        docname,
+        ["Buyback Manager", "Buyback Store Manager", "Buyback Admin"],
+        store=store,
+    )
     send_alert(subject, message, recipients, doctype, docname, "Critical", send_whatsapp=True)
 
 
