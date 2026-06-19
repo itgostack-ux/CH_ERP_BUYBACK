@@ -120,30 +120,50 @@ def _resolve_token(token: str, *, require_payout_editable: bool = False) -> str:
     return row.name
 
 
+# @contextmanager
+# def _as_system_user():
+#     """Temporarily set session user to Administrator for guest API calls.
+
+#     Frappe's workflow engine reads frappe.session.user for permission
+#     checks.  Guest endpoints (allow_guest=True) have user=None which
+#     causes 'User None not found'.  This context manager sets a valid
+#     user so .save() / workflow transitions succeed, then restores the
+#     original user.
+#     """
+#     prev = (frappe.session.user or "").strip()
+#     restore_user = (
+#         prev
+#         if prev and prev != "None" and frappe.db.exists("User", prev)
+#         else "Guest"
+#     )
+
+#     if not prev or prev in {"Guest", "None"} or not frappe.db.exists("User", prev):
+#         frappe.set_user("Administrator")
+#     try:
+#         yield
+#     finally:
+#         frappe.set_user(restore_user)
+
+# updated _as_system_user
 @contextmanager
 def _as_system_user():
-    """Temporarily set session user to Administrator for guest API calls.
-
-    Frappe's workflow engine reads frappe.session.user for permission
-    checks.  Guest endpoints (allow_guest=True) have user=None which
-    causes 'User None not found'.  This context manager sets a valid
-    user so .save() / workflow transitions succeed, then restores the
-    original user.
+    """Temporarily elevate permissions for guest API calls WITHOUT 
+    touching the session user (which would corrupt browser cookies
+    shared between POS tab and customer approval tab).
+    
+    We change only frappe.session.user in memory, NOT via 
+    frappe.set_user() which writes Set-Cookie headers.
     """
-    prev = (frappe.session.user or "").strip()
-    restore_user = (
-        prev
-        if prev and prev != "None" and frappe.db.exists("User", prev)
-        else "Guest"
-    )
-
-    if not prev or prev in {"Guest", "None"} or not frappe.db.exists("User", prev):
-        frappe.set_user("Administrator")
+    prev_user = frappe.session.user
     try:
+        # Change ONLY in-memory session user, no cookie writes
+        frappe.session.user = "Administrator"
+        frappe.local.session_obj = None  # force perm cache refresh
         yield
     finally:
-        frappe.set_user(restore_user)
-
+        # Restore in-memory only - no cookies touched
+        frappe.session.user = prev_user
+        frappe.local.session_obj = None
 
 # ── Step 1: Get Estimate ─────────────────────────────────────────
 

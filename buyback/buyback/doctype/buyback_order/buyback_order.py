@@ -1311,16 +1311,51 @@ class BuybackOrder(Document):
                 title=f"Customer Activity Update Error: {self.name}",
             )
 
+    # def _create_accounting_entries(self):
+    #     """Create JE + SE atomically — called when status transitions to Paid."""
+    #     _prev_user = (frappe.session.user or "").strip()
+    #     restore_user = (
+    #         _prev_user
+    #         if _prev_user and _prev_user != "None" and frappe.db.exists("User", _prev_user)
+    #         else "Guest"
+    #     )
+    #     try:
+    #         frappe.set_user("Administrator")
+    #         self._create_journal_entry()
+    #         self._create_stock_entry()
+    #         # Persist the JE/SE links via db.set_value (avoid recursive save)
+    #         frappe.db.set_value("Buyback Order", self.name, {
+    #             "journal_entry": self.journal_entry,
+    #             "stock_entry": self.stock_entry,
+    #         }, update_modified=False)
+    #         # Auto-create Material Transfer Material Request from store →
+    #         # central Buyback Bin so delivery staff pick the device up.
+    #         # Failures must NOT roll back JE/SE (logistics is downstream).
+    #         try:
+    #             self._create_pickup_request()
+    #         except Exception:
+    #             frappe.log_error(
+    #                 title=_("Buyback Order {0}: pickup MR creation failed").format(self.name),
+    #             )
+    #     except Exception:
+    #         frappe.log_error(
+    #             title=_("Buyback Order {0}: JE/SE creation failed").format(self.name),
+    #         )
+    #         raise
+    #     finally:
+    #         frappe.set_user(restore_user)
+
+
+    # update _create_accounting_entries
+
     def _create_accounting_entries(self):
         """Create JE + SE atomically — called when status transitions to Paid."""
-        _prev_user = (frappe.session.user or "").strip()
-        restore_user = (
-            _prev_user
-            if _prev_user and _prev_user != "None" and frappe.db.exists("User", _prev_user)
-            else "Guest"
-        )
+        prev_user = frappe.session.user
         try:
-            frappe.set_user("Administrator")
+            # In-memory only - do NOT use frappe.set_user (it writes cookies)
+            frappe.session.user = "Administrator"
+            frappe.local.session_obj = None
+            
             self._create_journal_entry()
             self._create_stock_entry()
             # Persist the JE/SE links via db.set_value (avoid recursive save)
@@ -1343,7 +1378,8 @@ class BuybackOrder(Document):
             )
             raise
         finally:
-            frappe.set_user(restore_user)
+            frappe.session.user = prev_user
+            frappe.local.session_obj = None
 
     def _update_serial_no_bought_back(self):
         """Mark Serial No as 'Bought Back' and add timeline comment on close."""
