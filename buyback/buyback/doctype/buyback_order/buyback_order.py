@@ -26,14 +26,88 @@ def _normalize_customer_approval_method(method: str | None) -> str:
     return method
 
 
+MANAGER_APPROVAL_ROLES = {"Buyback Manager", "Buyback Admin", "System Manager"}
+
+
+def _require_manager_approval_role():
+    """Server-side guard for manager approval actions.
+
+    DocPerm write access is broader than the approval workflow. Keep the
+    controller method aligned with the workflow role gate so API/Desk calls
+    cannot approve just because the user can edit the document.
+    """
+    user = frappe.session.user
+    if user == "Administrator":
+        return
+    roles = set(frappe.get_roles(user))
+    if roles.intersection(MANAGER_APPROVAL_ROLES):
+        return
+    frappe.throw(
+        _("Only a Buyback Manager can approve or reject a buyback order."),
+        exc=frappe.PermissionError,
+    )
+
+
 class BuybackOrder(Document):
     def before_insert(self):
         """Validate uniqueness, assign sequential order_id, generate approval token."""
         self._check_duplicate_active_order()
         self._assign_order_id()
-        self.status = "Draft"
+        self._set_status("Draft")
         if not self.approval_token:
             self.approval_token = frappe.generate_hash(length=32)
+
+    def _has_workflow_state_field(self):
+        return bool(self.meta.has_field("workflow_state"))
+
+    def _set_status(self, status):
+        self.status = status
+        if self._has_workflow_state_field():
+            self.workflow_state = status
+
+    def _status_update(self, status, **extra):
+        updates = {"status": status}
+        if self._has_workflow_state_field():
+            updates["workflow_state"] = status
+        updates.update(extra)
+        return updates
+
+    def _sync_workflow_state(self):
+        """Keep workflow_state aligned when server code changes status directly."""
+        if self.status and self._has_workflow_state_field() and self.workflow_state != self.status:
+            self.workflow_state = self.status
+
+    def _sync_approval_status_after_price_change(self):
+        """Repair pending approval state when final_price crosses the threshold."""
+        if self.docstatus != 1:
+            return
+        if self.status in ("Draft", "Awaiting Approval") and not cint(self.requires_approval):
+            self._set_status("Approved")
+        elif self.status == "Draft" and cint(self.requires_approval):
+            self._set_status("Awaiting Approval")
+        elif (
+            self.status == "Approved"
+            and cint(self.requires_approval)
+            and (not self.approved_by or flt(self.approved_price) != flt(self.final_price))
+        ):
+            self.approved_by = None
+            self.approved_price = 0
+            self.approval_date = None
+            self._set_status("Awaiting Approval")
+
+    def _notify_manager_approval_required(self):
+        try:
+            from buyback.buyback.alerts import alert_manager_approval_required
+
+            threshold = frappe.db.get_single_value(
+                "Buyback Settings", "require_manager_approval_above"
+            ) or 0
+            alert_manager_approval_required(self.name, self.final_price, threshold)
+        except Exception:
+            frappe.log_error(
+                frappe.get_traceback(),
+                title=f"Manager approval alert failed for {self.name}",
+            )
 
     def _check_duplicate_active_order(self):
         """Prevent creating a second active buyback order for the same serial number."""
@@ -117,6 +191,7 @@ class BuybackOrder(Document):
         self._validate_ownership_proof_threshold()
         self._validate_kyc_for_otp_stage()
         self._check_exchange_value_override()
+        self._sync_workflow_state()
 
     def _sync_customer_id(self):
         """Populate ch_customer_id / ch_membership_id from Customer master."""
@@ -134,6 +209,9 @@ class BuybackOrder(Document):
                 self.ch_membership_id = cust.ch_membership_id
 
     def before_update_after_submit(self):
+        self._check_approval_requirement()
+        self._sync_approval_status_after_price_change()
+        self._sync_workflow_state()
         self._calculate_payment_totals()
         self._validate_payment_rows()
         # Field updates on an already-submitted doc go through update_after_submit,
@@ -248,7 +326,7 @@ class BuybackOrder(Document):
         Paid → Closed.  The "Confirm Payment" transition (docstatus 0→1)
         fires on_submit() instead — JE/SE creation is handled there too.
         """
-        status = self.workflow_state or self.status
+        status = self.status or self.workflow_state
 
         # Auto-dispatch OTP whenever the doc enters "Awaiting OTP" via any
         # path (workflow Action button, direct status edit, etc.). The
@@ -270,7 +348,10 @@ class BuybackOrder(Document):
                 frappe.log_error(title=f"Auto OTP dispatch failed for {self.name}")
 
         previous = self.get_doc_before_save()
-        previous_status = (getattr(previous, "workflow_state", None) or getattr(previous, "status", None) or "") if previous else ""
+        previous_status = (getattr(previous, "status", None) or getattr(previous, "workflow_state", None) or "") if previous else ""
+
+        if status == "Awaiting Approval" and previous_status != "Awaiting Approval":
+            self._notify_manager_approval_required()
 
         # Safety net: create JE + SE only on the transition into Paid.
         # A later edit to an already-paid order (for example payout-preference
@@ -309,10 +390,12 @@ class BuybackOrder(Document):
         """
         if self.status == "Draft":
             new_status = "Awaiting Approval" if self.requires_approval else "Approved"
-            self.status = new_status
+            self._set_status(new_status)
             # db_set is required: Frappe saves the doc before firing on_submit,
             # so in-memory changes to self.status are not persisted automatically.
-            self.db_set("status", new_status, notify=True)
+            self.db_set(self._status_update(new_status), notify=True)
+            if new_status == "Awaiting Approval":
+                self._notify_manager_approval_required()
 
         log_audit("Order Created", "Buyback Order", self.name,
                   new_value={"final_price": self.final_price, "status": self.status})
@@ -343,7 +426,9 @@ class BuybackOrder(Document):
         """Reverse GL and Stock entries on cancellation."""
         self._cancel_linked_entry("Journal Entry", self.journal_entry)
         self._cancel_linked_entry("Stock Entry", self.stock_entry)
-        self.status = "Cancelled"
+        self._set_status("Cancelled")
+        if self.name:
+            self.db_set(self._status_update("Cancelled"), notify=True)
         log_audit("Order Cancelled", "Buyback Order", self.name,
                   new_value={"status": "Cancelled"})
 
@@ -490,8 +575,7 @@ class BuybackOrder(Document):
         threshold = frappe.db.get_single_value(
             "Buyback Settings", "require_manager_approval_above"
         ) or 0
-        if flt(self.final_price) > flt(threshold):
-            self.requires_approval = 1
+        self.requires_approval = 1 if flt(self.final_price) > flt(threshold) else 0
 
     def _check_exchange_value_override(self):
         """Log exception when buyback value is overridden from original assessment (#2).
@@ -535,12 +619,13 @@ class BuybackOrder(Document):
 
     def approve(self, remarks=None):
         """Manager approves the order."""
+        _require_manager_approval_role()
         if self.status != "Awaiting Approval":
             frappe.throw(
                 _("Can only approve orders in 'Awaiting Approval' status."),
                 exc=BuybackStatusError,
             )
-        self.status = "Approved"
+        self._set_status("Approved")
         self.approved_by = frappe.session.user
         self.approved_price = self.final_price
         self.approval_date = now_datetime()
@@ -552,12 +637,13 @@ class BuybackOrder(Document):
 
     def reject(self, remarks=None):
         """Manager rejects the order."""
+        _require_manager_approval_role()
         if self.status != "Awaiting Approval":
             frappe.throw(
                 _("Can only reject orders in 'Awaiting Approval' status."),
                 exc=BuybackStatusError,
             )
-        self.status = "Rejected"
+        self._set_status("Rejected")
         self.approved_by = frappe.session.user
         self.approval_date = now_datetime()
         if remarks:
@@ -585,7 +671,7 @@ class BuybackOrder(Document):
         self.customer_approved = 1
         self.customer_approved_at = now_datetime()
         self.customer_approval_method = method
-        self.status = "Customer Approved"
+        self._set_status("Customer Approved")
         self.save()
         log_audit("Customer Approved", "Buyback Order", self.name,
                   new_value={"method": method, "final_price": self.final_price})
@@ -657,7 +743,7 @@ class BuybackOrder(Document):
 
         otp_code = self._dispatch_otp()
         self.flags.otp_just_dispatched = True
-        self.status = "Awaiting OTP"
+        self._set_status("Awaiting OTP")
         self.save()
         return otp_code
 
@@ -739,7 +825,7 @@ class BuybackOrder(Document):
                 "customer_approved": 1,
                 "customer_approved_at": verified_at,
                 "customer_approval_method": approval_method,
-                "status": "OTP Verified",
+                **self._status_update("OTP Verified"),
             }
 
             # OTP verification is often done after submit from customer flows.
@@ -753,7 +839,7 @@ class BuybackOrder(Document):
                 self.customer_approved = 1
                 self.customer_approved_at = verified_at
                 self.customer_approval_method = approval_method
-                self.status = "OTP Verified"
+                self._set_status("OTP Verified")
                 self.save()
 
             log_audit("OTP Verified", "Buyback Order", self.name)
@@ -781,7 +867,7 @@ class BuybackOrder(Document):
             "otp_verified_at": verified_at,
             "customer_approved": 1,
             "customer_approved_at": verified_at,
-            "status": "OTP Verified",
+            **self._status_update("OTP Verified"),
         }
 
         if self.docstatus == 1:
@@ -792,7 +878,7 @@ class BuybackOrder(Document):
             self.otp_verified_at = verified_at
             self.customer_approved = 1
             self.customer_approved_at = verified_at
-            self.status = "OTP Verified"
+            self._set_status("OTP Verified")
             self.save()
 
         audit_note = f"In-Store OTP Bypass — {remarks}" if remarks else "In-Store OTP Bypass (no OTP)"
@@ -806,7 +892,7 @@ class BuybackOrder(Document):
                 _("Must verify OTP before proceeding to payment."),
                 exc=BuybackStatusError,
             )
-        self.status = "Ready to Pay"
+        self._set_status("Ready to Pay")
         self.save()
 
     def mark_paid(self):
@@ -816,7 +902,7 @@ class BuybackOrder(Document):
                 _("Total paid must equal final price."),
                 exc=BuybackStatusError,
             )
-        self.status = "Paid"
+        self._set_status("Paid")
         self.save()
         log_audit("Payment Made", "Buyback Order", self.name,
                   new_value={"total_paid": self.total_paid})
@@ -828,7 +914,7 @@ class BuybackOrder(Document):
                 _("Can only close paid orders."),
                 exc=BuybackStatusError,
             )
-        self.status = "Closed"
+        self._set_status("Closed")
         self.save()
         log_audit("Order Closed", "Buyback Order", self.name)
 
@@ -1121,7 +1207,7 @@ class BuybackOrder(Document):
         if status in bad_outcomes:
             # Definitive national-registry hit — reject outright, do not
             # leave the order sitting in limbo for staff to "fix" later.
-            self.db_set("status", "Rejected", update_modified=True)
+            self.db_set(self._status_update("Rejected"), update_modified=True)
             self.db_set(
                 "approval_remarks",
                 f"Auto-rejected: Sanchar Saathi IMEI check = {status}"

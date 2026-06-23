@@ -10,8 +10,27 @@ def on_buyback_order_update(doc, method):
     if frappe.flags.in_demo_data:
         return
 
+    _check_manager_approval_alert(doc)
     _check_high_value_alert(doc)
     _check_duplicate_imei(doc)
+
+
+def _check_manager_approval_alert(doc):
+    """Email managers when an order newly enters Awaiting Approval."""
+    if doc.status != "Awaiting Approval":
+        return
+
+    old = doc.get_doc_before_save()
+    if old and old.status == "Awaiting Approval":
+        return
+
+    threshold = (
+        frappe.db.get_single_value("Buyback Settings", "require_manager_approval_above")
+        or 0
+    )
+    from buyback.buyback.alerts import alert_manager_approval_required
+
+    alert_manager_approval_required(doc.name, doc.final_price, threshold)
 
 
 def _check_high_value_alert(doc):

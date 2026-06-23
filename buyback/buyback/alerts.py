@@ -21,12 +21,13 @@ import requests
 # ─── Alert Dispatcher ────────────────────────────────────────────────
 
 def send_alert(subject, message, recipients=None, doctype=None, docname=None,
-               alert_type="Warning", send_whatsapp=False):
+               alert_type="Warning", send_whatsapp=False, send_email=False):
     """Central alert dispatcher — sends via available channels."""
+    recipients = list(dict.fromkeys(recipients or []))
 
     # 1. ERPNext Notification Log
     try:
-        for user in (recipients or []):
+        for user in recipients:
             doc = frappe.new_doc("Notification Log")
             doc.subject = subject
             doc.email_content = message
@@ -40,7 +41,7 @@ def send_alert(subject, message, recipients=None, doctype=None, docname=None,
         pass
 
     # 2. Realtime push
-    for user in (recipients or []):
+    for user in recipients:
         try:
             frappe.publish_realtime(
                 "msgprint",
@@ -50,7 +51,20 @@ def send_alert(subject, message, recipients=None, doctype=None, docname=None,
         except Exception:
             pass
 
-    # 3. WhatsApp (if enabled)
+    # 3. Email (if explicitly enabled)
+    if send_email and recipients:
+        try:
+            frappe.sendmail(
+                recipients=recipients,
+                subject=subject,
+                message=message,
+                reference_doctype=doctype,
+                reference_name=docname,
+            )
+        except Exception:
+            frappe.log_error(frappe.get_traceback(), title=f"Alert email failed: {subject}")
+
+    # 4. WhatsApp (if enabled)
     if send_whatsapp:
         _send_whatsapp(subject, message)
 
@@ -111,6 +125,55 @@ def alert_high_value_order(docname, final_price, threshold):
     store = frappe.db.get_value("Buyback Order", docname, "store")
     recipients = _get_alert_recipients("Buyback Order", docname, ["Buyback Manager", "Buyback Admin"], store=store)
     send_alert(subject, message, recipients, "Buyback Order", docname, "Warning")
+
+
+def alert_manager_approval_required(docname, final_price=None, threshold=None):
+    """Email scoped managers when an order enters Awaiting Approval."""
+    cache_key = f"manager_approval_required_{docname}"
+    if frappe.cache.get_value(cache_key):
+        return
+
+    row = frappe.db.get_value(
+        "Buyback Order",
+        docname,
+        ["store", "customer_name", "item_name", "final_price"],
+        as_dict=True,
+    )
+    if not row:
+        return
+
+    final_price = flt(final_price if final_price is not None else row.final_price)
+    threshold = flt(threshold)
+    url = get_url_to_form("Buyback Order", docname)
+    subject = f"Manager Approval Required: {docname}"
+    message = (
+        f"Buyback Order <a href='{url}'>{docname}</a> requires manager approval."
+        f"<br>Amount: {fmt_money(final_price, currency='INR')}"
+        f"<br>Threshold: {fmt_money(threshold, currency='INR')}"
+        f"<br>Customer: {frappe.utils.escape_html(row.customer_name or '-')}"
+        f"<br>Device: {frappe.utils.escape_html(row.item_name or '-')}"
+    )
+
+    recipients = _get_alert_recipients(
+        "Buyback Order",
+        docname,
+        ["Buyback Manager", "Buyback Admin"],
+        store=row.store,
+        include_owner=False,
+    )
+    if not recipients:
+        return
+
+    send_alert(
+        subject,
+        message,
+        recipients,
+        "Buyback Order",
+        docname,
+        "Warning",
+        send_email=True,
+    )
+    frappe.cache.set_value(cache_key, 1, expires_in_sec=7 * 86400)
 
 
 def alert_duplicate_imei(imei, order_names):
@@ -252,7 +315,7 @@ def _check_inspection_backlogs():
 
 # ─── Helpers ─────────────────────────────────────────────────────────
 
-def _get_alert_recipients(doctype=None, docname=None, roles=None, store=None):
+def _get_alert_recipients(doctype=None, docname=None, roles=None, store=None, include_owner=True):
     """Get alert recipients: role-holders scoped to `store` + optional doc owner.
 
     When `store` is provided, only users whose CH User Scope includes that store
@@ -265,7 +328,7 @@ def _get_alert_recipients(doctype=None, docname=None, roles=None, store=None):
     users = set()
 
     # Document owner always included (Odoo followers-model equivalent)
-    if doctype and docname:
+    if include_owner and doctype and docname:
         try:
             owner = frappe.db.get_value(doctype, docname, "owner")
             if owner and owner not in ("Administrator", "Guest"):

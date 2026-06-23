@@ -2,12 +2,16 @@
 // For license information, please see license.txt
 
 frappe.ui.form.on("Buyback Order", {
-    refresh(frm) {
-        frm.clear_custom_buttons();
-        if (frm.doc.docstatus !== 1) return;
+	    refresh(frm) {
+	        frm.clear_custom_buttons();
+	        if (frm.doc.docstatus !== 1) return;
+	        const can_manager_approve = frappe.session.user === "Administrator"
+	            || frappe.user.has_role("Buyback Manager")
+	            || frappe.user.has_role("Buyback Admin")
+	            || frappe.user.has_role("System Manager");
 
-        if (frm.doc.status === "Awaiting Approval") {
-            frm.add_custom_button(__("Approve"), () => {
+	        if (frm.doc.status === "Awaiting Approval" && can_manager_approve) {
+	            frm.add_custom_button(__("Approve"), () => {
                 frappe.prompt({
                     label: "Remarks",
                     fieldname: "remarks",
