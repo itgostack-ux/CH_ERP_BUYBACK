@@ -177,3 +177,65 @@ frappe.ui.form.on("Buyback Order", {
         frm.page.set_indicator(frm.doc.status, colors[frm.doc.status] || "grey");
     },
 });
+
+// Store staff can request a buyback PRICE OVERRIDE on any saved order → routes
+// to the Buyback Manager via the shared CH Exception framework. Kept in its own
+// form handler so it shows regardless of order status/docstatus.
+frappe.ui.form.on("Buyback Order", {
+    refresh(frm) {
+        if (frm.is_new()) return;
+        frm.add_custom_button(__("Raise Price Exception"), () => {
+            const current = frm.doc.approved_price || frm.doc.final_price || frm.doc.base_price || 0;
+            const d = new frappe.ui.Dialog({
+                title: __("Request Buyback Price Override"),
+                fields: [
+                    {
+                        fieldname: "current_price",
+                        fieldtype: "Currency",
+                        label: __("Current Buyback Price"),
+                        read_only: 1,
+                        default: current,
+                    },
+                    {
+                        fieldname: "requested_price",
+                        fieldtype: "Currency",
+                        label: __("Requested Buyback Price"),
+                        reqd: 1,
+                        default: current,
+                    },
+                    {
+                        fieldname: "reason",
+                        fieldtype: "Small Text",
+                        label: __("Reason for the price change"),
+                        reqd: 1,
+                        description: __("Routed to the Buyback Manager for approval."),
+                    },
+                ],
+                primary_action_label: __("Submit to Buyback Manager"),
+                primary_action: (v) => {
+                    d.hide();
+                    frappe.call({
+                        method: "buyback.api.raise_buyback_exception",
+                        args: {
+                            order: frm.doc.name,
+                            requested_price: v.requested_price,
+                            reason: v.reason,
+                        },
+                        freeze: true,
+                        freeze_message: __("Submitting price override…"),
+                        callback: (r) => {
+                            if (r.message && r.message.name) {
+                                frappe.show_alert({
+                                    message: __("Price override {0} raised — routed to Buyback Manager.",
+                                        [r.message.name]),
+                                    indicator: "orange",
+                                }, 7);
+                            }
+                        },
+                    });
+                },
+            });
+            d.show();
+        });
+    },
+});

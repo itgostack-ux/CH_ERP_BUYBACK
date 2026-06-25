@@ -2321,3 +2321,66 @@ def apply_exchange_to_invoice(
             "Exchange credit ₹{0} applied to invoice {1}."
         ).format(buyback_amount, sales_invoice),
     }
+
+
+@frappe.whitelist()
+def raise_buyback_exception(
+    order: str,
+    requested_price: float,
+    reason: str,
+    exception_type: str = "Buyback Price Override",
+) -> dict:
+    """Store staff request a buyback **price override** on a Buyback Order.
+
+    Mirrors the POS 'Discount Override' pattern: the proposed price and the
+    order's current price are captured so the Buyback Manager sees the change
+    and the CH Exception framework can route by the requested amount. Tracked as
+    a CH Exception Request linked back to this order.
+    """
+    if not reason or not reason.strip():
+        frappe.throw(_("Please give a reason for the price change."),
+                     title=_("Reason Required"), exc=BuybackValidationError)
+    requested = flt(requested_price)
+    if requested <= 0:
+        frappe.throw(_("Requested buyback price must be greater than zero."),
+                     title=_("Invalid Price"), exc=BuybackValidationError)
+
+    o = frappe.get_doc("Buyback Order", order)
+    o.check_permission("read")
+
+    # Current buyback price = manager-approved if present, else the computed
+    # final price (base − deductions), else base price.
+    current = flt(o.get("approved_price")) or flt(o.get("final_price")) or flt(o.get("base_price"))
+
+    warehouse = (
+        frappe.db.get_value("CH Store", o.store, "warehouse") if o.get("store") else None
+    )
+    # Buyback overrides go both ways — a store may need to *raise* the payout
+    # (e.g. system 4,850 but customer wants 5,000), not only reduce it. Spell out
+    # the direction so the manager sees it clearly even though the underlying
+    # exception email is discount-oriented.
+    delta = requested - current
+    if delta > 0:
+        direction = _("increase of ₹{0}").format(f"{delta:,.2f}")
+    elif delta < 0:
+        direction = _("decrease of ₹{0}").format(f"{abs(delta):,.2f}")
+    else:
+        direction = _("no change")
+    full_reason = _("Buyback price override: ₹{0} → ₹{1} ({2}). {3}").format(
+        f"{current:,.2f}", f"{requested:,.2f}", direction, reason.strip())
+
+    from ch_item_master.ch_item_master.exception_api import raise_exception
+
+    return raise_exception(
+        exception_type=exception_type,
+        company=o.company,
+        reason=full_reason,
+        requested_value=requested,   # proposed buyback payout → drives value-band routing
+        original_value=current,      # current/system buyback price
+        reference_doctype="Buyback Order",
+        reference_name=o.name,
+        item_code=o.get("item"),
+        serial_no=o.get("serial_no") or o.get("imei_serial"),
+        store_warehouse=warehouse,
+        customer=o.get("customer"),
+    )
