@@ -100,6 +100,55 @@ def _get_email_for_mobile(mobile_no: str) -> str:
     return email or ""
 
 
+def send_otp(mobile_no: str, otp_code: str, purpose: str,
+             ref_doctype: str = "", ref_name: str = "", email: str | None = None) -> dict:
+    """Deliver an OTP across ALL available channels — SMS, WhatsApp and email.
+
+    Each channel is best-effort and independent: a failure in one never blocks
+    the others, so the customer receives the OTP wherever they can. Returns a
+    per-channel result dict.
+    """
+    results = {"sms": False, "whatsapp": False, "email": False}
+
+    # 1) SMS via Frappe SMS Settings.
+    try:
+        from frappe.core.doctype.sms_settings.sms_settings import send_sms
+        msg = (f"Your OTP for {purpose} is {otp_code}. "
+               f"Valid for 5 minutes. Do not share it with anyone.")
+        send_sms([mobile_no], msg)
+        results["sms"] = True
+    except Exception:
+        frappe.log_error(frappe.get_traceback(), f"OTP SMS delivery failed for {mobile_no}")
+
+    # 2) WhatsApp via the configured OTP template.
+    try:
+        settings = _get_settings()
+        if settings and getattr(settings, "buyback_otp", None):
+            from ch_item_master.ch_core.whatsapp import send_template_message
+            send_template_message(
+                phone=mobile_no,
+                template_name=settings.buyback_otp,
+                body_values={"1": otp_code},
+                customer_name="Customer",
+                ref_doctype=ref_doctype or "CH OTP Log",
+                ref_name=ref_name or "",
+                enqueue=False,  # OTP must go out immediately
+            )
+            results["whatsapp"] = True
+    except Exception:
+        frappe.log_error(frappe.get_traceback(), f"OTP WhatsApp delivery failed for {mobile_no}")
+
+    # 3) Email (resolve from mobile if not supplied).
+    try:
+        to_email = email or _get_email_for_mobile(mobile_no)
+        if to_email:
+            results["email"] = send_otp_email(to_email, otp_code, purpose, ref_name)
+    except Exception:
+        frappe.log_error(frappe.get_traceback(), f"OTP email delivery failed for {mobile_no}")
+
+    return results
+
+
 # ── Private helpers ──────────────────────────────────────────────────
 
 def _get_settings():

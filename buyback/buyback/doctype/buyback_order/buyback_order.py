@@ -768,19 +768,16 @@ class BuybackOrder(Document):
         )
         log_audit("OTP Sent", "Buyback Order", self.name)
 
-        # Deliver OTP via WhatsApp + Email — failures are logged, not raised,
-        # so a delivery hiccup never blocks the workflow transition.
+        # Deliver OTP across all channels — SMS, WhatsApp and Email. Failures
+        # are logged, not raised, so a delivery hiccup never blocks the workflow.
         try:
-            from buyback.buyback.whatsapp_notifications import (
-                send_otp_whatsapp, send_otp_email, _get_email_for_mobile,
-            )
-            send_otp_whatsapp(self.mobile_no, otp_code, self.name)
+            from buyback.buyback.whatsapp_notifications import send_otp as _send_otp
             customer_email = ""
             if self.customer:
                 customer_email = frappe.db.get_value("Customer", self.customer, "email_id") or ""
-            if not customer_email:
-                customer_email = _get_email_for_mobile(self.mobile_no)
-            send_otp_email(customer_email, otp_code, "Buyback Confirmation", self.name)
+            _send_otp(self.mobile_no, otp_code, "Buyback Confirmation",
+                      ref_doctype="Buyback Order", ref_name=self.name,
+                      email=customer_email or None)
         except Exception:
             frappe.log_error(title="OTP delivery failed")
 
