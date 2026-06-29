@@ -64,7 +64,7 @@ def run():
 				default_company="BestBuy Mobiles Pvt Ltd",
 			)
 
-		def _fake_get_value(doctype, filters, fieldname=None):
+		def _fake_get_value(doctype, filters=None, fieldname=None, *args, **kwargs):
 			if doctype == "Company" and fieldname in {
 				"default_cash_account",
 				"default_bank_account",
@@ -77,7 +77,7 @@ def run():
 					"default_payable_account": "Payable - BM",
 					"cost_center": "Main - BM",
 				}[fieldname]
-			return None
+			return orig_get_value(doctype, filters, fieldname, *args, **kwargs)
 
 		def _fake_get_doc(arg, *args, **kwargs):
 			if isinstance(arg, dict) and arg.get("doctype") == "Journal Entry":

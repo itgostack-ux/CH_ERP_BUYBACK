@@ -29,7 +29,19 @@ def get_columns():
 
 def get_data(filters):
     dc = date_condition("creation", filters)
-    sc = standard_conditions(filters)
+    sc = standard_conditions(filters, field_map={"settlement_type": None, "inspector": None})
+    i_dc = date_condition("creation", filters, alias="i.")
+    i_sc = standard_conditions(
+        filters,
+        alias="i.",
+        field_map={"source": "a.source", "settlement_type": None},
+    )
+    o_dc = date_condition("creation", filters, alias="o.")
+    o_sc = standard_conditions(
+        filters,
+        alias="o.",
+        field_map={"source": "a.source", "item_group": "a.item_group", "inspector": None},
+    )
 
     def _q(sql):
         return frappe.db.sql(sql, as_dict=1)[0]
@@ -50,12 +62,10 @@ def get_data(filters):
                SUM(CASE WHEN IFNULL(a.source,'Store Manual')='Store Manual' THEN 1 ELSE 0 END) as manual_count
         FROM `tabBuyback Inspection` i
         LEFT JOIN `tabBuyback Assessment` a ON a.name = i.buyback_assessment
-        WHERE i.status='Completed' AND {dc.replace('creation','i.creation')} {sc.replace(' AND ',' AND i.',1) if sc else ''}
+        WHERE i.status='Completed' AND {i_dc} {i_sc}
     """)
 
     # Stage 3: Orders Created
-    o_dc = dc.replace("creation", "o.creation")
-    o_sc_raw = standard_conditions(filters, alias="o.")
     o = _q(f"""
         SELECT COUNT(*) as total,
                SUM(CASE WHEN a.source='App Diagnosis' THEN 1 ELSE 0 END) as app_count,
@@ -63,7 +73,7 @@ def get_data(filters):
                COALESCE(SUM(o.final_price),0) as value
         FROM `tabBuyback Order` o
         LEFT JOIN `tabBuyback Assessment` a ON a.name = o.buyback_assessment
-        WHERE o.docstatus<2 AND {o_dc} {o_sc_raw}
+        WHERE o.docstatus<2 AND {o_dc} {o_sc}
     """)
 
     # Stage 4: Customer Approved
@@ -74,7 +84,7 @@ def get_data(filters):
                COALESCE(SUM(o.final_price),0) as value
         FROM `tabBuyback Order` o
         LEFT JOIN `tabBuyback Assessment` a ON a.name = o.buyback_assessment
-        WHERE o.docstatus<2 AND o.customer_approved=1 AND {o_dc} {o_sc_raw}
+        WHERE o.docstatus<2 AND o.customer_approved=1 AND {o_dc} {o_sc}
     """)
 
     # Stage 5: Settled (Paid/Closed)
@@ -85,7 +95,7 @@ def get_data(filters):
                COALESCE(SUM(o.total_paid),0) as value
         FROM `tabBuyback Order` o
         LEFT JOIN `tabBuyback Assessment` a ON a.name = o.buyback_assessment
-        WHERE o.docstatus<2 AND o.status IN ('Paid','Closed') AND {o_dc} {o_sc_raw}
+        WHERE o.docstatus<2 AND o.status IN ('Paid','Closed') AND {o_dc} {o_sc}
     """)
 
     # Stage 6: Closed
@@ -96,7 +106,7 @@ def get_data(filters):
                COALESCE(SUM(o.total_paid),0) as value
         FROM `tabBuyback Order` o
         LEFT JOIN `tabBuyback Assessment` a ON a.name = o.buyback_assessment
-        WHERE o.docstatus<2 AND o.status='Closed' AND {o_dc} {o_sc_raw}
+        WHERE o.docstatus<2 AND o.status='Closed' AND {o_dc} {o_sc}
     """)
 
     stages = [

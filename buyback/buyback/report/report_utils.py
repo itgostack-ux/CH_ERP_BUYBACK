@@ -57,7 +57,9 @@ def standard_conditions(filters=None, alias="", field_map=None):
         val = filters.get(key)
         if val:
             col = fm.get(key, key)
-            prefix = f"{alias}" if alias else ""
+            if not col:
+                continue
+            prefix = f"{alias}" if alias and "." not in col else ""
             conds.append(f"{prefix}{col} = {frappe.db.escape(val)}")
 
     return (" AND " + " AND ".join(conds)) if conds else ""

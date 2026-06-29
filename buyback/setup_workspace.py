@@ -25,7 +25,7 @@ def _setup_number_cards():
             "label": "Today's Assessments",
             "document_type": "Buyback Assessment",
             "function": "Count",
-            "filters_json": '["Buyback Assessment","creation","Timespan","today"]]',
+            "filters_json": '[["Buyback Assessment","creation","Timespan","today"]]',
             "color": "#2490EF",
             "show_percentage_stats": 1,
             "stats_time_interval": "Daily",
@@ -62,13 +62,26 @@ def _setup_number_cards():
     ]
 
     for card_def in cards:
+        for duplicate in frappe.get_all(
+            "Number Card",
+            filters={
+                "label": card_def["label"],
+                "document_type": card_def["document_type"],
+                "name": ["!=", card_def["name"]],
+            },
+            pluck="name",
+        ):
+            frappe.delete_doc("Number Card", duplicate, force=True, ignore_permissions=True)
+
         if frappe.db.exists("Number Card", card_def["name"]):
             doc = frappe.get_doc("Number Card", card_def["name"])
             doc.update(card_def)
             doc.save(ignore_permissions=True)
         else:
-            doc = frappe.get_doc({"doctype": "Number Card", **card_def})
-            doc.insert(ignore_permissions=True)
+            doc = frappe.new_doc("Number Card")
+            doc.update(card_def)
+            doc.is_public = 1
+            doc.insert(ignore_permissions=True, set_name=card_def["name"])
         print(f"  Number Card: {card_def['name']}")
 
 
@@ -101,6 +114,7 @@ def _setup_workspace():
     # ── Shortcuts ──
     for sc in [
         {"type": "DocType", "link_to": "Buyback Assessment", "label": "Assessments"},
+        {"type": "DocType", "link_to": "Buyback Assessment", "label": "Quotes"},
         {"type": "DocType", "link_to": "Buyback Inspection", "label": "Inspections"},
         {"type": "DocType", "link_to": "Buyback Order", "label": "Orders"},
         {"type": "DocType", "link_to": "Buyback Exchange Order", "label": "Exchange"},
@@ -146,6 +160,24 @@ def _setup_workspace():
         "Buyback Item Question Map",
         "Buyback Checklist Template",
         "Buyback Pricing Rule",
+    ]:
+        ws.append("links", {
+            "type": "Link",
+            "link_type": "DocType",
+            "link_to": dt,
+            "label": dt,
+        })
+
+    # --- Shared Masters ---
+    ws.append("links", {
+        "type": "Card Break",
+        "label": "Shared Masters",
+    })
+    for dt in [
+        "Customer",
+        "Item",
+        "Warehouse",
+        "POS Profile",
     ]:
         ws.append("links", {
             "type": "Link",

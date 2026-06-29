@@ -28,7 +28,11 @@ def get_columns():
 
 def get_data(filters):
     dc = date_condition("a.creation", filters)
-    sc = standard_conditions(filters, alias="a.")
+    sc = standard_conditions(
+        filters,
+        alias="o.",
+        field_map={"source": None, "item_group": None, "inspector": None},
+    )
     rows = frappe.db.sql("""
         SELECT
             a.name, a.action,

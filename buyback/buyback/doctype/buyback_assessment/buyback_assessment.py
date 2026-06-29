@@ -44,7 +44,8 @@ class BuybackAssessment(Document):
             self._fill_diagnostic_impacts()
         if self.responses:
             self._fill_response_impacts()
-        if self.diagnostic_tests or self.responses:
+        has_pricing_inputs = self.item and self.warranty_status and self.device_age_months
+        if self.diagnostic_tests or self.responses or has_pricing_inputs:
             self._calculate_estimate()
         # P2-10: Block submission with unanswered diagnostic responses so the
         # inspector cannot grade a device with a partial question bank.

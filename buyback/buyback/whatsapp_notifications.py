@@ -35,7 +35,8 @@ def on_buyback_order_whatsapp(doc, method):
 
 def send_otp_whatsapp(mobile_no: str, otp_code: str, order_name: str):
     """Send OTP via WhatsApp. Called from BuybackOrder.send_otp() after OTP generation."""
-    settings = _get_settings()
+    company = frappe.db.get_value("Buyback Order", order_name, "company")
+    settings = _get_settings(company)
     if not settings:
         return
 
@@ -43,12 +44,13 @@ def send_otp_whatsapp(mobile_no: str, otp_code: str, order_name: str):
 
     send_template_message(
         phone=mobile_no,
-        template_name=settings.buyback_otp,
+        event="buyback_otp",
         body_values={"1": otp_code},
         customer_name="Customer",
         ref_doctype="Buyback Order",
         ref_name=order_name,
         enqueue=False,  # OTP must be sent immediately
+        company=company,
     )
 
 
@@ -101,38 +103,48 @@ def _get_email_for_mobile(mobile_no: str) -> str:
 
 
 def send_otp(mobile_no: str, otp_code: str, purpose: str,
-             ref_doctype: str = "", ref_name: str = "", email: str | None = None) -> dict:
+             ref_doctype: str = "", ref_name: str = "", email: str | None = None,
+             company: str | None = None) -> dict:
     """Deliver an OTP across ALL available channels — SMS, WhatsApp and email.
 
     Each channel is best-effort and independent: a failure in one never blocks
-    the others, so the customer receives the OTP wherever they can. Returns a
-    per-channel result dict.
+    the others, so the customer receives the OTP wherever they can. WhatsApp
+    routes via the company's account (derived from the reference doc when
+    ``company`` is omitted). Returns a per-channel result dict.
     """
     results = {"sms": False, "whatsapp": False, "email": False}
+    if not company and ref_doctype and ref_name:
+        try:
+            if frappe.get_meta(ref_doctype).has_field("company"):
+                company = frappe.db.get_value(ref_doctype, ref_name, "company")
+        except Exception:
+            company = None
 
-    # 1) SMS via Frappe SMS Settings.
+    # 1) SMS via the company's gateway (CH SMS Account) → global SMS Settings.
     try:
-        from frappe.core.doctype.sms_settings.sms_settings import send_sms
+        from ch_item_master.ch_core.sms import send_company_sms, get_otp_expiry
+        mins = get_otp_expiry(company)
         msg = (f"Your OTP for {purpose} is {otp_code}. "
-               f"Valid for 5 minutes. Do not share it with anyone.")
-        send_sms([mobile_no], msg)
+               f"Valid for {mins} minutes. Do not share it with anyone.")
+        send_company_sms([mobile_no], msg, company=company)
         results["sms"] = True
     except Exception:
         frappe.log_error(frappe.get_traceback(), f"OTP SMS delivery failed for {mobile_no}")
 
-    # 2) WhatsApp via the configured OTP template.
+    # 2) WhatsApp via the company's OTP template (from the library, event-mapped).
     try:
-        settings = _get_settings()
-        if settings and getattr(settings, "buyback_otp", None):
-            from ch_item_master.ch_core.whatsapp import send_template_message
+        from ch_item_master.ch_core.whatsapp import get_template, send_template_message
+        tmpl, _ = get_template(company, "buyback_otp")
+        if _get_settings(company) and tmpl:
             send_template_message(
                 phone=mobile_no,
-                template_name=settings.buyback_otp,
+                event="buyback_otp",
                 body_values={"1": otp_code},
                 customer_name="Customer",
                 ref_doctype=ref_doctype or "CH OTP Log",
                 ref_name=ref_name or "",
                 enqueue=False,  # OTP must go out immediately
+                company=company,
             )
             results["whatsapp"] = True
     except Exception:
@@ -151,12 +163,11 @@ def send_otp(mobile_no: str, otp_code: str, purpose: str,
 
 # ── Private helpers ──────────────────────────────────────────────────
 
-def _get_settings():
-    try:
-        s = frappe.get_cached_doc("CH WhatsApp Settings")
-        return s if s.enabled else None
-    except frappe.DoesNotExistError:
-        return None
+def _get_settings(company=None):
+    """Per-company WhatsApp account (credentials + templates) → global single."""
+    from ch_item_master.ch_core.whatsapp import get_whatsapp_settings
+    s = get_whatsapp_settings(company)
+    return s if (s and s.enabled) else None
 
 
 def _notify_awaiting_customer_approval(doc, phone, customer_name):
@@ -168,15 +179,13 @@ def _notify_awaiting_customer_approval(doc, phone, customer_name):
     price_str = fmt_money(doc.final_price, currency="INR") if doc.final_price else ""
 
     # ── WhatsApp ─────────────────────────────────────────────────
-    settings = _get_settings()
-    template_name = getattr(settings, "buyback_customer_approval", "") if settings else ""
-    if template_name and approval_url:
+    if approval_url and _get_settings(doc.company):
         try:
             from ch_item_master.ch_core.whatsapp import send_template_message
 
             send_template_message(
                 phone=phone,
-                template_name=template_name,
+                event="buyback_customer_approval",
                 body_values={
                     "1": customer_name,
                     "2": item_label,
@@ -186,6 +195,7 @@ def _notify_awaiting_customer_approval(doc, phone, customer_name):
                 customer_name=customer_name,
                 ref_doctype="Buyback Order",
                 ref_name=doc.name,
+                company=doc.company,
             )
         except Exception:
             frappe.log_error(frappe.get_traceback(), f"Buyback approval WhatsApp failed for {doc.name}")
@@ -237,7 +247,7 @@ def _notify_awaiting_customer_approval(doc, phone, customer_name):
 
 
 def _notify_order_created(doc, phone, customer_name):
-    settings = _get_settings()
+    settings = _get_settings(doc.company)
     if not settings:
         return
 
@@ -245,7 +255,7 @@ def _notify_order_created(doc, phone, customer_name):
 
     send_template_message(
         phone=phone,
-        template_name=settings.buyback_order_created,
+        event="buyback_order_created",
         body_values={
             "1": customer_name,
             "2": doc.name,
@@ -258,7 +268,7 @@ def _notify_order_created(doc, phone, customer_name):
 
 
 def _notify_approved(doc, phone, customer_name):
-    settings = _get_settings()
+    settings = _get_settings(doc.company)
     if not settings:
         return
 
@@ -270,7 +280,7 @@ def _notify_approved(doc, phone, customer_name):
 
     send_template_message(
         phone=phone,
-        template_name=settings.buyback_approved,
+        event="buyback_approved",
         body_values={
             "1": customer_name,
             "2": doc.name,
@@ -284,7 +294,7 @@ def _notify_approved(doc, phone, customer_name):
 
 
 def _notify_paid(doc, phone, customer_name):
-    settings = _get_settings()
+    settings = _get_settings(doc.company)
     if not settings:
         return
 
@@ -296,7 +306,7 @@ def _notify_paid(doc, phone, customer_name):
 
     send_template_message(
         phone=phone,
-        template_name=settings.buyback_paid,
+        event="buyback_paid",
         body_values={
             "1": customer_name,
             "2": doc.name,

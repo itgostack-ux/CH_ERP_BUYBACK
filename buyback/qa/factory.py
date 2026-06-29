@@ -454,7 +454,7 @@ TEST_USERS = [
 
 def seed_all(company: str | None = None):
     """Idempotently create ALL QA master data.  Returns summary dict."""
-    co = company or COMPANY
+    co = _resolve_company(company)
     summary: dict[str, int] = {}
     frappe.flags.in_qa_seed = True
     try:
@@ -502,21 +502,7 @@ def _seed_brands() -> int:
     created = 0
     brand_names = {i["brand"] for i in ITEMS}
     for b in brand_names:
-        # Ensure a Manufacturer exists with same name
-        if not frappe.db.exists("Manufacturer", b):
-            frappe.get_doc({
-                "doctype": "Manufacturer",
-                "short_name": b,
-            }).insert(ignore_permissions=True)
-
-        if not frappe.db.exists("Brand", b):
-            doc = frappe.get_doc({
-                "doctype": "Brand",
-                "brand": b,
-                "ch_manufacturers": [{"manufacturer": b}],
-            })
-            doc.insert(ignore_permissions=True)
-            created += 1
+        created += _ensure_brand_manufacturer(b)
     return created
 
 
@@ -546,9 +532,10 @@ def _seed_grades() -> int:
 
 def _seed_stores(company: str) -> int:
     created = 0
+    company_abbr = _company_abbr(company)
     for s in STORES:
         # Use store_code as prefix for warehouse name for easy lookup
-        wh_name = f"{s['store_name']} - {COMPANY_ABBR}"
+        wh_name = f"{s['store_name']} - {company_abbr}"
         if not frappe.db.exists("Warehouse", wh_name):
             frappe.get_doc({
                 "doctype": "Warehouse",
@@ -610,6 +597,68 @@ def _seed_manufacturers() -> int:
     return created
 
 
+def _resolve_company(company: str | None = None) -> str:
+    """Pick an existing company for QA data instead of assuming demo masters."""
+    if company and frappe.db.exists("Company", company):
+        return company
+
+    default_company = (
+        frappe.defaults.get_user_default("Company")
+        or frappe.db.get_single_value("Global Defaults", "default_company")
+    )
+    if default_company and frappe.db.exists("Company", default_company):
+        return default_company
+
+    companies = frappe.get_all("Company", pluck="name", limit=1)
+    if companies:
+        return companies[0]
+
+    frappe.throw("Buyback QA seed requires at least one Company master.")
+
+
+def _company_abbr(company: str) -> str:
+    return frappe.db.get_value("Company", company, "abbr") or COMPANY_ABBR
+
+
+def _ensure_brand_manufacturer(brand_name: str) -> int:
+    """Ensure Brand exists and has one manufacturer child row per manufacturer."""
+    if not frappe.db.exists("Manufacturer", brand_name):
+        frappe.get_doc({"doctype": "Manufacturer", "short_name": brand_name}).insert(ignore_permissions=True)
+
+    if not frappe.db.exists("Brand", brand_name):
+        frappe.get_doc({
+            "doctype": "Brand",
+            "brand": brand_name,
+            "ch_manufacturers": [{"manufacturer": brand_name}],
+        }).insert(ignore_permissions=True)
+        return 1
+
+    brand_doc = frappe.get_doc("Brand", brand_name)
+    deduped = []
+    seen = set()
+    changed = False
+    for row in brand_doc.ch_manufacturers or []:
+        manufacturer = (row.manufacturer or "").strip()
+        key = manufacturer.lower()
+        if not key or key in seen:
+            changed = True
+            continue
+        seen.add(key)
+        deduped.append({"manufacturer": manufacturer})
+
+    if brand_name.lower() not in seen:
+        deduped.append({"manufacturer": brand_name})
+        changed = True
+
+    if changed:
+        brand_doc.set("ch_manufacturers", [])
+        for row in deduped:
+            brand_doc.append("ch_manufacturers", row)
+        brand_doc.save(ignore_permissions=True)
+
+    return 0
+
+
 def _seed_ch_hierarchy() -> int:
     """Create CH Category → CH Sub Category → CH Model hierarchy for QA items."""
     created = 0
@@ -621,11 +670,7 @@ def _seed_ch_hierarchy() -> int:
         if brand_name in seen_brands:
             continue
         seen_brands.add(brand_name)
-        brand_doc = frappe.get_doc("Brand", brand_name)
-        existing_mfgs = {r.manufacturer for r in brand_doc.ch_manufacturers}
-        if brand_name not in existing_mfgs:
-            brand_doc.append("ch_manufacturers", {"manufacturer": brand_name})
-            brand_doc.save(ignore_permissions=True)
+        _ensure_brand_manufacturer(brand_name)
 
     # Categories
     for cat in CH_CATEGORIES:
@@ -716,6 +761,7 @@ def _seed_items() -> int:
             "is_stock_item": 1,
             "has_serial_no": 1,
             "gst_hsn_code": hsn_map.get(item["item_group"], "85171300"),
+            "ch_item_mrp": item["market_price"],
         })
         doc.insert(ignore_permissions=True)
 
@@ -1164,7 +1210,7 @@ def _cleanup_masters():
 
     # Stores (now Warehouses)
     for s in STORES:
-        wh_name = f"{s['store_name']} - {COMPANY_ABBR}"
+        wh_name = frappe.db.get_value("Warehouse", {"ch_store_code": s["store_code"]}, "name")
         if frappe.db.exists("Warehouse", wh_name):
             frappe.delete_doc("Warehouse", wh_name, force=True, ignore_permissions=True)
 
