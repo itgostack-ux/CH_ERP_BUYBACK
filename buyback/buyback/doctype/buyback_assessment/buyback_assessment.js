@@ -150,6 +150,11 @@ frappe.ui.form.on("Buyback Assessment", {
 			buyback_load_diagnostic_tests(frm);
 			buyback_load_customer_questions(frm);
 		}
+
+		if (frm.doc.is_phone_dead) {
+			frm.set_df_property("diagnostic_tests", "hidden", 1);
+			frm.set_df_property("responses", "hidden", 1);
+		}
 	},
 
 	item(frm) {
@@ -179,6 +184,11 @@ frappe.ui.form.on("Buyback Assessment", {
 	},
 
 	warranty_status(frm) { buyback_render_price_cards(frm); buyback_recalculate_estimate(frm); },
+
+	is_phone_dead(frm) {
+		_buyback_handle_phone_dead_toggle(frm);
+	},
+
 });
 
 // ── Customer Question Responses: populate answer dropdown inline ──
@@ -377,6 +387,7 @@ function buyback_recalculate_estimate(frm) {
 				responses: JSON.stringify(resp),
 				brand: frm.doc.brand || "",
 				item_group: frm.doc.item_group || "",
+				is_phone_dead: frm.doc.is_phone_dead ? 1 : 0, 
 			},
 			callback(r) {
 				if (!r.message) return;
@@ -610,4 +621,14 @@ function buyback_open_new_customer_dialog(frm) {
 			frm.set_value("customer", customer);
 		},
 	});
+}
+
+// ── Handle Phone Dead checkbox toggle ────────────────────────────
+function _buyback_handle_phone_dead_toggle(frm) {
+    const is_dead = frm.doc.is_phone_dead;
+
+    frm.set_df_property("diagnostic_tests", "hidden", is_dead ? 1 : 0);
+    frm.set_df_property("responses", "hidden", is_dead ? 1 : 0);
+
+    buyback_recalculate_estimate(frm);
 }

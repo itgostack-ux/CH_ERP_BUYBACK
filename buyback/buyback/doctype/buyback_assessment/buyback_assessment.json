@@ -31,6 +31,7 @@
   "imei_serial",
   "device_age_months",
   "warranty_status",
+  "is_phone_dead",
   "imei_validation_section",
   "imei_validation_status",
   "imei_validation_checked_by",
@@ -250,19 +251,19 @@
    "options": "\nIn Warranty\nOut of Warranty"
   },
   {
+   "description": "Optional at this stage, but recommended before inspection \u2014 catching a blacklisted/stolen device here avoids wasting inspector time. Carried forward to the Buyback Order automatically if completed here.",
    "fieldname": "imei_validation_section",
    "fieldtype": "Section Break",
-   "label": "IMEI / Sanchar Saathi Validation",
-   "description": "Optional at this stage, but recommended before inspection — catching a blacklisted/stolen device here avoids wasting inspector time. Carried forward to the Buyback Order automatically if completed here."
+   "label": "IMEI / Sanchar Saathi Validation"
   },
   {
    "allow_on_submit": 1,
    "default": "Pending",
    "fieldname": "imei_validation_status",
    "fieldtype": "Select",
+   "in_list_view": 1,
    "label": "Validation Status",
-   "options": "Pending\nVerified Clean\nBlacklisted\nDuplicate IMEI\nAlready In Use\nCould Not Verify",
-   "in_list_view": 1
+   "options": "Pending\nVerified Clean\nBlacklisted\nDuplicate IMEI\nAlready In Use\nCould Not Verify"
   },
   {
    "allow_on_submit": 1,
@@ -285,10 +286,10 @@
   },
   {
    "allow_on_submit": 1,
+   "description": "Screenshot of the IMEI lookup result from ceir.sancharsaathi.gov.in (Know Your Mobile / KYM SMS 14422).",
    "fieldname": "imei_validation_screenshot",
    "fieldtype": "Attach Image",
-   "label": "Sanchar Saathi Screenshot",
-   "description": "Screenshot of the IMEI lookup result from ceir.sancharsaathi.gov.in (Know Your Mobile / KYM SMS 14422)."
+   "label": "Sanchar Saathi Screenshot"
   },
   {
    "allow_on_submit": 1,
@@ -459,12 +460,18 @@
    "fieldtype": "Attach",
    "label": "KYC Id Front",
    "read_only": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "is_phone_dead",
+   "fieldtype": "Check",
+   "label": "Is Phone Dead"
   }
  ],
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-06-18 15:26:14.481166",
+ "modified": "2026-07-01 10:54:07.150436",
  "modified_by": "Administrator",
  "module": "BuyBack",
  "name": "Buyback Assessment",

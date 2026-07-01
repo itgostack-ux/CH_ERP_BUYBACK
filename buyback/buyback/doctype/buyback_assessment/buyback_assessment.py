@@ -44,23 +44,24 @@ class BuybackAssessment(Document):
             self._fill_diagnostic_impacts()
         if self.responses:
             self._fill_response_impacts()
-        has_pricing_inputs = self.item and self.warranty_status and self.device_age_months
-        if self.diagnostic_tests or self.responses or has_pricing_inputs:
+        if self.diagnostic_tests or self.responses:
             self._calculate_estimate()
         # P2-10: Block submission with unanswered diagnostic responses so the
         # inspector cannot grade a device with a partial question bank.
-        if self.responses and self.status in ("Submitted", "Inspected", "Quoted"):
-            unanswered = [r for r in self.responses if not (r.get("answer_value") or "").strip()]
-            if unanswered:
-                missing = ", ".join(
-                    (r.get("question_text") or r.get("question_code") or r.get("name") or "")
-                    for r in unanswered[:5]
-                )
-                frappe.throw(
-                    _("All diagnostic questions must be answered before submission. "
-                      "Unanswered: {0}").format(missing),
-                    title=_("Incomplete Question Bank"),
-                )
+
+        if not self.get("is_phone_dead"):
+            if self.responses and self.status in ("Submitted", "Inspected", "Quoted"):
+                unanswered = [r for r in self.responses if not (r.get("answer") or "").strip()]
+                if unanswered:
+                    missing = ", ".join(
+                        (r.get("question_text") or r.get("question_code") or r.get("name") or "")
+                        for r in unanswered[:5]
+                    )
+                    frappe.throw(
+                        _("All diagnostic questions must be answered before submission. "
+                        "Unanswered: {0}").format(missing),
+                        title=_("Incomplete Question Bank"),
+                    )
         # Default estimated_grade to "A" (best condition) if still unset
         if not self.estimated_grade:
             self.estimated_grade = frappe.db.get_value(
@@ -321,6 +322,7 @@ class BuybackAssessment(Document):
                 diagnostic_tests=diagnostic_data,
                 brand=self.brand,
                 item_group=self.item_group,
+                is_phone_dead=bool(self.get("is_phone_dead")),
             )
 
             self.estimated_price = result.get("estimated_price", 0)

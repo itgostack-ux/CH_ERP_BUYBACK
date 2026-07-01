@@ -7,10 +7,18 @@ from frappe.utils import flt
 # Fields that can only be written via the CH Price Upload Batch (maker/checker)
 _PRICE_FIELDS = [
     "current_market_price", "vendor_price",
+    # IW 0-3
     "a_grade_iw_0_3", "b_grade_iw_0_3", "c_grade_iw_0_3",
+    "scrap_iw_0_3", "phone_dead_iw_0_3",
+    # IW 4-6
     "a_grade_iw_0_6", "b_grade_iw_0_6", "c_grade_iw_0_6", "d_grade_iw_0_6",
+    "scrap_iw_0_6", "phone_dead_iw_0_6",
+    # IW 6-11
     "a_grade_iw_6_11", "b_grade_iw_6_11", "c_grade_iw_6_11", "d_grade_iw_6_11",
+    "scrap_iw_6_11", "phone_dead_iw_6_11",
+    # OOW 11+
     "a_grade_oow_11", "b_grade_oow_11", "c_grade_oow_11", "d_grade_oow_11",
+    "scrap_oow_11", "phone_dead_oow_11",
 ]
 
 

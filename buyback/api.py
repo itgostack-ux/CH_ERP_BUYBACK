@@ -1887,14 +1887,14 @@ def calculate_live_estimate(
     responses: str = None,
     brand: str = None,
     item_group: str = None,
+    is_phone_dead: int = 0, 
 ) -> dict:
-    """Calculate estimated price + grade from price position in Ready Reckoner."""
+    """Calculate estimated price + grade."""
     import json
 
     diag_data = json.loads(diagnostic_tests or "[]")
     resp_data = json.loads(responses or "[]")
 
-    # Provisional Grade A for base lookup (engine always starts from A)
     provisional_grade_id = frappe.db.get_value(
         "Grade Master", {"grade_name": "A"}, "name"
     ) or ""
@@ -1910,7 +1910,17 @@ def calculate_live_estimate(
         diagnostic_tests=diag_data,
         brand=brand,
         item_group=item_group,
+        is_phone_dead=bool(int(is_phone_dead or 0)),
     )
+
+    if not result:
+        result = {
+            "base_price": 0,
+            "estimated_price": 0,
+            "deductions": [],
+            "total_deductions": 0,
+            "grade_letter": "A",
+        }
 
     final_grade = result.get("grade_letter") or "A"
     final_grade_id = frappe.db.get_value(

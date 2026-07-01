@@ -25,64 +25,48 @@ def calculate_estimated_price(
     diagnostic_tests: list = None,
     brand: str = None,
     item_group: str = None,
+    is_phone_dead: bool = False,         
 ):
-    """
-    Calculate the estimated buyback price for a device.
-
-    Args:
-        item_code: Item code (links to Buyback Price Master)
-        grade: Grade Master name (e.g. "GRD-00001" or "A")
-        warranty_status: "In Warranty" or "Out of Warranty"
-        device_age_months: Age of device in months
-        responses: List of dicts [{"question_code": "...", "answer_value": "..."}]
-        diagnostic_tests: List of dicts [{"test_code": "...", "result": "Pass/Fail/Partial"}]
-        brand: Brand name (for pricing rule matching)
-        item_group: Item Group name (for pricing rule matching)
-
-    Returns:
-        dict: {
-            "base_price": float,
-            "deductions": [{"label": str, "amount": float, "type": str}],
-            "total_deductions": float,
-            "estimated_price": float,
-        }
-    """
+    """Calculate the estimated buyback price for a device."""
     result = {
         "base_price": 0,
         "deductions": [],
         "total_deductions": 0,
         "estimated_price": 0,
+        "grade_letter": "A",
     }
 
-    # Resolve age bracket label to numeric for all downstream logic
-    resolved_age = _resolve_age_months(device_age_months)
+    # PHONE DEAD OVERRIDE — return Phone Dead price directly
+    if is_phone_dead:
+        dead_price = _get_phone_dead_price(item_code, warranty_status, device_age_months)
+        
+        result["base_price"] = dead_price
+        result["estimated_price"] = _round_price(dead_price)
+        result["grade_letter"] = "F" 
+        result["is_phone_dead"] = True
+        return result
 
-    # Step 1: Look up base price from BPM
+    resolved_age = _resolve_age_months(device_age_months)
     base_price = _get_base_price(item_code, grade, warranty_status, device_age_months)
     result["base_price"] = base_price
 
     if not base_price:
         return result
 
-    running_price = base_price
-
-    # Step 2a: Apply diagnostic-test-based deductions
+    # Apply diagnostic + question deductions
     if diagnostic_tests:
         for dt in diagnostic_tests:
             deduction = _get_diagnostic_deduction(dt, base_price)
             if deduction:
                 result["deductions"].append(deduction)
-                running_price -= deduction["amount"]
 
-    # Step 2b: Apply question-based deductions
     if responses:
         for resp in responses:
             deduction = _get_question_deduction(resp, base_price)
             if deduction:
                 result["deductions"].append(deduction)
-                running_price -= deduction["amount"]
 
-    # Step 3: Apply pricing rules
+    # Apply pricing rules
     rule_deductions = _apply_pricing_rules(
         base_price=base_price,
         brand=brand,
@@ -93,26 +77,32 @@ def calculate_estimated_price(
     )
     result["deductions"].extend(rule_deductions)
 
-    # Step 4: Calculate totals
     result["total_deductions"] = sum(d["amount"] for d in result["deductions"])
     estimated = base_price - result["total_deductions"]
 
-    # Step 5: Floor at lowest grade (D) price for this model/warranty/age
-    floor_price = _get_floor_price(item_code, warranty_status, device_age_months)
-    estimated = max(floor_price, estimated)
-    result["floor_price"] = floor_price
+    # NEW FLOOR LOGIC:
+    # If estimated < min grade price → use Scrap Price (never below scrap)
+    min_grade_price = _get_min_grade_price(item_code, warranty_status, device_age_months)
+    
+    if estimated < min_grade_price:
+        # Deductions dropped price below minimum grade → use Scrap Price
+        scrap_price = _get_scrap_price(item_code, warranty_status, device_age_months)
+        estimated = scrap_price
+        result["is_scrap"] = True
 
-    # Step 6: Round
     estimated = _round_price(estimated)
     result["estimated_price"] = estimated
 
-    # Step 7: Determine grade from final price position in Ready Reckoner
-    result["grade_letter"] = _determine_grade_from_price(
-        item_code=item_code,
-        final_price=estimated,
-        warranty_status=warranty_status,
-        device_age_months=device_age_months,
-    )
+    # Determine grade
+    if result.get("is_scrap"):
+        result["grade_letter"] = "E"                         # ← NEW: Always E for scrap
+    else:
+        result["grade_letter"] = _determine_grade_from_price(
+            item_code=item_code,
+            final_price=estimated,
+            warranty_status=warranty_status,
+            device_age_months=device_age_months,
+        )
 
     return result
 
@@ -670,20 +660,25 @@ def _apply_pricing_rules(base_price, brand=None, item_group=None,
     return deductions
 
 
-def _round_price(price):
-    """Round price per Buyback Settings."""
-    try:
-        rounding = frappe.db.get_single_value("Buyback Settings", "price_rounding")
-    except frappe.DoesNotExistError:
-        rounding = "Round to nearest 10"
+# def _round_price(price):
+#     """Round price per Buyback Settings."""
+#     try:
+#         rounding = frappe.db.get_single_value("Buyback Settings", "price_rounding")
+#     except frappe.DoesNotExistError:
+#         rounding = "Round to nearest 10"
 
-    if rounding == "Round to nearest 10":
-        return round(price / 10) * 10
-    elif rounding == "Round to nearest 50":
-        return round(price / 50) * 50
-    elif rounding == "Round to nearest 100":
-        return round(price / 100) * 100
-    return price
+#     if rounding == "Round to nearest 10":
+#         return round(price / 10) * 10
+#     elif rounding == "Round to nearest 50":
+#         return round(price / 50) * 50
+#     elif rounding == "Round to nearest 100":
+#         return round(price / 100) * 100
+#     return price
+
+# updated
+def _round_price(price):
+    #return exact price... no rounding to nearest 10/50/100
+    return round(float(price or 0), 2)
 
 def _determine_grade_from_price(item_code, final_price, warranty_status=None, device_age_months=None):
     """Determine grade by finding which price bracket the final price falls into."""
@@ -741,3 +736,87 @@ def _determine_grade_from_price(item_code, final_price, warranty_status=None, de
             return upper_grade if final >= midpoint else lower_grade
 
     return grade_prices[-1][0]
+
+def _get_phone_dead_price(item_code, warranty_status, device_age_months):
+    """Return Phone Dead price from Ready Reckoner for the current bucket."""
+    bpm = frappe.db.get_value(
+        "Buyback Price Master",
+        {"item_code": item_code},
+        [
+            "phone_dead_iw_0_3", "phone_dead_iw_0_6",
+            "phone_dead_iw_6_11", "phone_dead_oow_11",
+        ],
+        as_dict=True,
+    )
+    if not bpm:
+        return 0
+
+    age = _resolve_age_months(device_age_months)
+    is_iw = warranty_status == "In Warranty"
+
+    if is_iw and age <= 3:
+        return flt(bpm.get("phone_dead_iw_0_3"))
+    elif is_iw and age <= 6:
+        return flt(bpm.get("phone_dead_iw_0_6"))
+    elif is_iw and age <= 11:
+        return flt(bpm.get("phone_dead_iw_6_11"))
+    else:
+        return flt(bpm.get("phone_dead_oow_11"))
+
+
+def _get_scrap_price(item_code, warranty_status, device_age_months):
+    """Return Scrap Price from Ready Reckoner for the current bucket."""
+    bpm = frappe.db.get_value(
+        "Buyback Price Master",
+        {"item_code": item_code},
+        [
+            "scrap_iw_0_3", "scrap_iw_0_6",
+            "scrap_iw_6_11", "scrap_oow_11",
+        ],
+        as_dict=True,
+    )
+    if not bpm:
+        return 0
+
+    age = _resolve_age_months(device_age_months)
+    is_iw = warranty_status == "In Warranty"
+
+    if is_iw and age <= 3:
+        return flt(bpm.get("scrap_iw_0_3"))
+    elif is_iw and age <= 6:
+        return flt(bpm.get("scrap_iw_0_6"))
+    elif is_iw and age <= 11:
+        return flt(bpm.get("scrap_iw_6_11"))
+    else:
+        return flt(bpm.get("scrap_oow_11"))
+
+
+def _get_min_grade_price(item_code, warranty_status, device_age_months):
+    """Return the minimum grade price for the bucket.
+    
+    - 0-3 months: C grade (no D)
+    - Other buckets: D grade
+    """
+    bpm = frappe.db.get_value(
+        "Buyback Price Master",
+        {"item_code": item_code},
+        [
+            "c_grade_iw_0_3",
+            "d_grade_iw_0_6", "d_grade_iw_6_11", "d_grade_oow_11",
+        ],
+        as_dict=True,
+    )
+    if not bpm:
+        return 0
+
+    age = _resolve_age_months(device_age_months)
+    is_iw = warranty_status == "In Warranty"
+
+    if is_iw and age <= 3:
+        return flt(bpm.get("c_grade_iw_0_3"))
+    elif is_iw and age <= 6:
+        return flt(bpm.get("d_grade_iw_0_6"))
+    elif is_iw and age <= 11:
+        return flt(bpm.get("d_grade_iw_6_11"))
+    else:
+        return flt(bpm.get("d_grade_oow_11"))
