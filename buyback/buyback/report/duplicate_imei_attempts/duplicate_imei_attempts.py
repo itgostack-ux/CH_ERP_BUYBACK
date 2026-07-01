@@ -4,7 +4,7 @@
 
 import frappe
 from frappe import _
-from buyback.buyback.report.report_utils import date_condition
+from buyback.buyback.report.report_utils import date_condition, scope_condition
 
 
 def execute(filters=None):
@@ -26,6 +26,7 @@ def get_columns():
 
 def get_data(filters):
     dc = date_condition("creation", filters)
+    sc = scope_condition(store_field="store")
 
     # Combine assessments for same IMEI
     rows = frappe.db.sql("""
@@ -37,10 +38,10 @@ def get_data(filters):
             MAX(status) as latest_status,
             MAX(creation) as latest_date
         FROM `tabBuyback Assessment`
-        WHERE imei_serial IS NOT NULL AND imei_serial != '' AND {dc}
+        WHERE imei_serial IS NOT NULL AND imei_serial != '' AND {dc} {sc}
         GROUP BY imei_serial
         HAVING attempt_count > 1
         ORDER BY attempt_count DESC
         LIMIT 500
-    """.format(dc=dc), as_dict=1)  # noqa: UP032
+    """.format(dc=dc, sc=sc), as_dict=1)  # noqa: UP032
     return rows

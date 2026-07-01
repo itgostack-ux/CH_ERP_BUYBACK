@@ -5,6 +5,8 @@
 import frappe
 from frappe.utils import getdate
 
+from ch_erp15.ch_erp15.report_scope import scope_where_clause
+
 
 def date_condition(field="creation", filters=None, alias=""):
     """Return a SQL date-range clause.
@@ -39,30 +41,66 @@ def standard_conditions(filters=None, alias="", field_map=None):
     Args:
         filters: dict of filter values
         alias: table alias prefix (e.g. "o." or "q.")
-        field_map: override column names, e.g. {"source": "assessment_source"}
+        field_map: override column names, e.g. {"source": "assessment_source"}.
+            Pass ``{"store": None}`` to opt out of scope narrowing when the
+            underlying query genuinely has no store column.
 
     Returns:
-        str of AND-prefixed conditions (empty string if none)
+        str of AND-prefixed conditions. Always includes CH User Scope
+        narrowing (fail-closed) unless field_map explicitly maps ``store``
+        to ``None``.
     """
-    if not filters:
-        return ""
-
     fm = field_map or {}
     conds = []
 
-    simple_fields = ["company", "store", "brand", "item_group", "source",
-                     "settlement_type", "inspector", "status"]
+    if filters:
+        simple_fields = ["company", "store", "brand", "item_group", "source",
+                         "settlement_type", "inspector", "status"]
 
-    for key in simple_fields:
-        val = filters.get(key)
-        if val:
-            col = fm.get(key, key)
-            if not col:
-                continue
-            prefix = f"{alias}" if alias and "." not in col else ""
-            conds.append(f"{prefix}{col} = {frappe.db.escape(val)}")
+        for key in simple_fields:
+            val = filters.get(key)
+            if val:
+                col = fm.get(key, key)
+                if not col:
+                    continue
+                prefix = f"{alias}" if alias and "." not in col else ""
+                conds.append(f"{prefix}{col} = {frappe.db.escape(val)}")
 
-    return (" AND " + " AND ".join(conds)) if conds else ""
+    result = (" AND " + " AND ".join(conds)) if conds else ""
+
+    # Tier 4 — CH User Scope narrowing (fail-closed for scoped users).
+    # Applied unconditionally so a caller passing an empty / None filters
+    # dict cannot bypass scope. field_map={"store": None} opts out for
+    # queries whose underlying table genuinely has no store column.
+    store_col = fm.get("store", "store") if "store" in fm else "store"
+    if store_col:
+        field = f"{alias}{store_col}" if alias and "." not in store_col else store_col
+        scope_clause = scope_where_clause(store_field=field)
+        if scope_clause is not None:
+            result += f" AND {scope_clause}"
+
+    return result
+
+
+def scope_condition(alias="", store_field="store", pos_profile_field=None,
+                    warehouse_field=None):
+    """Return an AND-prefixed CH User Scope narrowing for reports that
+    don't route through ``standard_conditions``.
+
+    Fail-closed contract:
+      * Bypass caller (System Manager / Administrator) → ``""``.
+      * Scoped caller with a populated set → ``" AND (<field> IN (...))"``.
+      * Scoped caller with an empty set / no matching field → ``" AND 1=0"``.
+    """
+    kwargs = {}
+    if store_field:
+        kwargs["store_field"] = f"{alias}{store_field}" if alias and "." not in store_field else store_field
+    if pos_profile_field:
+        kwargs["pos_profile_field"] = f"{alias}{pos_profile_field}" if alias and "." not in pos_profile_field else pos_profile_field
+    if warehouse_field:
+        kwargs["warehouse_field"] = f"{alias}{warehouse_field}" if alias and "." not in warehouse_field else warehouse_field
+    clause = scope_where_clause(**kwargs)
+    return f" AND {clause}" if clause is not None else ""
 
 
 def in_condition(field, values, alias=""):

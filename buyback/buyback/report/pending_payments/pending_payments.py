@@ -3,6 +3,7 @@
 
 import frappe
 from frappe import _
+from buyback.buyback.report.report_utils import scope_condition
 
 
 def execute(filters=None):
@@ -28,6 +29,8 @@ def get_data(filters):
     if filters and filters.get("store"):
         sc_parts.append(f"store = {frappe.db.escape(filters['store'])}")
     sc = (" AND " + " AND ".join(sc_parts)) if sc_parts else ""
+    # Tier 4 — always append CH User Scope narrowing (fail-closed).
+    sc += scope_condition(store_field="store")
 
     rows = frappe.db.sql("""
         SELECT

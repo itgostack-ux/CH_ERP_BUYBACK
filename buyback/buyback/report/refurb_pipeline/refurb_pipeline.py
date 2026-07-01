@@ -1,5 +1,6 @@
 import frappe
 from frappe import _
+from buyback.buyback.report.report_utils import scope_condition
 
 
 def execute(filters=None):
@@ -30,6 +31,10 @@ def execute(filters=None):
 		conditions.append("status = %(status)s")
 		values["status"] = filters["status"]
 	where_clause = " AND ".join(conditions) if conditions else "1=1"
+	# Tier 4 — CH User Scope narrowing on source_warehouse (fail-closed).
+	sc = scope_condition(warehouse_field="source_warehouse", store_field=None)
+	if sc:
+		where_clause = f"({where_clause}){sc}"
 	data = frappe.db.sql(f"SELECT name, status, company, item_code, serial_no, grade, expected_resale_type, suggested_resale_price, return_invoice FROM `tabRefurbishment Order` WHERE {where_clause} ORDER BY modified DESC", values, as_dict=True)
 	summary = []
 	if data:

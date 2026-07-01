@@ -4,7 +4,7 @@
 
 import frappe
 from frappe import _
-from buyback.buyback.report.report_utils import date_condition, standard_conditions
+from buyback.buyback.report.report_utils import date_condition, scope_condition
 
 
 def execute(filters=None):
@@ -27,6 +27,8 @@ def get_columns():
 
 def get_data(filters):
     dc = date_condition("l.creation", filters)
+    # Tier 4 — CH User Scope narrowing via the joined Buyback Order alias.
+    sc = scope_condition(alias="o.", store_field="store")
     # OTP logs linked to buyback orders
     rows = frappe.db.sql("""
         SELECT
@@ -37,8 +39,8 @@ def get_data(filters):
         LEFT JOIN `tabBuyback Order` o ON o.mobile_no = l.mobile_no
             AND o.creation BETWEEN DATE_SUB(l.creation, INTERVAL 2 HOUR) AND l.creation
         WHERE l.status IN ('Failed','Expired','Pending')
-            AND {dc}
+            AND {dc} {sc}
         ORDER BY l.creation DESC
         LIMIT 500
-    """.format(dc=dc), as_dict=1)  # noqa: UP032
+    """.format(dc=dc, sc=sc), as_dict=1)  # noqa: UP032
     return rows

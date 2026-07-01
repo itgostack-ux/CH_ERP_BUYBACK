@@ -4,6 +4,7 @@
 
 import frappe
 from frappe import _
+from buyback.buyback.report.report_utils import scope_condition
 
 
 def execute(filters=None):
@@ -25,6 +26,7 @@ def get_columns():
 
 
 def get_data(filters):
+    sc = scope_condition(store_field="store")
     rows = frappe.db.sql("""
         SELECT
             name, store, customer_name, item, final_price, status,
@@ -32,7 +34,8 @@ def get_data(filters):
         FROM `tabBuyback Order`
         WHERE docstatus < 2
             AND status IN ('Awaiting Customer Approval', 'Awaiting Approval', 'Awaiting OTP')
+            {sc}
         ORDER BY modified ASC
         LIMIT 500
-    """, as_dict=1)
+    """.format(sc=sc), as_dict=1)  # noqa: UP032
     return rows
