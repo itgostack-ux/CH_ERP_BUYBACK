@@ -92,6 +92,12 @@ def sync_default_settings():
 def _create_default_settings():
     """Seed Buyback Settings with sensible defaults (if empty)."""
     settings = frappe.get_single("Buyback Settings")
+    if settings.buyback_warehouse and not frappe.db.exists("Warehouse", settings.buyback_warehouse):
+        frappe.logger("buyback").warning(
+            "Clearing stale Buyback Settings.buyback_warehouse: %s",
+            settings.buyback_warehouse,
+        )
+        settings.buyback_warehouse = None
     if not settings.quote_validity_days:
         settings.quote_validity_days = 7
     if not settings.otp_expiry_minutes:
