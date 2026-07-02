@@ -17,11 +17,41 @@ except ImportError:
         }
 
 
-def _build_filters(company=None, store=None, from_date=None, to_date=None):
-    # SECURITY (H6): Enforce user's company/store scope
-    eff = intersect_filters(company=company, store=store)
+def _store_warehouses(store_names):
+    """All warehouses belonging to the given CH Stores.
+
+    Buyback Order.store is a *Warehouse* (Sellable / Buyback / Damaged / Demo),
+    and each CH Store owns several of them under its `warehouse_group`. So a
+    store selection expands to every warehouse in that store's group (plus its
+    primary warehouse) to catch buyback receipts booked at any of them.
+    """
+    if not store_names:
+        return []
+    rows = frappe.get_all(
+        "CH Store", filters={"name": ("in", list(store_names))},
+        fields=["warehouse", "warehouse_group"],
+    )
+    whs = set()
+    groups = set()
+    for r in rows:
+        if r.warehouse:
+            whs.add(r.warehouse)
+        if r.warehouse_group:
+            groups.add(r.warehouse_group)
+    if groups:
+        for w in frappe.get_all(
+            "Warehouse",
+            filters={"parent_warehouse": ("in", list(groups)), "is_group": 0},
+            pluck="name",
+        ):
+            whs.add(w)
+    return sorted(whs)
+
+
+def _build_filters(company=None, store=None, from_date=None, to_date=None, city=None, zone=None):
+    # SECURITY (H6): Enforce user's company/store scope + hierarchy selection
+    eff = intersect_filters(company=company, city=city, zone=zone, store=store)
     company = eff["company"]
-    store = eff["store"]
     allowed_stores = eff["allowed_stores"]  # None = unrestricted, [] = blocked, [list] = restricted
 
     prm = {}
@@ -30,17 +60,14 @@ def _build_filters(company=None, store=None, from_date=None, to_date=None):
     if company:
         co = " AND bo.company = %(company)s"
         prm["company"] = company
-    if store:
-        st = " AND bo.store = %(store)s"
-        prm["store"] = store
-    elif allowed_stores is not None:
-        # User has scope restrictions and no explicit store
-        if not allowed_stores:
-            # User has no accessible stores
+    if allowed_stores is not None:
+        # A City / Zone / Store selection (or a scoped user) → restrict to the
+        # warehouses of those stores.
+        whs = _store_warehouses(allowed_stores) if allowed_stores else []
+        if not whs:
             st = " AND 1=0"
         else:
-            # Restrict to user's allowed stores
-            st_in = "(" + ", ".join(frappe.db.escape(s) for s in allowed_stores) + ")"
+            st_in = "(" + ", ".join(frappe.db.escape(w) for w in whs) + ")"
             st = f" AND bo.store IN {st_in}"
 
     from_date = str(getdate(from_date)) if from_date else None
@@ -63,9 +90,9 @@ def _build_filters(company=None, store=None, from_date=None, to_date=None):
 
 
 @frappe.whitelist()
-def get_buyback_hub_data(company=None, store=None, from_date=None, to_date=None):
+def get_buyback_hub_data(company=None, store=None, from_date=None, to_date=None, city=None, zone=None):
     """Buyback lifecycle dashboard: Assessment → OTP → Approval → Inspection → Payment → Closed."""
-    f = _build_filters(company, store, from_date, to_date)
+    f = _build_filters(company, store, from_date, to_date, city=city, zone=zone)
     prm = f["prm"]
     co = f["co"]
     st = f["st"]
@@ -133,12 +160,12 @@ def get_buyback_hub_data(company=None, store=None, from_date=None, to_date=None)
     # Assessment & inspection counts
     assessment_count = frappe.db.sql(
         f"""SELECT COUNT(*) FROM `tabBuyback Assessment` ba
-            WHERE 1=1 {dc('ba.creation').replace('bo.','ba.')}""", prm
+            WHERE 1=1 {co.replace('bo.','ba.')} {st.replace('bo.','ba.')} {dc('ba.creation').replace('bo.','ba.')}""", prm
     )[0][0]
 
     inspection_count = frappe.db.sql(
         f"""SELECT COUNT(*) FROM `tabBuyback Inspection` bi
-            WHERE 1=1 {dc('bi.creation').replace('bo.','bi.')}""", prm
+            WHERE 1=1 {co.replace('bo.','bi.')} {st.replace('bo.','bi.')} {dc('bi.creation').replace('bo.','bi.')}""", prm
     )[0][0]
 
     kpis = [
@@ -177,7 +204,7 @@ def get_buyback_hub_data(company=None, store=None, from_date=None, to_date=None)
                    ba.estimated_price, ba.creation
             FROM `tabBuyback Assessment` ba
             LEFT JOIN `tabGrade Master` gm ON gm.name = ba.estimated_grade
-            WHERE 1=1 {dc('ba.creation').replace('bo.','ba.')}
+            WHERE 1=1 {co.replace('bo.','ba.')} {st.replace('bo.','ba.')} {dc('ba.creation').replace('bo.','ba.')}
             ORDER BY ba.creation DESC LIMIT 30""", prm, as_dict=True
     )
 
@@ -187,7 +214,7 @@ def get_buyback_hub_data(company=None, store=None, from_date=None, to_date=None)
                    bi.status, bi.creation
             FROM `tabBuyback Inspection` bi
             LEFT JOIN `tabGrade Master` gm ON gm.name = bi.condition_grade
-            WHERE 1=1 {dc('bi.creation').replace('bo.','bi.')}
+            WHERE 1=1 {co.replace('bo.','bi.')} {st.replace('bo.','bi.')} {dc('bi.creation').replace('bo.','bi.')}
             ORDER BY bi.creation DESC LIMIT 30""", prm, as_dict=True
     )
 
