@@ -47,7 +47,8 @@
   "buyback_warehouse",
   "auto_create_pickup_request",
   "column_break_logistics",
-  "pickup_notify_role"
+  "pickup_notify_role",
+  "require_buyback_enabled_store"
  ],
  "fields": [
   {
@@ -308,6 +309,13 @@
    "label": "Notify Pickup Role",
    "options": "Role",
    "description": "Users with this role get a Notification + ToDo when a buyback pickup Material Request is created. Defaults to Stock Manager when blank."
+  },
+  {
+   "default": "1",
+   "fieldname": "require_buyback_enabled_store",
+   "fieldtype": "Check",
+   "label": "Require Buyback-Enabled Store",
+   "description": "When ON (market-standard: Cashify / Samsung / Apple Trade In), all buyback intake APIs (assessment, order, pickup) refuse to run unless the target Warehouse has ch_is_buyback_enabled = 1. Turn OFF only for pilot rollouts where every warehouse is transient."
   }
  ],
  "index_web_pages_for_search": 0,

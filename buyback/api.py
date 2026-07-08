@@ -417,6 +417,28 @@ def create_order(
     frappe.has_permission("Buyback Order", ptype="create", throw=True)
     mobile_no = validate_indian_phone(mobile_no, "Mobile No")
 
+    # Market-standard store gate (Cashify partner stores, Samsung Exchange
+    # authorized centres, Best Buy Trade-In stores): the target Warehouse must
+    # be flagged as buyback-enabled. Controlled by Buyback Settings so pilots
+    # can bypass with an explicit setting flip.
+    _require_store_gate = frappe.db.get_single_value(
+        "Buyback Settings", "require_buyback_enabled_store"
+    )
+    # Default ON (missing/None on fresh installs → treat as enabled).
+    if _require_store_gate is None or int(_require_store_gate or 0):
+        _wh_enabled = frappe.db.get_value(
+            "Warehouse", store, "ch_is_buyback_enabled"
+        )
+        if not _wh_enabled:
+            frappe.throw(
+                _(
+                    "Warehouse {0} is not a buyback-enabled store. "
+                    "Set 'Buyback Enabled' on the Warehouse or disable "
+                    "'Require Buyback-Enabled Store' in Buyback Settings."
+                ).format(frappe.bold(store)),
+                title=_("Store Not Buyback-Enabled"),
+            )
+
     doc = frappe.get_doc(
         {
             "doctype": "Buyback Order",

@@ -9,6 +9,35 @@ from buyback.api import get_estimate
 from buyback.utils import validate_indian_phone
 
 
+def _validate_buyback_eligible_item(item_code: str) -> None:
+    """Hard-gate: item must exist, not be disabled, and be flagged eligible.
+
+    Market standard (Cashify / Samsung Exchange / Apple Trade In / Best Buy
+    Trade-In): only pre-approved SKUs with an active price policy are surfaced
+    to the public trade-in portal. Public callers cannot bypass this.
+    """
+    if not item_code or not frappe.db.exists("Item", item_code):
+        frappe.throw(_("Select a valid device model."), title=_("Missing Device"))
+
+    item_row = frappe.db.get_value(
+        "Item",
+        item_code,
+        ["disabled", "is_sales_item", "ch_is_buyback_eligible"],
+        as_dict=True,
+    ) or {}
+    if item_row.get("disabled") or not item_row.get("is_sales_item"):
+        frappe.throw(
+            _("This device model is not available."),
+            title=_("Not Available"),
+        )
+    # ch_is_buyback_eligible may be missing on first migrate — treat as ineligible.
+    if not item_row.get("ch_is_buyback_eligible"):
+        frappe.throw(
+            _("This device is not eligible for buyback / trade-in."),
+            title=_("Not Eligible"),
+        )
+
+
 def _resolve_grade(grade: str | None) -> tuple[str, str]:
     grade = (grade or "").strip()
     if not grade:
@@ -39,7 +68,13 @@ def _resolve_grade(grade: str | None) -> tuple[str, str]:
 @rate_limit(limit=120, seconds=60, ip_based=True)
 def search_buyback_items(query: str = "", limit: int = 12) -> list[dict]:
     limit = max(1, min(cint(limit or 12), 20))
-    filters = {"disabled": 0, "is_sales_item": 1}
+    # Market-standard eligibility gate: only expose SKUs explicitly opted-in
+    # to buyback via Item.ch_is_buyback_eligible (Cashify/Samsung/Apple pattern).
+    filters = {
+        "disabled": 0,
+        "is_sales_item": 1,
+        "ch_is_buyback_eligible": 1,
+    }
     or_filters = []
     query = (query or "").strip()
     if query:
@@ -83,8 +118,7 @@ def get_public_quote_estimate(
     responses: str | None = None,
 ) -> dict:
     item_code = (item_code or "").strip()
-    if not item_code or not frappe.db.exists("Item", item_code):
-        frappe.throw(_("Select a valid device model."), title=_("Missing Device"))
+    _validate_buyback_eligible_item(item_code)
 
     grade_link, grade_label = _resolve_grade(grade)
     item_meta = frappe.db.get_value(
@@ -130,8 +164,7 @@ def submit_public_quote_request(
 ) -> dict:
     mobile_no = validate_indian_phone(mobile_no, "Mobile No")
     item_code = (item_code or "").strip()
-    if not frappe.db.exists("Item", item_code):
-        frappe.throw(_("Select a valid device model."), title=_("Missing Device"))
+    _validate_buyback_eligible_item(item_code)
 
     grade_link, grade_label = _resolve_grade(grade)
     pricing = get_public_quote_estimate(

@@ -16,3 +16,4 @@ buyback.patches.phase4_return_closed_loop
 buyback.patches.fix_exchange_order_state_consistency
 buyback.patches.fix_buyback_order_approval_state_consistency
 buyback.patches.seed_buyback_exception_type
+buyback.patches.seed_require_buyback_enabled_store

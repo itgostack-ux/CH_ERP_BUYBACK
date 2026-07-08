@@ -905,12 +905,57 @@ class BuybackOrder(Document):
                   new_value={"total_paid": self.total_paid})
 
     def close(self):
-        """Close the order after payment."""
+        """Close the order after payment.
+
+        Market-standard closure gate (SAP RA / Oracle EBS / MS Dynamics):
+          1. Order must be in 'Paid' status.
+          2. Journal Entry + Stock Entry must exist (finance posted).
+          3. For bank-mode payouts, either the linked Bank Payment Request
+             must be in a terminal state (Payment Entry generated) or the
+             corresponding Payment Entry must be present.
+        Any missing link raises an exception request via _block_close_without_finance
+        for audit-trail parity with HRMS/India Compliance approval flows.
+        """
         if self.status != "Paid":
             frappe.throw(
                 _("Can only close paid orders."),
                 exc=BuybackStatusError,
             )
+
+        # Hard block: JE + SE must exist before we close the lifecycle.
+        # This method already logs a CH Exception Request and raises BuybackStatusError.
+        self._block_close_without_finance()
+
+        # For bank-based payouts, require the money leg to have settled.
+        _pmode = (self.get("customer_payout_mode") or "").lower()
+        if any(x in _pmode for x in ("bank", "transfer", "neft", "imps", "rtgs")):
+            bpr = self.get("custom_bank_payment_request")
+            has_pe = False
+            if bpr:
+                bpr_row = frappe.db.get_value(
+                    "Bank Payment Request",
+                    bpr,
+                    ["docstatus", "payment_status", "payment_entry"],
+                    as_dict=True,
+                )
+                if bpr_row:
+                    # Terminal states used by ch_payments.bank_payments
+                    # ("Processed"/"Reconciled") — or a Payment Entry link.
+                    has_pe = bool(bpr_row.get("payment_entry")) or (
+                        bpr_row.get("payment_status") in ("Processed", "Reconciled")
+                        and bpr_row.get("docstatus") == 1
+                    )
+            if not has_pe:
+                frappe.throw(
+                    _(
+                        "Cannot close Buyback Order {0}: bank payout has not "
+                        "settled. Bank Payment Request must be Processed / "
+                        "Reconciled with a Payment Entry before closing."
+                    ).format(frappe.bold(self.name)),
+                    exc=BuybackStatusError,
+                    title=_("Bank Payout Not Settled"),
+                )
+
         self._set_status("Closed")
         self.save()
         log_audit("Order Closed", "Buyback Order", self.name)
@@ -1528,7 +1573,15 @@ class BuybackOrder(Document):
         Dr: Buyback Expense Account
         Cr: Buyback Payable / Cash / Bank
         """
-        _pmode = (self.get("payout_mode") or self.get("payment_mode") or "Cash").lower()
+        # Canonical field is `customer_payout_mode` (see buyback_order.json).
+        # Legacy `payout_mode` / `payment_mode` kept in the fallback chain only
+        # to survive stale in-memory docs from older code paths.
+        _pmode = (
+            self.get("customer_payout_mode")
+            or self.get("payout_mode")
+            or self.get("payment_mode")
+            or "Cash"
+        ).lower()
         if any(x in _pmode for x in ("bank", "transfer", "neft", "imps", "rtgs")):
             try:
                 from ch_payments.bank_payments.api import create_bank_payment_request

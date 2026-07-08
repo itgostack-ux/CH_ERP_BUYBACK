@@ -209,6 +209,47 @@ CUSTOM_FIELDS = {
             ),
         },
     ],
+    # ──────────────────────────────────────────────────────────────
+    # Buyback Order — bank payout linkage
+    # Populated by _create_journal_entry when payout mode is bank-based.
+    # Read by close() to require terminal Payment Entry before order closure.
+    # ──────────────────────────────────────────────────────────────
+    "Buyback Order": [
+        {
+            "fieldname": "custom_bank_payment_request",
+            "label": _("Bank Payment Request"),
+            "fieldtype": "Link",
+            "options": "Bank Payment Request",
+            "insert_after": "customer_payout_notes",
+            "read_only": 1,
+            "in_standard_filter": 1,
+            "description": _(
+                "Bank Payment Request auto-created for NEFT/RTGS/IMPS payouts. "
+                "Must be Processed/Reconciled (Payment Entry generated) before "
+                "the Buyback Order can be closed."
+            ),
+        },
+    ],
+    # ──────────────────────────────────────────────────────────────
+    # Item — buyback eligibility gate
+    # Public quote APIs (search / estimate / submit) require this flag.
+    # Market standard (Cashify, Samsung, Apple Trade In): only pre-approved
+    # SKUs are surfaced to the public trade-in portal.
+    # ──────────────────────────────────────────────────────────────
+    "Item": [
+        {
+            "fieldname": "ch_is_buyback_eligible",
+            "label": _("Buyback Eligible"),
+            "fieldtype": "Check",
+            "insert_after": "is_sales_item",
+            "default": "0",
+            "in_standard_filter": 1,
+            "description": _(
+                "Show this item on the public buyback / trade-in portal. "
+                "Only items with an active Buyback Price Master should be flagged."
+            ),
+        },
+    ],
 }
 
 

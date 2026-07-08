@@ -66,18 +66,58 @@ def validate_exchange_order_customer_match(doc, method=None) -> None:
         )
         doc.ch_exchange_credit = flt(credit)
 
-    # Warn (not block) if exchange order is already applied to a different SI
+    # Hard-block: exchange order already applied to a different (non-cancelled) SI.
+    # Market standard (Cashify, Samsung Exchange, Best Buy Trade-In, Apple Trade In,
+    # Flipkart Reset): a trade-in credit is single-use. Reapplying it is a
+    # duplicate-credit fraud vector — must throw, not warn.
     existing_si = frappe.db.get_value(
         "Buyback Exchange Order", exchange_order, "sales_invoice"
     )
     if existing_si and existing_si != doc.name:
-        frappe.msgprint(
-            _(
-                "Warning: Exchange Order {0} has already been applied to "
-                "Sales Invoice {1}. Applying it here will create a duplicate "
-                "credit. Use the Apply Exchange API to link correctly."
-            ).format(frappe.bold(exchange_order), frappe.bold(existing_si)),
-            title=_("Exchange Already Applied"),
-            indicator="orange",
-            alert=True,
+        existing_docstatus = frappe.db.get_value(
+            "Sales Invoice", existing_si, "docstatus"
         )
+        # docstatus 2 = cancelled; only block if the prior SI is still Draft/Submitted
+        if existing_docstatus in (0, 1):
+            frappe.throw(
+                _(
+                    "Exchange Order {0} has already been applied to "
+                    "Sales Invoice {1}. A trade-in credit can only be used once. "
+                    "Cancel the prior invoice or use a different exchange order."
+                ).format(frappe.bold(exchange_order), frappe.bold(existing_si)),
+                exc=BuybackValidationError,
+                title=_("Exchange Already Applied"),
+            )
+
+    # Cross-flow bridge: the same underlying Buyback Assessment must not have
+    # been used on a POS invoice (ch_pos stamps `linked_pos_invoice` on the
+    # Assessment when applied via POS). Chain:
+    #   Buyback Exchange Order → buyback_order → buyback_assessment → linked_pos_invoice
+    buyback_order = frappe.db.get_value(
+        "Buyback Exchange Order", exchange_order, "buyback_order"
+    )
+    if buyback_order:
+        buyback_assessment = frappe.db.get_value(
+            "Buyback Order", buyback_order, "buyback_assessment"
+        )
+        if buyback_assessment:
+            pos_si = frappe.db.get_value(
+                "Buyback Assessment", buyback_assessment, "linked_pos_invoice"
+            )
+            if pos_si and pos_si != doc.name:
+                pos_docstatus = frappe.db.get_value(
+                    "Sales Invoice", pos_si, "docstatus"
+                )
+                if pos_docstatus in (0, 1):
+                    frappe.throw(
+                        _(
+                            "The underlying Buyback Assessment {0} has already "
+                            "been used as exchange credit on POS invoice {1}. "
+                            "The same trade-in cannot be applied twice."
+                        ).format(
+                            frappe.bold(buyback_assessment),
+                            frappe.bold(pos_si),
+                        ),
+                        exc=BuybackValidationError,
+                        title=_("Exchange Already Applied (POS)"),
+                    )
