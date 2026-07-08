@@ -138,6 +138,9 @@ def _setup_workspace():
         "Buyback SLA Log",
         "Refurbishment Order",
         "Store Credit Wallet",
+        # Phase B — pickup & compliance surface
+        "CH Buyback Pickup Appointment",
+        "CH Data Wipe Certificate",
     ]:
         ws.append("links", {
             "type": "Link",
@@ -262,6 +265,7 @@ def _setup_workspace():
             "OTP Failure Report",
             "Manager Overrides Audit",
             "Duplicate IMEI Attempts",
+            "Buyback Refurb Queue",
         ],
     }
 
@@ -322,10 +326,14 @@ def _setup_sidebar():
         {"label": "Exchange Orders", "link_type": "DocType", "link_to": "Buyback Exchange Order", "child": 1},
         {"label": "Refurbishment Orders", "link_type": "DocType", "link_to": "Refurbishment Order", "child": 1},
         {"label": "Store Credit Wallet", "link_type": "DocType", "link_to": "Store Credit Wallet", "child": 1},
+        # ── Phase B — pickup & compliance ──
+        {"label": "Pickup Appointments", "link_type": "DocType", "link_to": "CH Buyback Pickup Appointment", "child": 1},
+        {"label": "Data Wipe Certificates", "link_type": "DocType", "link_to": "CH Data Wipe Certificate", "child": 1},
         {"type": "Section Break", "label": "Reports & Audit", "indent": 1, "keep_closed": 0},
         {"label": "Daily Ops Queue", "link_type": "Report", "link_to": "Daily Ops Queue", "child": 1},
         {"label": "Settlement Register", "link_type": "Report", "link_to": "Settlement Register", "child": 1},
         {"label": "SLA Breach Report", "link_type": "Report", "link_to": "SLA Breach Report", "child": 1},
+        {"label": "Refurb Queue", "link_type": "Report", "link_to": "Buyback Refurb Queue", "child": 1},
         {"label": "Audit Log", "link_type": "DocType", "link_to": "Buyback Audit Log", "child": 1},
         {"label": "SLA Log", "link_type": "DocType", "link_to": "Buyback SLA Log", "child": 1},
         {"type": "Section Break", "label": "Setup", "indent": 1, "keep_closed": 1},

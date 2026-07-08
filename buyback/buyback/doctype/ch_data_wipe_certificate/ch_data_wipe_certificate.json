@@ -1,0 +1,235 @@
+{
+ "actions": [],
+ "allow_import": 1,
+ "autoname": "naming_series:",
+ "creation": "2026-07-08 12:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "is_submittable": 1,
+ "field_order": [
+  "naming_series",
+  "certificate_number",
+  "status",
+  "column_break_hdr",
+  "buyback_order",
+  "customer",
+  "amended_from",
+  "device_section",
+  "item",
+  "serial_no",
+  "column_break_dev",
+  "imei_serial",
+  "brand",
+  "wipe_section",
+  "wipe_method",
+  "wipe_standard",
+  "wipe_tool",
+  "column_break_wipe",
+  "wiped_by",
+  "wiped_at",
+  "wipe_duration_minutes",
+  "verification_section",
+  "wipe_verified",
+  "verified_by",
+  "column_break_verify",
+  "verified_at",
+  "verification_method",
+  "evidence_section",
+  "evidence_attachment",
+  "evidence_screenshot",
+  "column_break_evidence",
+  "remarks"
+ ],
+ "fields": [
+  {
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "label": "Series",
+   "options": "DWC-.YYYY.-",
+   "default": "DWC-.YYYY.-",
+   "reqd": 1
+  },
+  {
+   "fieldname": "certificate_number",
+   "fieldtype": "Data",
+   "label": "Certificate Number",
+   "read_only": 1,
+   "in_list_view": 1,
+   "description": "Human-readable certificate reference (same as name)."
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "options": "Draft\nSubmitted\nVerified\nRevoked",
+   "default": "Draft",
+   "read_only": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {"fieldname": "column_break_hdr", "fieldtype": "Column Break"},
+  {
+   "fieldname": "buyback_order",
+   "fieldtype": "Link",
+   "options": "Buyback Order",
+   "label": "Buyback Order",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "customer",
+   "fieldtype": "Link",
+   "options": "Customer",
+   "label": "Customer",
+   "read_only": 1,
+   "fetch_from": "buyback_order.customer",
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "options": "CH Data Wipe Certificate",
+   "label": "Amended From",
+   "no_copy": 1,
+   "print_hide": 1,
+   "read_only": 1
+  },
+  {"fieldname": "device_section", "fieldtype": "Section Break", "label": "Device"},
+  {
+   "fieldname": "item",
+   "fieldtype": "Link",
+   "options": "Item",
+   "label": "Item",
+   "fetch_from": "buyback_order.item"
+  },
+  {
+   "fieldname": "serial_no",
+   "fieldtype": "Link",
+   "options": "Serial No",
+   "label": "Serial No",
+   "description": "Optional — ERPNext Serial No when available."
+  },
+  {"fieldname": "column_break_dev", "fieldtype": "Column Break"},
+  {
+   "fieldname": "imei_serial",
+   "fieldtype": "Data",
+   "label": "IMEI / Serial",
+   "fetch_from": "buyback_order.imei_serial",
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "brand",
+   "fieldtype": "Data",
+   "label": "Brand",
+   "fetch_from": "buyback_order.brand"
+  },
+  {"fieldname": "wipe_section", "fieldtype": "Section Break", "label": "Wipe"},
+  {
+   "fieldname": "wipe_method",
+   "fieldtype": "Select",
+   "label": "Wipe Method",
+   "reqd": 1,
+   "options": "Factory Reset\nEncrypted Erase\nOverwrite (Single Pass)\nOverwrite (Multi Pass)\nCryptographic Erase\nPhysical Destruction",
+   "description": "Method used to sanitise the device. Physical Destruction is for devices moving to scrap."
+  },
+  {
+   "fieldname": "wipe_standard",
+   "fieldtype": "Select",
+   "label": "Wipe Standard",
+   "options": "\nDoD 5220.22-M\nNIST SP 800-88 Clear\nNIST SP 800-88 Purge\nNIST SP 800-88 Destroy\nGutmann 35-Pass\nVendor Default",
+   "description": "Sanitisation standard, if applicable. NIST SP 800-88 is the market-standard baseline (Cashify, Apple Trade In, Samsung Exchange)."
+  },
+  {
+   "fieldname": "wipe_tool",
+   "fieldtype": "Data",
+   "label": "Wipe Tool / Software",
+   "description": "e.g. Blancco, Certus, Samsung Smart Switch Reset, iOS Erase All Content."
+  },
+  {"fieldname": "column_break_wipe", "fieldtype": "Column Break"},
+  {
+   "fieldname": "wiped_by",
+   "fieldtype": "Link",
+   "options": "User",
+   "label": "Wiped By",
+   "reqd": 1
+  },
+  {
+   "fieldname": "wiped_at",
+   "fieldtype": "Datetime",
+   "label": "Wiped At",
+   "reqd": 1
+  },
+  {
+   "fieldname": "wipe_duration_minutes",
+   "fieldtype": "Int",
+   "label": "Duration (minutes)",
+   "description": "Approximate time taken. Used for audit + benchmark analytics."
+  },
+  {"fieldname": "verification_section", "fieldtype": "Section Break", "label": "Verification"},
+  {
+   "fieldname": "wipe_verified",
+   "fieldtype": "Check",
+   "label": "Wipe Verified",
+   "default": "0",
+   "description": "Second-person check that the wipe completed successfully."
+  },
+  {
+   "fieldname": "verified_by",
+   "fieldtype": "Link",
+   "options": "User",
+   "label": "Verified By",
+   "depends_on": "wipe_verified"
+  },
+  {"fieldname": "column_break_verify", "fieldtype": "Column Break"},
+  {
+   "fieldname": "verified_at",
+   "fieldtype": "Datetime",
+   "label": "Verified At",
+   "depends_on": "wipe_verified"
+  },
+  {
+   "fieldname": "verification_method",
+   "fieldtype": "Select",
+   "label": "Verification Method",
+   "options": "\nVisual — Fresh Boot Screen\nTool Report\nHash Comparison\nCryptographic Key Destruction",
+   "depends_on": "wipe_verified"
+  },
+  {"fieldname": "evidence_section", "fieldtype": "Section Break", "label": "Evidence"},
+  {
+   "fieldname": "evidence_attachment",
+   "fieldtype": "Attach",
+   "label": "Wipe Report (PDF)",
+   "description": "Attach the wipe tool's certificate / report."
+  },
+  {
+   "fieldname": "evidence_screenshot",
+   "fieldtype": "Attach Image",
+   "label": "Reset Screen Screenshot"
+  },
+  {"fieldname": "column_break_evidence", "fieldtype": "Column Break"},
+  {
+   "fieldname": "remarks",
+   "fieldtype": "Small Text",
+   "label": "Remarks"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-07-08 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "BuyBack",
+ "name": "CH Data Wipe Certificate",
+ "naming_rule": "By \"Naming Series\" field",
+ "owner": "Administrator",
+ "permissions": [
+  {"role": "System Manager", "create": 1, "read": 1, "write": 1, "delete": 1, "submit": 1, "cancel": 1, "amend": 1, "email": 1, "print": 1, "share": 1, "report": 1},
+  {"role": "Buyback Manager", "create": 1, "read": 1, "write": 1, "submit": 1, "cancel": 1, "amend": 1, "email": 1, "print": 1, "report": 1, "share": 1},
+  {"role": "Buyback User", "create": 1, "read": 1, "write": 1, "submit": 1, "email": 1, "print": 1, "report": 1}
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "certificate_number",
+ "track_changes": 1
+}

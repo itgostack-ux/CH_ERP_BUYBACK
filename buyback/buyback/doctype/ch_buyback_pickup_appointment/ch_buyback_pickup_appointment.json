@@ -1,0 +1,237 @@
+{
+ "actions": [],
+ "allow_import": 1,
+ "autoname": "naming_series:",
+ "creation": "2026-07-08 12:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "is_submittable": 1,
+ "field_order": [
+  "naming_series",
+  "appointment_id",
+  "status",
+  "column_break_hdr",
+  "buyback_order",
+  "customer",
+  "customer_name",
+  "amended_from",
+  "schedule_section",
+  "appointment_date",
+  "appointment_slot",
+  "attempt_number",
+  "column_break_sched",
+  "assigned_to",
+  "vendor_partner",
+  "vendor_reference",
+  "address_section",
+  "pickup_address",
+  "column_break_addr",
+  "contact_phone",
+  "landmark",
+  "pincode",
+  "outcome_section",
+  "completed_at",
+  "failure_reason",
+  "column_break_outcome",
+  "next_action",
+  "reschedule_to",
+  "cancelled_at",
+  "notes_section",
+  "remarks",
+  "customer_notes"
+ ],
+ "fields": [
+  {
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "label": "Series",
+   "options": "BPA-.YYYY.-",
+   "default": "BPA-.YYYY.-",
+   "reqd": 1
+  },
+  {
+   "fieldname": "appointment_id",
+   "fieldtype": "Data",
+   "label": "Appointment ID",
+   "read_only": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "options": "Scheduled\nConfirmed\nEn Route\nCompleted\nAttempted (Failed)\nRescheduled\nCancelled",
+   "default": "Scheduled",
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {"fieldname": "column_break_hdr", "fieldtype": "Column Break"},
+  {
+   "fieldname": "buyback_order",
+   "fieldtype": "Link",
+   "options": "Buyback Order",
+   "label": "Buyback Order",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "customer",
+   "fieldtype": "Link",
+   "options": "Customer",
+   "label": "Customer",
+   "read_only": 1,
+   "fetch_from": "buyback_order.customer",
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "customer_name",
+   "fieldtype": "Data",
+   "label": "Customer Name",
+   "read_only": 1,
+   "fetch_from": "buyback_order.customer_name"
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "options": "CH Buyback Pickup Appointment",
+   "label": "Amended From",
+   "no_copy": 1,
+   "print_hide": 1,
+   "read_only": 1
+  },
+  {"fieldname": "schedule_section", "fieldtype": "Section Break", "label": "Schedule"},
+  {
+   "fieldname": "appointment_date",
+   "fieldtype": "Date",
+   "label": "Appointment Date",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "appointment_slot",
+   "fieldtype": "Select",
+   "label": "Slot",
+   "options": "\n09:00 - 12:00 (Morning)\n12:00 - 15:00 (Afternoon)\n15:00 - 18:00 (Evening)\n18:00 - 21:00 (Late Evening)",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "attempt_number",
+   "fieldtype": "Int",
+   "label": "Attempt #",
+   "default": "1",
+   "read_only": 1,
+   "in_list_view": 1,
+   "description": "Auto-set to (prior attempts for this Buyback Order) + 1. Third attempt is the market-standard final one; further scheduling escalates to Exception."
+  },
+  {"fieldname": "column_break_sched", "fieldtype": "Column Break"},
+  {
+   "fieldname": "assigned_to",
+   "fieldtype": "Link",
+   "options": "User",
+   "label": "Assigned Executive"
+  },
+  {
+   "fieldname": "vendor_partner",
+   "fieldtype": "Data",
+   "label": "Logistics Partner",
+   "description": "e.g. Ecom Express, Delhivery, In-house Rider."
+  },
+  {
+   "fieldname": "vendor_reference",
+   "fieldtype": "Data",
+   "label": "Vendor Tracking Ref"
+  },
+  {"fieldname": "address_section", "fieldtype": "Section Break", "label": "Pickup Address"},
+  {
+   "fieldname": "pickup_address",
+   "fieldtype": "Small Text",
+   "label": "Pickup Address",
+   "reqd": 1
+  },
+  {"fieldname": "column_break_addr", "fieldtype": "Column Break"},
+  {
+   "fieldname": "contact_phone",
+   "fieldtype": "Data",
+   "label": "Contact Phone",
+   "fetch_from": "buyback_order.mobile_no"
+  },
+  {
+   "fieldname": "landmark",
+   "fieldtype": "Data",
+   "label": "Landmark"
+  },
+  {
+   "fieldname": "pincode",
+   "fieldtype": "Data",
+   "label": "Pincode"
+  },
+  {"fieldname": "outcome_section", "fieldtype": "Section Break", "label": "Outcome"},
+  {
+   "fieldname": "completed_at",
+   "fieldtype": "Datetime",
+   "label": "Completed At",
+   "depends_on": "eval:doc.status==='Completed'"
+  },
+  {
+   "fieldname": "failure_reason",
+   "fieldtype": "Select",
+   "label": "Failure Reason",
+   "options": "\nCustomer Unavailable\nWrong Address\nDevice Not Ready\nCustomer Refused Pickup\nDevice Condition Mismatch\nAccount Locked / Data Not Wiped\nOther",
+   "depends_on": "eval:doc.status==='Attempted (Failed)'"
+  },
+  {"fieldname": "column_break_outcome", "fieldtype": "Column Break"},
+  {
+   "fieldname": "next_action",
+   "fieldtype": "Select",
+   "label": "Next Action",
+   "options": "\nRetry Same Slot\nRetry Different Slot\nEscalate to Manager\nCancel Order",
+   "depends_on": "eval:doc.status==='Attempted (Failed)'"
+  },
+  {
+   "fieldname": "reschedule_to",
+   "fieldtype": "Link",
+   "options": "CH Buyback Pickup Appointment",
+   "label": "Rescheduled To",
+   "read_only": 1,
+   "description": "Set when a failed attempt spawned a follow-up appointment."
+  },
+  {
+   "fieldname": "cancelled_at",
+   "fieldtype": "Datetime",
+   "label": "Cancelled At",
+   "depends_on": "eval:doc.status==='Cancelled'"
+  },
+  {"fieldname": "notes_section", "fieldtype": "Section Break", "label": "Notes"},
+  {
+   "fieldname": "remarks",
+   "fieldtype": "Small Text",
+   "label": "Internal Remarks"
+  },
+  {
+   "fieldname": "customer_notes",
+   "fieldtype": "Small Text",
+   "label": "Customer Notes",
+   "description": "Notes shared with the customer via SMS/WhatsApp."
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-07-08 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "BuyBack",
+ "name": "CH Buyback Pickup Appointment",
+ "naming_rule": "By \"Naming Series\" field",
+ "owner": "Administrator",
+ "permissions": [
+  {"role": "System Manager", "create": 1, "read": 1, "write": 1, "delete": 1, "submit": 1, "cancel": 1, "amend": 1, "email": 1, "print": 1, "share": 1, "report": 1},
+  {"role": "Buyback Manager", "create": 1, "read": 1, "write": 1, "submit": 1, "cancel": 1, "amend": 1, "email": 1, "print": 1, "report": 1, "share": 1},
+  {"role": "Buyback User", "create": 1, "read": 1, "write": 1, "submit": 1, "email": 1, "print": 1, "report": 1}
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "appointment_id",
+ "track_changes": 1
+}

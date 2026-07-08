@@ -362,6 +362,8 @@ class BuybackOrder(Document):
             and not self.journal_entry
             and not self.stock_entry
         ):
+            # Phase B — indemnity is mandatory before Paid.
+            self._require_indemnity_before_paid()
             self._create_accounting_entries()
 
         # Update serial lifecycle on Paid (don't wait for Closed)
@@ -1008,6 +1010,32 @@ class BuybackOrder(Document):
             title=_("Finance Closure Required"),
             exc=BuybackStatusError,
         )
+
+    def _require_indemnity_before_paid(self):
+        """Phase B — market-standard indemnity/NOC gate before payout.
+
+        Cashify, Samsung Exchange, Best Buy Trade-In and Apple Trade In all
+        require a signed customer declaration of ownership + consent to
+        transfer before releasing money. We enforce it on the Paid transition
+        to keep POS + kiosk flows unblocked earlier in the lifecycle.
+        """
+        # Skip when Buyback Settings toggles the gate off (pilot rollouts).
+        gate_on = frappe.db.get_single_value(
+            "Buyback Settings", "require_indemnity_before_paid"
+        )
+        # Default ON when the setting is absent / unset — safer default.
+        if gate_on is not None and not int(gate_on or 0):
+            return
+        if not self.get("indemnity_signed"):
+            frappe.throw(
+                _(
+                    "Cannot mark Buyback Order {0} Paid: customer indemnity / "
+                    "NOC has not been captured. Use 'Record Indemnity' on the "
+                    "order form (or the kiosk consent flow) first."
+                ).format(frappe.bold(self.name)),
+                exc=BuybackStatusError,
+                title=_("Indemnity Required"),
+            )
 
     def _validate_imei_check_before_kyc(self):
         """Require a completed Sanchar Saathi (CEIR) IMEI check before customer-facing stages.

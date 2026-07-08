@@ -47,7 +47,61 @@ class RefurbishmentOrder(Document):
 			elif grade_name:
 				self.expected_resale_type = "Pre-Owned"
 		if self.status == "Restocked" and not self.resulting_stock_entry:
+			# Phase B — market-standard data-wipe gate: refurb devices sourced
+			# from a Buyback Order cannot enter resale stock without a
+			# submitted CH Data Wipe Certificate. Cashify, Samsung Exchange,
+			# Apple Trade In and Best Buy Trade-In all enforce this on the
+			# resale side.
+			self._require_data_wipe_before_restock()
 			self._create_restock_disposition()
+
+	def _require_data_wipe_before_restock(self):
+		# Off-switch for pilots / legacy back-fills.
+		gate_on = frappe.db.get_single_value(
+			"Buyback Settings", "require_data_wipe_before_restock"
+		)
+		if gate_on is not None and not int(gate_on or 0):
+			return
+
+		# Trace back to a Buyback Order via the serial (auto-set by the
+		# buyback lifecycle when the device was bought back).
+		buyback_order = None
+		if self.serial_no:
+			buyback_order = frappe.db.get_value(
+				"Serial No", self.serial_no, "ch_buyback_order"
+			)
+
+		# When there's no source Buyback Order we treat this refurb as a
+		# regular sales return / vendor RMA — no data-wipe gate applies.
+		if not buyback_order:
+			return
+
+		wiped = frappe.db.get_value(
+			"Buyback Order", buyback_order, "data_wipe_certificate"
+		)
+		if not wiped:
+			frappe.throw(
+				_(
+					"Refurbishment Order {0} sources a device from Buyback "
+					"Order {1} but no submitted CH Data Wipe Certificate is on "
+					"file. Record the wipe (Buyback Order → 'Record Data Wipe') "
+					"before Restocking."
+				).format(frappe.bold(self.name), frappe.bold(buyback_order)),
+				title=_("Data Wipe Certificate Required"),
+			)
+
+		# Also gate against a revoked / cancelled certificate.
+		cert_docstatus = frappe.db.get_value(
+			"CH Data Wipe Certificate", wiped, "docstatus"
+		)
+		if cert_docstatus != 1:
+			frappe.throw(
+				_(
+					"Data Wipe Certificate {0} for Buyback Order {1} is not in "
+					"a submitted state. Re-run the wipe before Restocking."
+				).format(frappe.bold(wiped), frappe.bold(buyback_order)),
+				title=_("Data Wipe Certificate Not Submitted"),
+			)
 
 	def _create_restock_disposition(self):
 		if not frappe.db.exists("DocType", "CH Buyback Disposition"):

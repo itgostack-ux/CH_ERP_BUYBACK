@@ -131,6 +131,19 @@ CUSTOM_FIELDS = {
             "insert_after": "ch_buyback_count",
             "read_only": 1,
         },
+        {
+            "fieldname": "ch_data_wiped",
+            "label": _("Data Wiped"),
+            "fieldtype": "Check",
+            "insert_after": "ch_buyback_customer",
+            "read_only": 1,
+            "default": "0",
+            "in_standard_filter": 1,
+            "description": _(
+                "Set by a submitted CH Data Wipe Certificate. Required before "
+                "the device can be Restocked / resold."
+            ),
+        },
     ],
     # ──────────────────────────────────────────────────────────────
     # Warehouse — store capability flags (replaces CH Store DocType)
@@ -227,6 +240,156 @@ CUSTOM_FIELDS = {
                 "Bank Payment Request auto-created for NEFT/RTGS/IMPS payouts. "
                 "Must be Processed/Reconciled (Payment Entry generated) before "
                 "the Buyback Order can be closed."
+            ),
+        },
+        # Phase B — Indemnity / NOC capture
+        {
+            "fieldname": "ch_indemnity_section",
+            "label": _("Indemnity / NOC"),
+            "fieldtype": "Section Break",
+            "insert_after": "custom_bank_payment_request",
+            "collapsible": 1,
+            "description": _(
+                "Customer NOC declaring legal ownership and consent to transfer. "
+                "Market-standard controls (Cashify, Samsung Exchange, Best Buy): "
+                "device cannot be marked Paid without a signed indemnity."
+            ),
+        },
+        {
+            "fieldname": "indemnity_signed",
+            "label": _("Indemnity Signed"),
+            "fieldtype": "Check",
+            "insert_after": "ch_indemnity_section",
+            "default": "0",
+            "in_standard_filter": 1,
+        },
+        {
+            "fieldname": "indemnity_signed_at",
+            "label": _("Signed At"),
+            "fieldtype": "Datetime",
+            "insert_after": "indemnity_signed",
+            "read_only": 1,
+        },
+        {
+            "fieldname": "indemnity_signature_type",
+            "label": _("Signature Type"),
+            "fieldtype": "Select",
+            "options": "\nE-Signature (Kiosk)\nWet Signature Scanned\nAadhaar OTP Consent\nDigilocker eSign",
+            "insert_after": "indemnity_signed_at",
+            "depends_on": "indemnity_signed",
+        },
+        {
+            "fieldname": "ch_indemnity_col",
+            "fieldtype": "Column Break",
+            "insert_after": "indemnity_signature_type",
+        },
+        {
+            "fieldname": "indemnity_signed_by_name",
+            "label": _("Signed By (Customer Name)"),
+            "fieldtype": "Data",
+            "insert_after": "ch_indemnity_col",
+            "depends_on": "indemnity_signed",
+        },
+        {
+            "fieldname": "indemnity_captured_by",
+            "label": _("Captured By (Staff)"),
+            "fieldtype": "Link",
+            "options": "User",
+            "insert_after": "indemnity_signed_by_name",
+            "read_only": 1,
+        },
+        {
+            "fieldname": "indemnity_attachment",
+            "label": _("Indemnity Attachment"),
+            "fieldtype": "Attach",
+            "insert_after": "indemnity_captured_by",
+            "description": _("Signed NOC / consent form."),
+        },
+        # Phase B — Pickup lifecycle summary
+        {
+            "fieldname": "ch_pickup_section",
+            "label": _("Pickup Lifecycle"),
+            "fieldtype": "Section Break",
+            "insert_after": "indemnity_attachment",
+            "collapsible": 1,
+        },
+        {
+            "fieldname": "latest_pickup_appointment",
+            "label": _("Latest Pickup Appointment"),
+            "fieldtype": "Link",
+            "options": "CH Buyback Pickup Appointment",
+            "insert_after": "ch_pickup_section",
+            "read_only": 1,
+        },
+        {
+            "fieldname": "pickup_attempts_count",
+            "label": _("Pickup Attempts"),
+            "fieldtype": "Int",
+            "insert_after": "latest_pickup_appointment",
+            "read_only": 1,
+            "default": "0",
+            "in_standard_filter": 1,
+        },
+        {
+            "fieldname": "ch_pickup_col",
+            "fieldtype": "Column Break",
+            "insert_after": "pickup_attempts_count",
+        },
+        {
+            "fieldname": "pickup_completed_at",
+            "label": _("Pickup Completed At"),
+            "fieldtype": "Datetime",
+            "insert_after": "ch_pickup_col",
+            "read_only": 1,
+            "in_standard_filter": 1,
+        },
+        # Phase B — Data-Wipe Certificate linkage
+        {
+            "fieldname": "ch_data_wipe_section",
+            "label": _("Data Wipe"),
+            "fieldtype": "Section Break",
+            "insert_after": "pickup_completed_at",
+            "collapsible": 1,
+        },
+        {
+            "fieldname": "data_wipe_certificate",
+            "label": _("Data Wipe Certificate"),
+            "fieldtype": "Link",
+            "options": "CH Data Wipe Certificate",
+            "insert_after": "ch_data_wipe_section",
+            "read_only": 1,
+            "in_standard_filter": 1,
+            "description": _(
+                "Set automatically when a submitted certificate references this "
+                "Buyback Order. Required before Refurbishment Order can be "
+                "Restocked."
+            ),
+        },
+        {
+            "fieldname": "data_wipe_completed_at",
+            "label": _("Data Wiped At"),
+            "fieldtype": "Datetime",
+            "insert_after": "data_wipe_certificate",
+            "read_only": 1,
+        },
+    ],
+    # ──────────────────────────────────────────────────────────────
+    # Buyback Assessment — canonical exchange-order link
+    # Populated by ``buyback.exchange_lifecycle.ensure_exchange_order_from_assessment``
+    # so both POS and in-form flows converge on the same Exchange Order.
+    # ──────────────────────────────────────────────────────────────
+    "Buyback Assessment": [
+        {
+            "fieldname": "linked_exchange_order",
+            "label": _("Linked Exchange Order"),
+            "fieldtype": "Link",
+            "options": "Buyback Exchange Order",
+            "insert_after": "status",
+            "read_only": 1,
+            "in_standard_filter": 1,
+            "description": _(
+                "Set by the single-source-of-truth exchange lifecycle helper. "
+                "Guarantees only one Exchange Order exists per Assessment."
             ),
         },
     ],

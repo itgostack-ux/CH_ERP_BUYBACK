@@ -48,7 +48,10 @@
   "auto_create_pickup_request",
   "column_break_logistics",
   "pickup_notify_role",
-  "require_buyback_enabled_store"
+  "require_buyback_enabled_store",
+  "compliance_section",
+  "require_indemnity_before_paid",
+  "require_data_wipe_before_restock"
  ],
  "fields": [
   {
@@ -316,6 +319,26 @@
    "fieldtype": "Check",
    "label": "Require Buyback-Enabled Store",
    "description": "When ON (market-standard: Cashify / Samsung / Apple Trade In), all buyback intake APIs (assessment, order, pickup) refuse to run unless the target Warehouse has ch_is_buyback_enabled = 1. Turn OFF only for pilot rollouts where every warehouse is transient."
+  },
+  {
+   "fieldname": "compliance_section",
+   "fieldtype": "Section Break",
+   "label": "Compliance Gates (Phase B)",
+   "description": "Market-standard gates that must be satisfied before a buyback device can be paid out and released to refurb / resale."
+  },
+  {
+   "default": "1",
+   "fieldname": "require_indemnity_before_paid",
+   "fieldtype": "Check",
+   "label": "Require Indemnity / NOC Before Paid",
+   "description": "Cannot mark a Buyback Order Paid unless a customer NOC / indemnity has been captured (Cashify / Samsung / Best Buy pattern). Turn OFF only for pilots."
+  },
+  {
+   "default": "1",
+   "fieldname": "require_data_wipe_before_restock",
+   "fieldtype": "Check",
+   "label": "Require Data-Wipe Certificate Before Restock",
+   "description": "Refurbishment Orders derived from a Buyback Order cannot transition to Restocked without a submitted CH Data Wipe Certificate. Legal / privacy standard across Apple Trade In, Samsung Exchange, Best Buy Trade-In."
   }
  ],
  "index_web_pages_for_search": 0,
