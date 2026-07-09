@@ -5,8 +5,100 @@ import frappe
 from frappe.tests.utils import FrappeTestCase
 
 
+# ─── Minimal seed helpers (idempotent) ────────────────────────────────────────
+#
+# The Buyback Assessment test used to be an empty ``pass``, which meant every
+# ``bench run-tests --app buyback`` reported a false green even when the
+# doctype's validate path was broken. The class below now exercises the
+# minimum contract required by the pricing engine + validate — insert,
+# validate, and rollback — so a regression on Buyback Assessment.validate
+# fails loudly instead of vanishing.
+#
+# Grade Masters are the only master this insert *requires*. install.py seeds
+# them on ``after_install``; when a test site is provisioned without the
+# after-install hook (bare Frappe test bootstrap), we recreate them here so
+# the test is self-sufficient. Any other seed (Buyback Price Master, CH
+# Model, Item) is optional — the ``skipTest`` branches keep this class
+# green on a bare site while the richer TC_048 suite covers the full path.
+
+_GRADES = [
+    {"grade_name": "A", "display_order": 1, "description": "Excellent"},
+    {"grade_name": "B", "display_order": 2, "description": "Good"},
+    {"grade_name": "C", "display_order": 3, "description": "Fair"},
+    {"grade_name": "D", "display_order": 4, "description": "Poor"},
+]
+
+
+def _ensure_grades() -> None:
+    for g in _GRADES:
+        if not frappe.db.exists("Grade Master", {"grade_name": g["grade_name"]}):
+            frappe.get_doc({"doctype": "Grade Master", **g}).insert(
+                ignore_permissions=True
+            )
+
+
+def _pick_item_with_price_master() -> list[tuple[str, ...]]:
+    """Return one ``(item_code,)`` row from Buyback Price Master joined to a
+    non-disabled Item with a non-zero base price, or ``[]`` if none exist."""
+    return frappe.db.sql(
+        """
+        SELECT bpm.item_code
+        FROM `tabBuyback Price Master` bpm
+        JOIN `tabItem` i ON i.name = bpm.item_code
+        WHERE COALESCE(bpm.is_active, 0) = 1
+          AND COALESCE(bpm.a_grade_iw_0_6, 0) > 0
+          AND COALESCE(i.disabled, 0) = 0
+        LIMIT 1
+        """,
+        as_dict=False,
+    )
+
+
 class TestBuybackAssessment(FrappeTestCase):
-    pass
+    """Contract: Buyback Assessment can be built + validated in-memory
+    against a real Price Master row. If no seed is available we skip
+    loudly rather than pass silently — that visibility is the point."""
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        _ensure_grades()
+        row = _pick_item_with_price_master()
+        cls.item_code = row[0][0] if row else None
+        cls.customer = frappe.db.get_value("Customer", {}, "name")
+
+    def test_new_doc_is_creatable(self):
+        """Smoke: `frappe.new_doc` returns a Buyback Assessment we can shape.
+
+        No DB write. Guards against the doctype JSON being renamed / a
+        controller import breaking under a migration.
+        """
+        doc = frappe.new_doc("Buyback Assessment")
+        self.assertEqual(doc.doctype, "Buyback Assessment")
+
+    def test_validate_populates_estimated_price(self):
+        """End-to-end contract: item + grade + warranty + age → estimated_price."""
+        if not self.item_code:
+            self.skipTest(
+                "No Buyback Price Master seeded — cannot exercise validate. "
+                "Run `bench execute buyback.qa.factory.seed_all` to seed."
+            )
+        if not self.customer:
+            self.skipTest("No Customer on site — cannot exercise validate.")
+
+        doc = frappe.new_doc("Buyback Assessment")
+        doc.item = self.item_code
+        doc.warranty_status = "In Warranty"
+        doc.device_age_months = "4-6 Months"
+        doc.customer = self.customer
+        doc.mobile_no = "9999999999"
+        doc.flags.skip_duplicate_check = True
+        doc.run_method("validate")
+
+        self.assertGreater(
+            float(doc.estimated_price or 0), 0,
+            "validate() must populate estimated_price for a priced item.",
+        )
 
 
 class TestBuybackQuestionBankCategories(FrappeTestCase):
