@@ -44,7 +44,9 @@ class BuybackAssessment(Document):
             self._fill_diagnostic_impacts()
         if self.responses:
             self._fill_response_impacts()
-        if self.diagnostic_tests or self.responses:
+        if self.item:
+            # Price whenever the item is known — the base grade/warranty/age
+            # price must populate even with no responses or diagnostic tests.
             self._calculate_estimate()
         # P2-10: Block submission with unanswered diagnostic responses so the
         # inspector cannot grade a device with a partial question bank.
@@ -325,7 +327,11 @@ class BuybackAssessment(Document):
                 is_phone_dead=bool(self.get("is_phone_dead")),
             )
 
-            self.estimated_price = result.get("estimated_price", 0)
+            # When the engine can't price the item at all (no Buyback Price
+            # Master row → base_price 0), keep any pre-set estimate instead
+            # of clobbering it with 0 (e.g. demo/imported assessments).
+            if result.get("base_price") or not self.estimated_price:
+                self.estimated_price = result.get("estimated_price", 0)
             final_grade_letter = result.get("grade_letter") or "A"
             final_grade_id = frappe.db.get_value(
                 "Grade Master", {"grade_name": final_grade_letter}, "name"
