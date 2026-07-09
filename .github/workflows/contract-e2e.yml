@@ -1,0 +1,134 @@
+# Contract + E2E tests for buyback
+# --------------------------------
+# Runs the tiered test strategy described in the bench-level
+# /memories/repo/test-strategy-tiered.md doc.
+#
+# buyback tests import from ``ch_erp15.testing.contract`` and
+# ``ch_erp15.testing.e2e`` (the shared testing lib), so this workflow
+# ALSO clones ch_erp15 and installs it into the CI bench.
+#
+# Required secret: CH_ERP15_TOKEN — a PAT (or fine-grained token) with
+# `Contents: Read` on the ch_erp15 repo. Set it under
+# Settings → Secrets and variables → Actions → New repository secret.
+# Without it, the checkout of ch_erp15 will fail.
+#
+# Locally: `make test-app APP=buyback` runs the exact same modules.
+
+name: Contract + E2E
+
+on:
+  push:
+    branches: [main, master, development, develop]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: contract-e2e-buyback-${{ github.event.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  CH_ERP15_REPO: itgostack-ux/GOGIZMOERP_ERPNEXT_DEVELOPMENT
+  CH_ERP15_REF: development
+
+jobs:
+  contract-e2e:
+    name: Contract + E2E (buyback)
+    runs-on: ubuntu-latest
+
+    services:
+      mariadb:
+        image: mariadb:10.6
+        env:
+          MYSQL_ROOT_PASSWORD: root
+        ports: ["3306:3306"]
+        options: >-
+          --health-cmd="mariadb-admin ping -uroot -proot"
+          --health-interval=5s
+          --health-timeout=2s
+          --health-retries=10
+      redis-cache:
+        image: redis:alpine
+        ports: ["13000:6379"]
+      redis-queue:
+        image: redis:alpine
+        ports: ["11000:6379"]
+
+    steps:
+      - name: Checkout buyback
+        uses: actions/checkout@v4
+        with:
+          path: apps/buyback
+
+      - name: Checkout companion ch_erp15 (shared testing lib)
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.CH_ERP15_REPO }}
+          ref: ${{ env.CH_ERP15_REF }}
+          token: ${{ secrets.CH_ERP15_TOKEN }}
+          path: apps/ch_erp15
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+
+      - name: Install MariaDB client + wkhtmltopdf
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y mariadb-client-10.6 wkhtmltopdf
+
+      - name: Init frappe-bench
+        run: |
+          pip install frappe-bench
+          cd $HOME
+          bench init --skip-redis-config-generation --skip-assets \
+                     --python "$(which python)" ci-bench
+          mariadb -h 127.0.0.1 -uroot -proot -e "SET GLOBAL character_set_server = 'utf8mb4'"
+          mariadb -h 127.0.0.1 -uroot -proot -e "SET GLOBAL collation_server = 'utf8mb4_unicode_ci'"
+
+      - name: Install custom apps into bench
+        working-directory: /home/runner/ci-bench
+        run: |
+          # Copy the checked-out repos into the bench's apps/ dir.
+          cp -r $GITHUB_WORKSPACE/apps/ch_erp15 ./apps/ch_erp15
+          cp -r $GITHUB_WORKSPACE/apps/buyback  ./apps/buyback
+          ./env/bin/pip install -e ./apps/ch_erp15
+          ./env/bin/pip install -e ./apps/buyback
+          # Order matters — ch_erp15 first, buyback last.
+          echo "ch_erp15" >> sites/apps.txt
+          echo "buyback"  >> sites/apps.txt
+
+      - name: Create site + install apps
+        working-directory: /home/runner/ci-bench
+        env:
+          CI: "1"
+        run: |
+          bench new-site --db-root-password root --admin-password admin \
+                         --no-mariadb-socket ci_site
+          bench --site ci_site install-app erpnext || true
+          bench --site ci_site install-app ch_erp15
+          bench --site ci_site install-app buyback
+          bench --site ci_site set-config allow_tests true
+
+      - name: Run contract tests
+        working-directory: /home/runner/ci-bench
+        run: |
+          for m in $(find apps/buyback/buyback/tests/contract -maxdepth 1 -name 'test_*.py' \
+                     | sed -E 's|apps/buyback/(.+)\.py|\1|' | tr '/' '.'); do
+            echo "▶ $m"
+            bench --site ci_site run-tests --app buyback --module "$m"
+          done
+
+      - name: Run e2e tests
+        working-directory: /home/runner/ci-bench
+        run: |
+          for m in $(find apps/buyback/buyback/tests/e2e -maxdepth 1 -name 'test_*.py' \
+                     | sed -E 's|apps/buyback/(.+)\.py|\1|' | tr '/' '.'); do
+            echo "▶ $m"
+            bench --site ci_site run-tests --app buyback --module "$m"
+          done
