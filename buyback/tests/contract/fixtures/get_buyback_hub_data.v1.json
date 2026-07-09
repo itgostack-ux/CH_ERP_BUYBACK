@@ -1,0 +1,79 @@
+{
+  "ai_insights": "<any>",
+  "brand_summary": [
+    {
+      "approved": "<int>",
+      "brand": "<str|null>",
+      "rejected": "<int>",
+      "total": "<int>",
+      "total_value": "<int|float>"
+    }
+  ],
+  "financial_control": {
+    "approval_rate": "<str>",
+    "avg_order_value": "<int|float>",
+    "rejection_rate": "<str>",
+    "total_buyback_value": "<int|float>"
+  },
+  "kpis": [
+    {
+      "color": "<str>",
+      "fmt": "<str>",
+      "key": "<str>",
+      "label": "<str>",
+      "value": "<int|float>"
+    }
+  ],
+  "pending_action": [
+    {
+      "customer": "<str|null>",
+      "customer_name": "<str|null>",
+      "days_pending": "<int|null>",
+      "modified": "<any>",
+      "name": "<str>",
+      "status": "<str>"
+    }
+  ],
+  "pipeline": [
+    {
+      "color": "<str>",
+      "count": "<int>",
+      "icon": "<str>",
+      "key": "<str>",
+      "label": "<str>",
+      "sub": "<str>"
+    }
+  ],
+  "recent_assessments": [
+    {
+      "creation": "<any>",
+      "customer_name": "<str|null>",
+      "estimated_price": "<int|float|null>",
+      "grade": "<str|null>",
+      "grade_name": "<str|null>",
+      "item_name": "<str|null>",
+      "name": "<str>"
+    }
+  ],
+  "recent_inspections": [
+    {
+      "buyback_assessment": "<str|null>",
+      "condition_grade": "<str|null>",
+      "condition_grade_name": "<str|null>",
+      "creation": "<any>",
+      "name": "<str>",
+      "status": "<str>"
+    }
+  ],
+  "recent_orders": [
+    {
+      "buyback_value": "<int|float|null>",
+      "creation": "<any>",
+      "customer": "<str|null>",
+      "customer_name": "<str|null>",
+      "item_name": "<str|null>",
+      "name": "<str>",
+      "status": "<str>"
+    }
+  ]
+}
