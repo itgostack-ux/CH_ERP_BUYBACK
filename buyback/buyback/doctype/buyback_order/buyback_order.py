@@ -930,7 +930,7 @@ class BuybackOrder(Document):
 
         # For bank-based payouts, require the money leg to have settled.
         _pmode = (self.get("customer_payout_mode") or "").lower()
-        if any(x in _pmode for x in ("bank", "transfer", "neft", "imps", "rtgs")):
+        if any(x in _pmode for x in ("bank", "transfer", "neft", "imps", "rtgs", "upi")):
             bpr = self.get("custom_bank_payment_request")
             has_pe = False
             if bpr:
@@ -963,10 +963,17 @@ class BuybackOrder(Document):
         log_audit("Order Closed", "Buyback Order", self.name)
 
     def _block_close_without_finance(self):
-        """Hard block: cannot close/dispatch without JE + SE created (#13).
+        """Hard block: cannot close/dispatch without finance posted (#13).
 
         For exchange orders the replacement device dispatch happens at close,
         so accounting entries MUST exist before that point.
+
+        Both cash-mode and bank-mode payouts now post a Journal Entry at
+        Paid — cash-mode as a direct Dr Buyback Expense / Cr Cash entry,
+        bank-mode as an accrual JE (Dr Buyback Expense / Cr Debtors[Customer])
+        that is later netted by the Payment Entry created off the BPR
+        settlement. So the JE + SE gate applies uniformly. The additional
+        bank-mode settlement gate is enforced separately in ``close()``.
         """
         missing = []
         if not self.journal_entry:
@@ -1610,18 +1617,49 @@ class BuybackOrder(Document):
             or self.get("payment_mode")
             or "Cash"
         ).lower()
-        if any(x in _pmode for x in ("bank", "transfer", "neft", "imps", "rtgs")):
+        if any(x in _pmode for x in ("bank", "transfer", "neft", "imps", "rtgs", "upi")):
+            # Market-standard (SAP FI-AR one-time-customer / ERPNext Expense
+            # Claim) two-document pattern for bank payouts:
+            #   (1) Accrual JE here: Dr Buyback Expense / Cr Debtors[Customer]
+            #       — recognises the expense at Paid, independent of the cash
+            #       leg, and tags the customer sub-ledger so audit can trace.
+            #   (2) Bank Payment Request → auto-created Payment Entry on
+            #       settlement: Dr Debtors[Customer] / Cr Bank — nets the
+            #       Debtors sub-ledger for that customer back to zero.
+            # Post the accrual first; a failure MUST not silently swallow the
+            # BPR side and vice-versa, so each is wrapped in its own try.
             try:
-                from ch_payments.bank_payments.api import create_bank_payment_request
-                _def_profile = frappe.db.get_single_value("Buyback Settings", "default_bank_profile") or ""
+                self._post_bank_payout_accrual_je()
+            except Exception:
+                frappe.log_error(
+                    frappe.get_traceback(),
+                    f"Buyback accrual JE failed for {self.name}",
+                )
+            try:
+                # NOTE: canonical path is ch_payments.api (there is no
+                # ``ch_payments.bank_payments.api`` module — mirrors how
+                # buyback.payment_api and ch_payments.doc_events import it).
+                from ch_payments.api import create_bank_payment_request
+                # ``default_bank_profile`` isn't a Buyback Settings field yet;
+                # get_single_value returns None and create_bank_payment_request
+                # then falls back to Bank Integration Settings.default_bank_profile.
+                _def_profile = frappe.db.get_single_value("Buyback Settings", "default_bank_profile") or None
                 _bpr = create_bank_payment_request("Buyback Order", self.name, _def_profile)
-                if _bpr:
-                    self.db_set("custom_bank_payment_request", _bpr)
-                    frappe.msgprint(frappe._("Bank Payment Request {0} created. Finance to approve.").format(_bpr), indicator="green")
+                # create_bank_payment_request returns {"name": ..., "doctype": ...};
+                # the Link field expects the docname string, not the dict.
+                _bpr_name = (_bpr or {}).get("name") if isinstance(_bpr, dict) else _bpr
+                if _bpr_name:
+                    self.db_set("custom_bank_payment_request", _bpr_name)
+                    frappe.msgprint(
+                        frappe._("Bank Payment Request {0} created. Finance to approve.").format(
+                            frappe.utils.get_link_to_form("Bank Payment Request", _bpr_name)
+                        ),
+                        indicator="green",
+                    )
             except Exception:
                 frappe.log_error(frappe.get_traceback(), f"BPR creation failed for Buyback Order {self.name}")
                 frappe.msgprint(frappe._("Could not auto-create BPR. Create manually from Bank Payments."), indicator="orange")
-            return  # Do not create JE for bank transfers
+            return  # Bank leg's cash entry is posted later by the BPR's Payment Entry.
 
         settings = frappe.get_single("Buyback Settings")
         expense_account = settings.buyback_expense_account
@@ -1670,6 +1708,97 @@ class BuybackOrder(Document):
                 {
                     "account": credit_account,
                     "credit_in_account_currency": flt(self.final_price),
+                },
+            ],
+        })
+        je.flags.ch_system_generated_je = True
+        je.insert(ignore_permissions=True)
+        je.flags.ignore_permissions = True
+        je.submit()
+        self.journal_entry = je.name
+
+    def _post_bank_payout_accrual_je(self):
+        """Accrual JE for bank-mode buyback payouts (SAP FI-AR one-time-customer).
+
+        Posts:
+            Dr  Buyback Expense (settings.buyback_expense_account)   final_price
+                Cr  Party Account (Debtors[Customer])                       final_price
+
+        Rationale (market-standard):
+            * Recognises the buyback expense at Paid, independent of the
+              cash-clearing leg. SAP F-53 / Oracle EBS AP / MS Dynamics
+              F&O all separate expense recognition from cash settlement so
+              period-end P&L is not distorted by unsettled bank payouts.
+            * Tagging the customer party on the Debtors credit line means
+              the Payment Entry auto-created by the BPR's settlement
+              (Dr Debtors[Customer] / Cr Bank) will net the customer
+              sub-ledger to zero — no orphan open balance.
+            * Mirrors ERPNext's own Expense Claim → Payment Entry pattern
+              (payable on submit, cash outflow on PE reconcile).
+
+        Skips (with a log warning, no throw) when the required config is
+        absent, so a mis-configured pilot does not brick the workflow:
+          - buyback_expense_account not set on Buyback Settings
+          - final_price ≤ 0
+          - company not resolvable
+          - party account not resolvable
+        """
+        settings = frappe.get_single("Buyback Settings")
+        expense_account = settings.buyback_expense_account
+        if not expense_account:
+            frappe.logger("buyback").warning(
+                f"No buyback_expense_account configured — skipping accrual JE for {self.name}"
+            )
+            return
+
+        if flt(self.final_price) <= 0:
+            frappe.logger("buyback").warning(
+                f"Buyback Order {self.name} has non-positive final_price — skipping accrual JE"
+            )
+            return
+
+        company = self.company or settings.default_company
+        if not company:
+            return
+
+        # Use the same resolver Payment Entry uses so JE-credit and
+        # PE-debit hit the same account and the party sub-ledger nets.
+        try:
+            from erpnext.accounts.party import get_party_account
+            party_account = get_party_account("Customer", self.customer, company)
+        except Exception:
+            party_account = None
+        if not party_account:
+            party_account = frappe.db.get_value("Company", company, "default_receivable_account")
+        if not party_account:
+            frappe.logger("buyback").warning(
+                f"No party/receivable account for {self.customer} @ {company} — skipping accrual JE for {self.name}"
+            )
+            return
+
+        cost_center = frappe.db.get_value("Company", company, "cost_center")
+
+        je = frappe.get_doc({
+            "doctype": "Journal Entry",
+            "voucher_type": "Journal Entry",
+            "company": company,
+            "posting_date": frappe.utils.nowdate(),
+            "user_remark": (
+                f"Buyback Order {self.name} — accrual "
+                f"({self.item_name or self.item}, bank payout via BPR)"
+            ),
+            "accounts": [
+                {
+                    "account": expense_account,
+                    "debit_in_account_currency": flt(self.final_price),
+                    "cost_center": cost_center,
+                },
+                {
+                    "account": party_account,
+                    "credit_in_account_currency": flt(self.final_price),
+                    "party_type": "Customer",
+                    "party": self.customer,
+                    "cost_center": cost_center,
                 },
             ],
         })
