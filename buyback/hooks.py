@@ -50,6 +50,12 @@ doc_events = {
     # Prevent cross-customer exchange credit misuse on every SI save/submit
     "Sales Invoice": {
         "validate": "buyback.exchange_hooks.validate_exchange_order_customer_match",
+        # Exchange invoice completed → move the traded-in device from the
+        # reserved sellable stock into the store's Buyback bin.
+        "on_submit": "buyback.exchange_hooks.move_traded_device_to_buyback_on_invoice",
+        # Exchange invoice cancelled → reverse it: return the device to reserved
+        # sellable stock (held for the original buyback customer).
+        "on_cancel": "buyback.exchange_hooks.restore_traded_device_on_invoice_cancel",
     },
     # Close the loop: an approved 'Buyback Price Override' exception writes the
     # approved price back to its referenced Buyback Order (that order only).

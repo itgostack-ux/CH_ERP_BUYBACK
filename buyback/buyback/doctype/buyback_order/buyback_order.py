@@ -1824,15 +1824,28 @@ class BuybackOrder(Document):
 
         settings = frappe.get_single("Buyback Settings")
 
-        # Determine target warehouse: store's Buyback bin (created by ensure_store_bins).
+        # Destination depends on settlement type:
+        #   • Buyback  → store's Buyback bin (device quarantine → refurbish),
+        #                tagged Buyback so POS excludes it from selling.
+        #   • Exchange → store's SELLABLE warehouse, but the serial is tagged
+        #                RESERVED (held for the buyback customer, NOT sellable to
+        #                other walk-ins). It stays reserved for the duration of
+        #                the exchange (so the trade-in can be represented on the
+        #                new-device invoice and reversed cleanly), then moves to
+        #                the Buyback bin once the exchange invoice is completed
+        #                (buyback.exchange_hooks.move_traded_device_to_buyback_on_invoice).
+        from buyback.utils import resolve_store_bin_warehouse
+
+        is_exchange = self.settlement_type == "Exchange"
+        # Physical warehouse the device is received into…
+        warehouse_bin_type = "Sellable" if is_exchange else "Buyback"
+        # …and the logical bin the serial is tagged with (Reserved holds an
+        # exchange device in the sellable warehouse without exposing it for sale).
+        tag_bin_type = "Reserved" if is_exchange else "Buyback"
+
+        # Determine target warehouse: store's bin (created by ensure_store_bins).
         # Falls back to the store base warehouse if the bin doesn't exist yet.
-        target_warehouse = None
-        if self.store:
-            target_warehouse = frappe.db.get_value(
-                "Warehouse",
-                {"parent_warehouse": self.store, "ch_bin_type": "Buyback", "company": self.company},
-                "name",
-            ) or self.store
+        target_warehouse = resolve_store_bin_warehouse(self.store, self.company, warehouse_bin_type) if self.store else None
         if not target_warehouse:
             target_warehouse = frappe.db.get_value(
                 "Company", self.company or settings.default_company, "default_warehouse"
@@ -1869,19 +1882,21 @@ class BuybackOrder(Document):
         se.submit()
         self.stock_entry = se.name
 
-        # Tag the serial as Buyback-bin so POS search excludes it from selling.
+        # Tag the serial's logical bin: Buyback (excluded from POS selling) for a
+        # buyback; Reserved (held for the exchange customer, excluded from selling
+        # to other walk-ins) for an exchange.
         if self.imei_serial:
             try:
                 from ch_erp15.ch_erp15.stock_bin_api import move_to_bin
                 move_to_bin(
                     self.imei_serial,
-                    "Buyback",
-                    reason=f"Received via Buyback Order {self.name}",
+                    tag_bin_type,
+                    reason=f"Received via Buyback Order {self.name} ({self.settlement_type or 'Buyback'})",
                     reference_doctype="Buyback Order",
                     reference_name=self.name,
                 )
             except Exception:
-                frappe.log_error(frappe.get_traceback(), f"Buyback bin tag failed for {self.imei_serial}")
+                frappe.log_error(frappe.get_traceback(), f"Bin tag ({tag_bin_type}) failed for {self.imei_serial}")
 
     # ──────────────────────────────────────────────────────────────
     # Pickup logistics: route bought-back device from store to Buyback Bin

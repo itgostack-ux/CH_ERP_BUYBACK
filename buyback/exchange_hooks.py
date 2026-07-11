@@ -21,6 +21,62 @@ from frappe.utils import flt
 from buyback.exceptions import BuybackValidationError
 
 
+def move_traded_device_to_buyback_on_invoice(doc, method=None) -> None:
+    """On completion of an exchange sale invoice, retire the traded-in device
+    from the reserved sellable stock into the store's Buyback bin.
+
+    During the exchange the old device sits in the SELLABLE warehouse tagged
+    RESERVED — held for the buyback customer, not sellable to other walk-ins.
+    Once the exchange invoice is submitted the exchange is done, so the old
+    device follows the standard buyback path into quarantine/refurb (a store
+    executive later promotes it Buyback → Sellable to resell). Idempotent +
+    best-effort: the physical move must not roll back a submitted invoice.
+    """
+    exchange_order = doc.get("ch_exchange_order")
+    if not exchange_order or not frappe.db.exists("Buyback Exchange Order", exchange_order):
+        return
+    # Stamp the completing invoice on the exchange order (audit + single-use).
+    if not frappe.db.get_value("Buyback Exchange Order", exchange_order, "sales_invoice"):
+        frappe.db.set_value(
+            "Buyback Exchange Order", exchange_order, "sales_invoice", doc.name,
+            update_modified=False,
+        )
+    try:
+        exo = frappe.get_doc("Buyback Exchange Order", exchange_order)
+        exo._move_old_device_to_buyback_bin()
+    except Exception:
+        frappe.log_error(
+            frappe.get_traceback(),
+            f"Exchange invoice {doc.name}: move traded device to Buyback bin failed ({exchange_order})",
+        )
+
+
+def restore_traded_device_on_invoice_cancel(doc, method=None) -> None:
+    """Exchange invoice cancelled → reverse of the on_submit move: bring the
+    traded-in device back out of the Buyback bin into the store's SELLABLE
+    warehouse, RESERVED for the original buyback customer (so it can be
+    re-invoiced or handed back to that same customer). Also clears the
+    single-use invoice stamp so a corrected exchange invoice can be raised.
+    """
+    exchange_order = doc.get("ch_exchange_order")
+    if not exchange_order or not frappe.db.exists("Buyback Exchange Order", exchange_order):
+        return
+    # Release the single-use invoice stamp so the exchange can be re-invoiced.
+    if frappe.db.get_value("Buyback Exchange Order", exchange_order, "sales_invoice") == doc.name:
+        frappe.db.set_value(
+            "Buyback Exchange Order", exchange_order, "sales_invoice", None,
+            update_modified=False,
+        )
+    try:
+        exo = frappe.get_doc("Buyback Exchange Order", exchange_order)
+        exo._restore_old_device_to_reserved()
+    except Exception:
+        frappe.log_error(
+            frappe.get_traceback(),
+            f"Exchange invoice {doc.name}: restore traded device to reserved failed ({exchange_order})",
+        )
+
+
 def validate_exchange_order_customer_match(doc, method=None) -> None:
     """Validate that ch_exchange_order belongs to the same customer as this SI.
 

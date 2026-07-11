@@ -122,3 +122,91 @@ class BuybackExchangeOrder(Document):
             frappe.throw(_("Can only close settled exchange orders."), exc=BuybackStatusError, title=_("Buyback Exchange Order Error"))
         self.status = "Closed"
         self.save()
+        # Safety net: the traded-in device is normally moved to the Buyback bin
+        # when the exchange invoice is submitted
+        # (exchange_hooks.move_traded_device_to_buyback_on_invoice). This call
+        # covers exchanges closed without a linked sales invoice; it is
+        # idempotent (skips when the device already left the sellable stock).
+        self._move_old_device_to_buyback_bin()
+
+    def _move_old_device_to_buyback_bin(self):
+        """Exchange invoice completed → move the traded-in device out of the
+        reserved sellable stock into the store's Buyback bin for refurbishment.
+        Idempotent + best-effort."""
+        self._relocate_old_device(
+            target_wh_bin_type="Buyback",
+            tag_bin_type="Buyback",
+            reason=f"Exchange {self.name} invoice completed — to Buyback bin",
+            context="move to Buyback bin",
+        )
+
+    def _restore_old_device_to_reserved(self):
+        """Exchange invoice cancelled → reverse of _move_old_device_to_buyback_bin.
+        Bring the traded-in device back out of the Buyback bin into the store's
+        SELLABLE warehouse, RESERVED for the original buyback customer — so the
+        exchange can be re-invoiced or the device handed back to that same
+        customer. Idempotent + best-effort."""
+        self._relocate_old_device(
+            target_wh_bin_type="Sellable",
+            tag_bin_type="Reserved",
+            reason=f"Exchange {self.name} invoice cancelled — re-reserved for buyback customer",
+            context="restore to reserved sellable stock",
+        )
+
+    def _relocate_old_device(self, target_wh_bin_type, tag_bin_type, reason, context):
+        """Physically move the traded-in device to the store's
+        ``target_wh_bin_type`` warehouse AND tag its logical bin ``tag_bin_type``,
+        so POS selling is controlled on both gates it checks (Serial No.warehouse
+        and CH Stock Bin.bin_type). Best-effort (must not roll back the caller);
+        idempotent — skips when the device left inventory (sold) or is already in
+        the target warehouse.
+        """
+        serial = (self.old_imei_serial or "").strip()
+        if not serial or not frappe.db.exists("Serial No", serial):
+            return
+        sn = frappe.db.get_value(
+            "Serial No", serial, ["warehouse", "status", "item_code"], as_dict=True
+        )
+        if not sn or not sn.warehouse or sn.status != "Active":
+            return  # already sold / left inventory — nothing to move
+
+        from buyback.utils import resolve_store_bin_warehouse
+
+        target_wh = resolve_store_bin_warehouse(self.store, self.company, target_wh_bin_type)
+        if not target_wh:
+            return
+        try:
+            if target_wh != sn.warehouse:
+                se = frappe.get_doc({
+                    "doctype": "Stock Entry",
+                    "stock_entry_type": "Material Transfer",
+                    "company": self.company,
+                    "posting_date": frappe.utils.nowdate(),
+                    "remarks": reason,
+                    "items": [{
+                        "item_code": sn.item_code,
+                        "s_warehouse": sn.warehouse,
+                        "t_warehouse": target_wh,
+                        "qty": 1,
+                        "serial_no": serial,
+                    }],
+                })
+                se.insert(ignore_permissions=True)
+                se.flags.ignore_permissions = True
+                # Intra-store bin reclassification (same store's child bins):
+                # not an inter-store transfer, so exempt from the in-transit
+                # logistics guard (procurement_guardrails).
+                se.flags.ignore_procurement_guardrails = True
+                se.submit()
+            from ch_erp15.ch_erp15.stock_bin_api import move_to_bin
+            move_to_bin(
+                serial, tag_bin_type,
+                reason=reason,
+                reference_doctype="Buyback Exchange Order",
+                reference_name=self.name,
+            )
+        except Exception:
+            frappe.log_error(
+                frappe.get_traceback(),
+                f"Exchange {self.name}: {context} failed for {serial}",
+            )

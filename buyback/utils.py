@@ -74,3 +74,20 @@ def log_audit(
 def get_buyback_settings() -> "frappe.Document":
     """Return the cached Buyback Settings singleton."""
     return frappe.get_cached_doc("Buyback Settings")
+
+
+def resolve_store_bin_warehouse(store, company=None, bin_type="Sellable"):
+    """Resolve a store's child Warehouse for a given ``ch_bin_type``.
+
+    A store is a group Warehouse (``self.store`` on Buyback / Exchange orders)
+    whose children are the operational bins — ``Sellable`` (the store's own
+    selling stock), ``Buyback`` (device quarantine / refurb intake), ``Damaged``,
+    ``Demo``, etc. Returns the matching child, or ``store`` itself as a fallback
+    when the bin isn't provisioned yet.
+    """
+    if not store:
+        return None
+    filters = {"parent_warehouse": store, "ch_bin_type": bin_type}
+    if company:
+        filters["company"] = company
+    return frappe.db.get_value("Warehouse", filters, "name") or store
