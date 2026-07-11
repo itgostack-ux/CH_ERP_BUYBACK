@@ -7,7 +7,7 @@ app_license = "mit"
 
 boot_session = "buyback.boot.boot_session"
 
-required_apps = ["frappe/erpnext", "AbirJ1/ch_item_master"]
+required_apps = ["frappe/erpnext", "AbirJ1/ch_item_master", "ch_payments"]
 
 add_to_apps_screen = [
 	{
