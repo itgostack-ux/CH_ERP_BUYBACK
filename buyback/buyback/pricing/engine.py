@@ -543,6 +543,42 @@ def _resolve_age_months(device_age_months):
 
 
 # updated for
+# POS condition-check keys → Buyback Question Bank question_code.
+# The POS quick-grading UI sends short keys (screen/camera/…); the question
+# bank is seeded with diag-*/q-* codes. Without this mapping every failed
+# POS check silently deducted 0%.
+_DIAG_CODE_ALIASES = {
+    "screen": "diag-screen",
+    "camera": "diag-camera",
+    "speaker_mic": "diag-speaker",
+    "speaker": "diag-speaker",
+    "charging": "diag-charge",
+    "charge": "diag-charge",
+    "battery": "diag-battery",
+    "body": "q-cosmetic",
+    "cosmetic": "q-cosmetic",
+}
+
+
+def _resolve_diag_question(test_code):
+    """Return the enabled Buyback Question Bank name for a diagnostic code,
+    trying the exact code, the known POS alias, then a diag- prefix."""
+    key = (test_code or "").strip()
+    candidates = [key]
+    alias = _DIAG_CODE_ALIASES.get(key.lower())
+    if alias:
+        candidates.append(alias)
+    else:
+        candidates.append(f"diag-{key.lower()}")
+    for code in candidates:
+        name = frappe.db.get_value(
+            "Buyback Question Bank", {"question_code": code, "disabled": 0}, "name"
+        )
+        if name:
+            return name
+    return None
+
+
 def _get_diagnostic_deduction(diagnostic_test, base_price):
     """Calculate deduction from an automated diagnostic test result.    """
     test_code = diagnostic_test.get("test_code")
@@ -551,11 +587,7 @@ def _get_diagnostic_deduction(diagnostic_test, base_price):
     if not test_code or not result:
         return None
 
-    question = frappe.db.get_value(
-        "Buyback Question Bank",
-        {"question_code": test_code, "disabled": 0},
-        "name",
-    )
+    question = _resolve_diag_question(test_code)
     if not question:
         return None
 

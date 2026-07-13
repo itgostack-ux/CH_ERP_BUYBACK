@@ -57,6 +57,61 @@ def after_install():
     create_reporting_indexes()
 
 
+def before_install():
+    """Pre-flight hardening before fixtures import.
+
+    Some benches can carry a stale/null cache entry for System Settings;
+    then `frappe.get_system_settings("time_zone")` returns None-object and
+    fixture insert crashes while setting modified timestamp (`now()`).
+
+    Ensure the singleton exists, has a timezone, and clear any stale cache.
+    """
+    _ensure_system_settings_ready()
+
+
+def _ensure_system_settings_ready():
+    try:
+        from frappe.core.doctype.system_settings.system_settings import (
+            clear_system_settings_cache,
+            sync_system_settings,
+        )
+    except Exception:
+        clear_system_settings_cache = None  # type: ignore[assignment]
+        sync_system_settings = None  # type: ignore[assignment]
+
+    if sync_system_settings:
+        try:
+            sync_system_settings()
+        except Exception:
+            pass
+
+    # Materialize singleton doc in this request context.
+    try:
+        frappe.get_single("System Settings")
+    except Exception:
+        pass
+
+    # Keep timezone non-empty for now()/ZoneInfo during fixture import.
+    try:
+        if not frappe.db.get_single_value("System Settings", "time_zone"):
+            frappe.db.set_single_value(
+                "System Settings",
+                "time_zone",
+                (frappe.conf.get("time_zone") or "Asia/Kolkata"),
+                update_modified=False,
+            )
+    except Exception:
+        pass
+
+    if clear_system_settings_cache:
+        try:
+            clear_system_settings_cache()
+        except Exception:
+            pass
+
+    frappe.db.commit()
+
+
 GRADE_MASTER_SEED = [
     {"grade_name": "A", "description": "Like new / Excellent condition", "display_order": 1},
     {"grade_name": "B", "description": "Good condition, minor cosmetic marks", "display_order": 2},

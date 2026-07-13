@@ -25,6 +25,12 @@ class BuybackExchangeOrder(Document):
         self._calculate_amount_to_pay()
         self._sync_workflow_state()
 
+    def validate_workflow(self):
+        """Skip Frappe's workflow re-validation — status machine is
+        server-managed and workflow_state is a desk-visibility mirror
+        (same rationale as Buyback Order.validate_workflow)."""
+        return
+
     def _sync_workflow_state(self):
         """Keep workflow_state aligned when status is changed via server actions."""
         if not self.meta.has_field("workflow_state"):

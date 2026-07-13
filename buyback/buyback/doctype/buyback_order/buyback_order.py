@@ -57,6 +57,25 @@ class BuybackOrder(Document):
         if not self.approval_token:
             self.approval_token = frappe.generate_hash(length=32)
 
+    def validate_workflow(self):
+        """Skip Frappe's workflow transition re-validation on save.
+
+        The buyback status machine is server-managed: every transition is
+        enforced by explicit status gates in this controller and the API
+        layer, and `workflow_state` is only a mirror of `status` for desk
+        visibility (see _sync_workflow_state). Frappe would otherwise
+        re-validate the mirror write as a user-driven transition and crash
+        on legitimate server moves the desk workflow doesn't model — e.g.
+        POS advances status to 'Awaiting Customer Approval' via db_set,
+        then the customer's guest payout save syncs the mirror and dies
+        with WorkflowPermissionError ('transition not allowed from
+        Approved to Awaiting Customer Approval').
+
+        Desk workflow buttons stay safe: apply_workflow() validates the
+        transition (roles + condition) itself before saving.
+        """
+        return
+
     def _has_workflow_state_field(self):
         return bool(self.meta.has_field("workflow_state"))
 

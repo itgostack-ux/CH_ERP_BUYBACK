@@ -33,6 +33,7 @@ after_migrate = [
 ]
 
 before_uninstall = "buyback.uninstall.before_uninstall"
+before_install = "buyback.install.before_install"
 
 doc_events = {
     "Buyback Assessment": {
