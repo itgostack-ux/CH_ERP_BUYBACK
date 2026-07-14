@@ -122,14 +122,30 @@ frappe.ui.form.on("Buyback Assessment", {
 			);
 		}
 
-		// Hide "Add row" buttons — rows are auto-loaded from item diagnostics/questions
+		// Grid row controls:
+		//   • "Add row" always disabled — rows are auto-loaded from item diagnostics/questions.
+		//   • Row-select checkbox disabled (cannot_delete_rows=true) so the
+		//     "Delete row / Edit row / Duplicate row" toolbar never appears.
+		//     Users answer inline (Result / Answer dropdowns) but cannot
+		//     remove, duplicate, or bulk-edit rows.
+		//   • Inline dropdowns stay editable in Draft; Frappe locks them
+		//     automatically once the assessment is Submitted (docstatus=1).
+		const _is_draft = !frm.doc.docstatus;
 		frm.fields_dict.diagnostic_tests.grid.cannot_add_rows = true;
 		frm.fields_dict.diagnostic_tests.grid.cannot_delete_rows = true;
 		frm.fields_dict.diagnostic_tests.grid.update_docfield_property(
 			"depreciation_percent", "hidden", 1
 		);
+		frm.fields_dict.diagnostic_tests.grid.update_docfield_property(
+			"result", "read_only", _is_draft ? 0 : 1
+		);
 		frm.fields_dict.diagnostic_tests.grid.refresh();
+
 		frm.fields_dict.responses.grid.cannot_add_rows = true;
+		frm.fields_dict.responses.grid.cannot_delete_rows = true;
+		frm.fields_dict.responses.grid.update_docfield_property(
+			"answer_value", "read_only", _is_draft ? 0 : 1
+		);
 		frm.fields_dict.responses.grid.refresh();
 
 		// Filter diagnostic_tests Link to only show Automated Test type
