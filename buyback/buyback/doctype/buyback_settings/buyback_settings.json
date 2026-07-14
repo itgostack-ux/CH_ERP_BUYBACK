@@ -27,6 +27,7 @@
   "default_payment_method",
   "column_break_pay",
   "enable_split_payment",
+  "default_bank_profile",
   "notification_section",
   "send_sms_on_quote",
   "send_sms_on_order",
@@ -187,6 +188,13 @@
    "fieldtype": "Check",
    "label": "Enable Split Payment",
    "description": "Allow splitting payment across multiple methods"
+  },
+  {
+   "fieldname": "default_bank_profile",
+   "fieldtype": "Link",
+   "label": "Default Bank Profile",
+   "options": "Bank Integration Profile",
+   "description": "Bank Integration Profile used for auto-creating Bank Payment Requests on Buyback payout. Overrides Bank Integration Settings default."
   },
   {
    "fieldname": "notification_section",
