@@ -1681,8 +1681,7 @@ class BuybackOrder(Document):
             return  # Bank leg's cash entry is posted later by the BPR's Payment Entry.
 
         settings = frappe.get_single("Buyback Settings")
-        expense_account = settings.buyback_expense_account
-        if not expense_account:
+        if not settings.buyback_expense_account:
             frappe.logger("buyback").warning(
                 f"No buyback_expense_account configured — skipping JE for {self.name}"
             )
@@ -1696,6 +1695,12 @@ class BuybackOrder(Document):
 
         company = self.company or settings.default_company
         if not company:
+            return
+
+        expense_account = self._resolve_expense_account_for_company(
+            settings.buyback_expense_account, company
+        )
+        if not expense_account:
             return
 
         # Use default cash/bank account (buyback pays customer cash)
@@ -1736,6 +1741,43 @@ class BuybackOrder(Document):
         je.submit()
         self.journal_entry = je.name
 
+    def _resolve_expense_account_for_company(self, expense_account, company):
+        """Map the configured buyback expense account to this order's company.
+
+        Buyback Settings is a Single, so ``buyback_expense_account`` can only
+        point at ONE company's account. On multi-company sites every other
+        company's JE then dies in ERPNext's validation ("Account Cost of
+        Goods Sold - G does not belong to Company BestBuy Mobiles Pvt Ltd")
+        and the order can never be closed. Resolve the same-named ledger in
+        the order's company instead; skip the JE (logged) when the company
+        has no such account.
+        """
+        acc = frappe.db.get_value(
+            "Account", expense_account, ["company", "account_name"], as_dict=True
+        )
+        if not acc or acc.company == company:
+            return expense_account
+
+        mapped = frappe.db.get_value(
+            "Account",
+            {
+                "account_name": acc.account_name,
+                "company": company,
+                "is_group": 0,
+                "disabled": 0,
+            },
+            "name",
+        )
+        if mapped:
+            return mapped
+
+        frappe.logger("buyback").warning(
+            f"buyback_expense_account {expense_account} belongs to {acc.company} "
+            f"and company {company} has no '{acc.account_name}' ledger — "
+            f"skipping JE for {self.name}"
+        )
+        return None
+
     def _post_bank_payout_accrual_je(self):
         """Accrual JE for bank-mode buyback payouts (SAP FI-AR one-time-customer).
 
@@ -1763,8 +1805,7 @@ class BuybackOrder(Document):
           - party account not resolvable
         """
         settings = frappe.get_single("Buyback Settings")
-        expense_account = settings.buyback_expense_account
-        if not expense_account:
+        if not settings.buyback_expense_account:
             frappe.logger("buyback").warning(
                 f"No buyback_expense_account configured — skipping accrual JE for {self.name}"
             )
@@ -1778,6 +1819,12 @@ class BuybackOrder(Document):
 
         company = self.company or settings.default_company
         if not company:
+            return
+
+        expense_account = self._resolve_expense_account_for_company(
+            settings.buyback_expense_account, company
+        )
+        if not expense_account:
             return
 
         # Use the same resolver Payment Entry uses so JE-credit and
