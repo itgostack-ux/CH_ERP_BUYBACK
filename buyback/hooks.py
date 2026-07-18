@@ -9,6 +9,9 @@ boot_session = "buyback.boot.boot_session"
 
 required_apps = ["frappe/erpnext", "AbirJ1/ch_item_master", "ch_payments"]
 
+# Old apps-screen route lives on in bookmarks/history — redirect it.
+website_redirects = [{"source": "/BuyBack", "target": "/desk/buyback"}]
+
 add_to_apps_screen = [
 	{
 		"name": "buyback",
