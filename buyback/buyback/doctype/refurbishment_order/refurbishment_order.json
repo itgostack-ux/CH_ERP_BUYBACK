@@ -14,7 +14,7 @@
   {"fieldname": "customer", "fieldtype": "Link", "label": "Customer", "options": "Customer", "in_list_view": 1},
   {"fieldname": "customer_name", "fieldtype": "Data", "label": "Customer Name", "read_only": 1},
   {"fieldname": "column_break_1", "fieldtype": "Column Break"},
-  {"fieldname": "status", "fieldtype": "Select", "label": "Status", "options": "Received\nDiagnosed\nRepaired\nGraded\nRestocked\nCancelled", "default": "Received", "in_list_view": 1, "in_standard_filter": 1},
+  {"fieldname": "status", "fieldtype": "Select", "label": "Status", "options": "Received\nDiagnosed\nRepaired\nGraded\nRestocked\nCancelled", "default": "Received", "in_list_view": 1, "in_standard_filter": 1, "read_only": 1},
   {"fieldname": "physical_condition", "fieldtype": "Select", "label": "Physical Condition", "options": "Resalable\nDamaged\nRefurbish Required\nDead on Arrival", "default": "Damaged"},
   {"fieldname": "section_invoices", "fieldtype": "Section Break", "label": "Source Documents"},
   {"fieldname": "original_invoice", "fieldtype": "Link", "label": "Original Invoice", "options": "Sales Invoice"},
@@ -41,10 +41,37 @@
  "module": "BuyBack",
  "name": "Refurbishment Order",
  "permissions": [
-  {"role": "System Manager", "read": 1, "write": 1, "create": 1, "delete": 1},
-  {"role": "Buyback Manager", "read": 1, "write": 1, "create": 1},
-  {"role": "Buyback Store Manager", "read": 1, "write": 1, "create": 1},
-  {"role": "Stock Manager", "read": 1, "write": 1}
+  {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "import": 1
+  },
+  {
+   "role": "Buyback Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1
+  },
+  {
+   "role": "Buyback Store Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1
+  },
+  {
+   "role": "Stock Manager",
+   "read": 1,
+   "write": 1
+  },
+  {
+   "role": "Buyback Admin",
+   "read": 1,
+   "write": 1,
+   "create": 1
+  }
  ],
  "sort_field": "modified",
  "sort_order": "DESC",

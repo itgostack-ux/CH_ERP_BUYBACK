@@ -5,7 +5,9 @@
 
 import frappe
 from frappe import _
-from frappe.utils import nowdate, add_months, add_days, date_diff, flt
+from frappe.utils import nowdate, add_months, add_days, date_diff, flt, getdate
+
+from buyback.utils import assert_buyback_scope, build_buyback_scope_sql, get_int_setting, require_configured_role
 
 
 def _date_params(from_date, to_date):
@@ -13,7 +15,7 @@ def _date_params(from_date, to_date):
     return {"from_date": from_date, "to_date_end": f"{to_date} 23:59:59"}
 
 
-def _build_params(from_date, to_date, col="creation", **kwargs):
+def _build_params(from_date, to_date, col="creation", alias="", scope_prefix="dashboard", **kwargs):
     """Build a params dict and a list of SQL AND-clauses from optional filters.
 
     Returns (sql_conditions_str, params_dict).
@@ -21,13 +23,13 @@ def _build_params(from_date, to_date, col="creation", **kwargs):
     Optional filters (company, store, brand, item_group) are added only when truthy.
     """
     params = _date_params(from_date, to_date)
-    clauses = [f"{col} BETWEEN %(from_date)s AND %(to_date_end)s"]
+    clauses = [f"{alias}{col} BETWEEN %(from_date)s AND %(to_date_end)s"]
 
     field_map = {
-        "company": "company",
-        "store": "store",
-        "brand": "brand",
-        "item_group": "item_group",
+        "company": f"{alias}company",
+        "store": f"{alias}store",
+        "brand": f"{alias}brand",
+        "item_group": f"{alias}item_group",
     }
 
     for key, db_field in field_map.items():
@@ -36,13 +38,41 @@ def _build_params(from_date, to_date, col="creation", **kwargs):
             params[key] = value
             clauses.append(f"{db_field} = %({key})s")
 
+    scope_clause, scope_params = build_buyback_scope_sql(
+        store_field=f"{alias}store",
+        company_field=f"{alias}company",
+        prefix=scope_prefix,
+    )
+    clauses.append(scope_clause)
+    params.update(scope_params)
+
     return " AND ".join(clauses), params
 
 
 def _check_dashboard_access():
     """Ensure caller has at least read access to Buyback Order."""
-    if not frappe.has_permission("Buyback Order", "read"):
-        frappe.throw(_("You do not have permission to view buyback dashboards"), frappe.PermissionError, title=_("API Error"))
+    require_configured_role("dashboard_roles", action=_("view Buyback dashboards"))
+    for doctype in (
+        "Buyback Order", "Buyback Assessment", "Buyback Inspection",
+        "Buyback SLA Log", "Buyback Audit Log",
+    ):
+        if not frappe.has_permission(doctype, "read"):
+            frappe.throw(
+                _("You do not have permission to view {0}.").format(doctype),
+                frappe.PermissionError,
+                title=_("API Error"),
+            )
+
+
+def _validate_date_range(from_date, to_date):
+    start = getdate(from_date)
+    end = getdate(to_date)
+    if end < start:
+        frappe.throw(_("To Date cannot be before From Date."))
+    max_days = min(get_int_setting("scorecard_max_range_days", 366), 730)
+    if date_diff(end, start) > max_days:
+        frappe.throw(_("Dashboard date range cannot exceed {0} days.").format(max_days))
+    return start, end
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -55,10 +85,12 @@ def get_store_dashboard(store=None, from_date=None, to_date=None) -> dict:
     _check_dashboard_access()
     from_date = from_date or nowdate()
     to_date = to_date or nowdate()
+    from_date, to_date = _validate_date_range(from_date, to_date)
     if not store:
         frappe.throw(_("Store is required"), title=_("API Error"))
+    assert_buyback_scope(store=store)
 
-    where, params = _build_params(from_date, to_date, store=store)
+    where, params = _build_params(from_date, to_date, store=store, scope_prefix="store_dashboard")
 
     # KPIs
     o_row = frappe.db.sql("""
@@ -148,12 +180,19 @@ def get_category_dashboard(from_date=None, to_date=None, brand=None, item_group=
     _check_dashboard_access()
     from_date = from_date or add_months(nowdate(), -1)
     to_date = to_date or nowdate()
+    from_date, to_date = _validate_date_range(from_date, to_date)
 
-    where, params = _build_params(from_date, to_date, brand=brand, item_group=item_group)
+    where, params = _build_params(
+        from_date, to_date, brand=brand, item_group=item_group, scope_prefix="category_assessment"
+    )
 
     # Build a separate where clause for Buyback Order (no item_group column)
-    order_where, order_params = _build_params(from_date, to_date, brand=brand)
-    order_where_aliased = order_where.replace("creation", "o.creation").replace("brand", "o.brand")
+    order_where, order_params = _build_params(
+        from_date, to_date, brand=brand, scope_prefix="category_order"
+    )
+    order_where_aliased, order_params_aliased = _build_params(
+        from_date, to_date, alias="o.", brand=brand, scope_prefix="category_order_alias"
+    )
 
     # Top categories
     top_cats = frappe.db.sql("""
@@ -179,11 +218,7 @@ def get_category_dashboard(from_date=None, to_date=None, brand=None, item_group=
     """.format(where=where), params, as_dict=1)  # noqa: UP032
 
     # Mismatch hotspots (models with highest mismatch) — uses aliased columns
-    mm_clauses = ["o.creation BETWEEN %(from_date)s AND %(to_date_end)s"]
-    if brand:
-        mm_clauses.append("o.brand = %(brand)s")
-    # Note: item_group does not exist on tabBuyback Order, so not filtered here
-    mm_where = " AND ".join(mm_clauses)
+    mm_where = order_where_aliased
 
     mismatch_hotspots = frappe.db.sql("""
         SELECT o.item, o.brand,
@@ -197,7 +232,7 @@ def get_category_dashboard(from_date=None, to_date=None, brand=None, item_group=
         GROUP BY o.item, o.brand
         ORDER BY avg_mismatch DESC
         LIMIT 10
-    """.format(where=mm_where), params, as_dict=1)  # noqa: UP032
+    """.format(where=mm_where), order_params_aliased, as_dict=1)  # noqa: UP032
 
     # Grade mix (for pie chart) — uses order_where (no item_group on Buyback Order)
     grade_data = frappe.db.sql("""
@@ -210,7 +245,7 @@ def get_category_dashboard(from_date=None, to_date=None, brand=None, item_group=
         WHERE o.docstatus < 2 AND {where} AND o.condition_grade IS NOT NULL
         GROUP BY o.condition_grade, gm.grade_name
         ORDER BY qty DESC
-    """.format(where=order_where_aliased), order_params, as_dict=1)  # noqa: UP032
+    """.format(where=order_where_aliased), order_params_aliased, as_dict=1)  # noqa: UP032
 
     # Settlement mix by brand — uses order_where (no item_group on Buyback Order)
     settlement_by_brand = frappe.db.sql("""
@@ -275,8 +310,14 @@ def get_finance_dashboard(from_date=None, to_date=None, company=None) -> dict:
     _check_dashboard_access()
     from_date = from_date or add_months(nowdate(), -1)
     to_date = to_date or nowdate()
+    from_date, to_date = _validate_date_range(from_date, to_date)
 
-    where, params = _build_params(from_date, to_date, company=company)
+    if company:
+        assert_buyback_scope(company=company)
+
+    where, params = _build_params(
+        from_date, to_date, company=company, scope_prefix="finance_dashboard"
+    )
 
     # Payout KPIs
     p_row = frappe.db.sql("""
@@ -340,14 +381,16 @@ def get_finance_dashboard(from_date=None, to_date=None, company=None) -> dict:
         GROUP BY DATE(creation) ORDER BY date
     """.format(where=where), params, as_dict=1)  # noqa: UP032
 
-    # High-value payouts (> 50000)
+    high_value_threshold = flt(
+        frappe.db.get_single_value("Buyback SLA Settings", "large_payout_threshold")
+    ) or 50000
     high_value = frappe.db.sql("""
         SELECT name, store, customer_name, total_paid, customer_payout_mode, customer_payout_updated_at as payment_date
         FROM `tabBuyback Order`
         WHERE docstatus < 2 AND status IN ('Paid','Closed')
-            AND total_paid > 50000 AND {where}
+            AND total_paid > %(high_value_threshold)s AND {where}
         ORDER BY total_paid DESC LIMIT 20
-    """.format(where=where), params, as_dict=1)  # noqa: UP032
+    """.format(where=where), {**params, "high_value_threshold": high_value_threshold}, as_dict=1)  # noqa: UP032
 
     # Build payment methods summary string
     methods_parts = [f"{m.method}: {m['count']}" for m in payment_by_method if m.method != 'Unknown']
@@ -385,19 +428,45 @@ def get_compliance_dashboard(from_date=None, to_date=None, company=None) -> dict
     _check_dashboard_access()
     from_date = from_date or add_months(nowdate(), -1)
     to_date = to_date or nowdate()
+    from_date, to_date = _validate_date_range(from_date, to_date)
 
-    where, params = _build_params(from_date, to_date, company=company)
+    if company:
+        assert_buyback_scope(company=company)
+
+    where, params = _build_params(
+        from_date, to_date, company=company, scope_prefix="compliance_dashboard"
+    )
     date_params = _date_params(from_date, to_date)
+    order_scope, order_scope_params = build_buyback_scope_sql(
+        store_field="o.store", company_field="o.company", prefix="compliance_order"
+    )
+    assessment_where, assessment_params = _build_params(
+        from_date,
+        to_date,
+        company=company,
+        scope_prefix="compliance_assessment",
+    )
+    inspection_where, inspection_params = _build_params(
+        from_date,
+        to_date,
+        company=company,
+        scope_prefix="compliance_inspection",
+    )
+    scoped_date_params = {**date_params, **order_scope_params}
     kpis = {}
 
     # OTP failures
     otp_row = frappe.db.sql("""
         SELECT
             COUNT(*) as total_otp,
-            SUM(CASE WHEN status IN ('Failed','Expired') THEN 1 ELSE 0 END) as failures
-        FROM `tabCH OTP Log`
-        WHERE creation BETWEEN %(from_date)s AND %(to_date_end)s
-    """, date_params, as_dict=1)[0]
+            SUM(CASE WHEN otp.status IN ('Failed','Expired') THEN 1 ELSE 0 END) as failures
+        FROM `tabCH OTP Log` otp
+        INNER JOIN `tabBuyback Order` o
+            ON otp.reference_doctype = 'Buyback Order'
+            AND otp.reference_name = o.name
+        WHERE otp.creation BETWEEN %(from_date)s AND %(to_date_end)s
+            AND {order_scope}
+    """.format(order_scope=order_scope), scoped_date_params, as_dict=1)[0]  # noqa: UP032
     kpis["otp_total"] = otp_row.total_otp or 0
     kpis["otp_failures"] = otp_row.failures or 0
     kpis["otp_failure_rate"] = round(
@@ -418,16 +487,21 @@ def get_compliance_dashboard(from_date=None, to_date=None, company=None) -> dict
         SELECT COUNT(*) FROM (
             SELECT imei_serial FROM `tabBuyback Assessment`
             WHERE imei_serial IS NOT NULL AND imei_serial != ''
-                AND creation BETWEEN %(from_date)s AND %(to_date_end)s
+                AND {assessment_where}
             GROUP BY imei_serial HAVING COUNT(*) > 1
         ) dup
-    """, date_params)[0][0] or 0
+    """.format(assessment_where=assessment_where), assessment_params)[0][0] or 0  # noqa: UP032
 
     # Manager overrides
-    kpis["manager_overrides"] = frappe.db.count("Buyback Audit Log", {
-        "action": ["in", ["Price Override", "Grade Changed"]],
-        "creation": ("between", [from_date, f"{to_date} 23:59:59"]),
-    })
+    kpis["manager_overrides"] = frappe.db.sql("""
+        SELECT COUNT(DISTINCT a.name)
+        FROM `tabBuyback Audit Log` a
+        INNER JOIN `tabBuyback Order` o
+            ON a.reference_doctype = 'Buyback Order' AND a.reference_name = o.name
+        WHERE a.action IN ('Price Override', 'Grade Changed')
+            AND a.creation BETWEEN %(from_date)s AND %(to_date_end)s
+            AND {order_scope}
+    """.format(order_scope=order_scope), scoped_date_params)[0][0] or 0  # noqa: UP032
 
     # High-value orders
     threshold = flt(frappe.db.get_single_value("Buyback SLA Settings", "large_payout_threshold")) or 25000
@@ -443,11 +517,14 @@ def get_compliance_dashboard(from_date=None, to_date=None, company=None) -> dict
 
     # Manual vs auto approvals
     manual_approvals = frappe.db.sql("""
-        SELECT COUNT(DISTINCT reference_name)
-        FROM `tabBuyback Audit Log`
-        WHERE action IN ('Manual Approval','Price Override','Grade Changed')
-            AND creation BETWEEN %(from_date)s AND %(to_date_end)s
-    """, date_params)[0][0] or 0
+        SELECT COUNT(DISTINCT a.reference_name)
+        FROM `tabBuyback Audit Log` a
+        INNER JOIN `tabBuyback Order` o
+            ON a.reference_doctype = 'Buyback Order' AND a.reference_name = o.name
+        WHERE a.action IN ('Manual Approval','Price Override','Grade Changed')
+            AND a.creation BETWEEN %(from_date)s AND %(to_date_end)s
+            AND {order_scope}
+    """.format(order_scope=order_scope), scoped_date_params)[0][0] or 0  # noqa: UP032
     kpis["manual_approvals"] = manual_approvals
 
     total_approved = frappe.db.sql("""
@@ -467,6 +544,7 @@ def get_compliance_dashboard(from_date=None, to_date=None, company=None) -> dict
     kpis["sla_breaches"] = sla.breaches or 0
 
     # Suspicious: branches with high override rate
+    suspicious_threshold = get_int_setting("dashboard_suspicious_override_threshold", 3)
     suspicious_branches = frappe.db.sql("""
         SELECT o.store, COUNT(DISTINCT a.name) as override_count,
             COUNT(DISTINCT o.name) as order_count
@@ -475,19 +553,26 @@ def get_compliance_dashboard(from_date=None, to_date=None, company=None) -> dict
             AND a.reference_doctype = 'Buyback Order'
         WHERE a.action IN ('Price Override','Grade Changed')
             AND a.creation BETWEEN %(from_date)s AND %(to_date_end)s
+            AND {order_scope}
         GROUP BY o.store
-        HAVING override_count > 3
+        HAVING override_count > %(suspicious_threshold)s
         ORDER BY override_count DESC LIMIT 10
-    """, date_params, as_dict=1)
+    """.format(order_scope=order_scope), {
+        **scoped_date_params,
+        "suspicious_threshold": suspicious_threshold,
+    }, as_dict=1)  # noqa: UP032
 
     # Recent audit actions
     recent_audits = frappe.db.sql("""
-        SELECT creation, action, reference_name as reference,
-            reference_doctype as reference_type, owner as user, reason
-        FROM `tabBuyback Audit Log`
-        WHERE creation BETWEEN %(from_date)s AND %(to_date_end)s
-        ORDER BY creation DESC LIMIT 20
-    """, date_params, as_dict=1)
+        SELECT a.creation, a.action, a.reference_name as reference,
+            a.reference_doctype as reference_type, a.owner as user, a.reason
+        FROM `tabBuyback Audit Log` a
+        INNER JOIN `tabBuyback Order` o
+            ON a.reference_doctype = 'Buyback Order' AND a.reference_name = o.name
+        WHERE a.creation BETWEEN %(from_date)s AND %(to_date_end)s
+            AND {order_scope}
+        ORDER BY a.creation DESC LIMIT 20
+    """.format(order_scope=order_scope), scoped_date_params, as_dict=1)  # noqa: UP032
 
     # Mismatch anomaly trend (daily)
     mismatch_trend = frappe.db.sql("""
@@ -496,9 +581,9 @@ def get_compliance_dashboard(from_date=None, to_date=None, company=None) -> dict
             COUNT(*) as cnt
         FROM `tabBuyback Inspection`
         WHERE status='Completed'
-            AND creation BETWEEN %(from_date)s AND %(to_date_end)s
+            AND {inspection_where}
         GROUP BY DATE(creation) ORDER BY date
-    """, date_params, as_dict=1)
+    """.format(inspection_where=inspection_where), inspection_params, as_dict=1)  # noqa: UP032
 
     return {
         "kpis": kpis,
@@ -518,8 +603,13 @@ def get_operations_dashboard(from_date=None, to_date=None, store=None) -> dict:
     _check_dashboard_access()
     from_date = from_date or nowdate()
     to_date = to_date or nowdate()
+    from_date, to_date = _validate_date_range(from_date, to_date)
 
-    where, params = _build_params(from_date, to_date, store=store)
+    if store:
+        assert_buyback_scope(store=store)
+    where, params = _build_params(
+        from_date, to_date, store=store, scope_prefix="operations_dashboard"
+    )
 
     # ── SLA overview ──
     sla_row = frappe.db.sql("""

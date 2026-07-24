@@ -12,9 +12,10 @@
   "question_code",
   "column_break_01",
   "diagnosis_type",
-    "question_category",
+  "question_category",
   "question_type",
   "applies_to_categories",
+  "applies_to_category",
   "display_order",
   "is_mandatory",
   "disabled",
@@ -173,20 +174,21 @@
  "owner": "Administrator",
  "permissions": [
   {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
    "create": 1,
    "delete": 1,
    "email": 1,
    "export": 1,
+   "import": 1,
    "print": 1,
-   "read": 1,
    "report": 1,
-   "role": "System Manager",
-   "share": 1,
-   "write": 1
+   "share": 1
   },
   {
-   "read": 1,
-   "role": "All"
+   "role": "All",
+   "read": 1
   }
  ],
  "search_fields": "question_text,question_code,question_category,question_type",

@@ -1,20 +1,17 @@
 """Buyback Hub – Backend API for buyback & exchange dashboard."""
 
 import frappe
-from frappe.utils import flt, nowdate, get_first_day, cint, getdate
+from frappe import _
+from frappe.utils import flt, nowdate, get_first_day, cint, getdate, date_diff
 
-# Import scope-aware filter builder (H6)
-try:
-    from ch_erp15.ch_erp15.scope import intersect_filters
-except ImportError:
-    # Fallback if ch_erp15 not available (unrestricted mode)
-    def intersect_filters(**kwargs):
-        return {
-            "company": kwargs.get("company"),
-            "store": kwargs.get("store"),
-            "allowed_stores": None,
-            "allowed_warehouses": None,
-        }
+from buyback.utils import get_int_setting, require_configured_role
+from ch_erp15.ch_erp15.scope import intersect_filters
+
+
+def _check_hub_access() -> None:
+    require_configured_role("dashboard_roles", action=_("view the Buyback Hub"))
+    for doctype in ("Buyback Order", "Buyback Assessment", "Buyback Inspection"):
+        frappe.has_permission(doctype, ptype="read", throw=True)
 
 
 def _store_warehouses(store_names):
@@ -70,8 +67,16 @@ def _build_filters(company=None, store=None, from_date=None, to_date=None, city=
             st_in = "(" + ", ".join(frappe.db.escape(w) for w in whs) + ")"
             st = f" AND bo.store IN {st_in}"
 
-    from_date = str(getdate(from_date)) if from_date else None
-    to_date = str(getdate(to_date)) if to_date else None
+    from_date = getdate(from_date) if from_date else None
+    to_date = getdate(to_date) if to_date else None
+    if from_date and to_date:
+        if to_date < from_date:
+            frappe.throw(_("To Date cannot be before From Date."))
+        max_days = min(get_int_setting("scorecard_max_range_days", 366), 730)
+        if date_diff(to_date, from_date) > max_days:
+            frappe.throw(_("Buyback Hub date range cannot exceed {0} days.").format(max_days))
+    from_date = str(from_date) if from_date else None
+    to_date = str(to_date) if to_date else None
     if from_date:
         prm["from_date"] = from_date
     if to_date:
@@ -92,6 +97,7 @@ def _build_filters(company=None, store=None, from_date=None, to_date=None, city=
 @frappe.whitelist()
 def get_buyback_hub_data(company=None, store=None, from_date=None, to_date=None, city=None, zone=None):
     """Buyback lifecycle dashboard: Assessment → OTP → Approval → Inspection → Payment → Closed."""
+    _check_hub_access()
     f = _build_filters(company, store, from_date, to_date, city=city, zone=zone)
     prm = f["prm"]
     co = f["co"]
@@ -232,23 +238,37 @@ def get_buyback_hub_data(company=None, store=None, from_date=None, to_date=None,
 
     # ── AI Insights ──
     ai_insights = []
+    stuck_otp_threshold = min(get_int_setting("hub_stuck_otp_alert_threshold", 5), 100000)
+    active_backlog_threshold = min(
+        get_int_setting("hub_active_backlog_alert_threshold", 20), 100000
+    )
+    rejection_rate_threshold = min(
+        get_int_setting("hub_rejection_rate_alert_pct", 30), 100
+    )
+    rejection_min_decisions = min(
+        get_int_setting("hub_rejection_min_decisions", 5), 100000
+    )
     stuck_otp = sc.get("Awaiting OTP", 0)
-    if stuck_otp > 5:
+    if stuck_otp > stuck_otp_threshold:
         ai_insights.append({
             "severity": "High", "title": f"{stuck_otp} Orders Stuck at OTP",
             "detail": "Multiple orders waiting for OTP verification. Customers may need assistance.",
             "action": "Follow up with customers for OTP completion or resend OTP."
         })
-    if active_orders > 20:
+    if active_orders > active_backlog_threshold:
         ai_insights.append({
             "severity": "Medium", "title": f"High Active Backlog ({active_orders} orders)",
             "detail": "Consider expediting assessment and approval processes.",
             "action": "Review pipeline for bottlenecks in assessment or approval stages."
         })
-    if rejected_total > approved_total * 0.3 and decided_total > 5:
+    rejection_pct = rejected_total / max(decided_total, 1) * 100
+    if (
+        rejection_pct > rejection_rate_threshold
+        and decided_total > rejection_min_decisions
+    ):
         ai_insights.append({
             "severity": "Medium", "title": f"High Rejection Rate ({rejection_rate})",
-            "detail": "Over 30% of decided orders are rejected. Review criteria.",
+            "detail": f"Rejections exceed the configured {rejection_rate_threshold}% threshold. Review criteria.",
             "action": "Analyze rejection reasons to improve initial screening."
         })
     if not ai_insights:

@@ -20,7 +20,23 @@
     "update_value": "Draft"
    },
    {
+    "allow_edit": "System Manager",
+    "doc_status": "0",
+    "is_optional_state": 0,
+    "state": "Draft",
+    "update_field": "status",
+    "update_value": "Draft"
+   },
+   {
     "allow_edit": "Buyback Manager",
+    "doc_status": "0",
+    "is_optional_state": 0,
+    "state": "Awaiting Approval",
+    "update_field": "status",
+    "update_value": "Awaiting Approval"
+   },
+   {
+    "allow_edit": "System Manager",
     "doc_status": "0",
     "is_optional_state": 0,
     "state": "Awaiting Approval",
@@ -36,7 +52,23 @@
     "update_value": "Approved"
    },
    {
+    "allow_edit": "System Manager",
+    "doc_status": "0",
+    "is_optional_state": 0,
+    "state": "Approved",
+    "update_field": "status",
+    "update_value": "Approved"
+   },
+   {
     "allow_edit": "Buyback Agent",
+    "doc_status": "0",
+    "is_optional_state": 0,
+    "state": "Awaiting Customer Approval",
+    "update_field": "status",
+    "update_value": "Awaiting Customer Approval"
+   },
+   {
+    "allow_edit": "System Manager",
     "doc_status": "0",
     "is_optional_state": 0,
     "state": "Awaiting Customer Approval",
@@ -52,7 +84,23 @@
     "update_value": "Customer Approved"
    },
    {
+    "allow_edit": "System Manager",
+    "doc_status": "0",
+    "is_optional_state": 0,
+    "state": "Customer Approved",
+    "update_field": "status",
+    "update_value": "Customer Approved"
+   },
+   {
     "allow_edit": "Buyback Agent",
+    "doc_status": "0",
+    "is_optional_state": 0,
+    "state": "Awaiting OTP",
+    "update_field": "status",
+    "update_value": "Awaiting OTP"
+   },
+   {
+    "allow_edit": "System Manager",
     "doc_status": "0",
     "is_optional_state": 0,
     "state": "Awaiting OTP",
@@ -68,7 +116,23 @@
     "update_value": "OTP Verified"
    },
    {
+    "allow_edit": "System Manager",
+    "doc_status": "0",
+    "is_optional_state": 0,
+    "state": "OTP Verified",
+    "update_field": "status",
+    "update_value": "OTP Verified"
+   },
+   {
     "allow_edit": "Buyback Agent",
+    "doc_status": "0",
+    "is_optional_state": 0,
+    "state": "Ready to Pay",
+    "update_field": "status",
+    "update_value": "Ready to Pay"
+   },
+   {
+    "allow_edit": "System Manager",
     "doc_status": "0",
     "is_optional_state": 0,
     "state": "Ready to Pay",
@@ -84,7 +148,23 @@
     "update_value": "Paid"
    },
    {
+    "allow_edit": "System Manager",
+    "doc_status": "1",
+    "is_optional_state": 0,
+    "state": "Paid",
+    "update_field": "status",
+    "update_value": "Paid"
+   },
+   {
     "allow_edit": "Buyback Manager",
+    "doc_status": "1",
+    "is_optional_state": 0,
+    "state": "Closed",
+    "update_field": "status",
+    "update_value": "Closed"
+   },
+   {
+    "allow_edit": "System Manager",
     "doc_status": "1",
     "is_optional_state": 0,
     "state": "Closed",
@@ -100,7 +180,23 @@
     "update_value": "Rejected"
    },
    {
+    "allow_edit": "System Manager",
+    "doc_status": "0",
+    "is_optional_state": 0,
+    "state": "Rejected",
+    "update_field": "status",
+    "update_value": "Rejected"
+   },
+   {
     "allow_edit": "Buyback Manager",
+    "doc_status": "2",
+    "is_optional_state": 0,
+    "state": "Cancelled",
+    "update_field": "status",
+    "update_value": "Cancelled"
+   },
+   {
+    "allow_edit": "System Manager",
     "doc_status": "2",
     "is_optional_state": 0,
     "state": "Cancelled",
@@ -118,9 +214,25 @@
     "state": "Draft"
    },
    {
+    "action": "Submit for Approval",
+    "allow_self_approval": 0,
+    "allowed": "System Manager",
+    "condition": "doc.requires_approval == 1",
+    "next_state": "Awaiting Approval",
+    "state": "Draft"
+   },
+   {
     "action": "Auto Approve",
     "allow_self_approval": 0,
     "allowed": "Buyback Agent",
+    "condition": "doc.requires_approval == 0",
+    "next_state": "Approved",
+    "state": "Draft"
+   },
+   {
+    "action": "Auto Approve",
+    "allow_self_approval": 0,
+    "allowed": "System Manager",
     "condition": "doc.requires_approval == 0",
     "next_state": "Approved",
     "state": "Draft"
@@ -133,6 +245,13 @@
     "state": "Awaiting Approval"
    },
    {
+    "action": "Approve",
+    "allow_self_approval": 0,
+    "allowed": "System Manager",
+    "next_state": "Approved",
+    "state": "Awaiting Approval"
+   },
+   {
     "action": "Reject",
     "allow_self_approval": 1,
     "allowed": "Buyback Manager",
@@ -140,9 +259,24 @@
     "state": "Awaiting Approval"
    },
    {
+    "action": "Reject",
+    "allow_self_approval": 1,
+    "allowed": "System Manager",
+    "next_state": "Rejected",
+    "state": "Awaiting Approval"
+   },
+   {
     "action": "Send OTP",
     "allow_self_approval": 1,
     "allowed": "Buyback Agent",
+    "condition": "doc.price_variance == 0 or not doc.buyback_assessment",
+    "next_state": "Awaiting OTP",
+    "state": "Approved"
+   },
+   {
+    "action": "Send OTP",
+    "allow_self_approval": 1,
+    "allowed": "System Manager",
     "condition": "doc.price_variance == 0 or not doc.buyback_assessment",
     "next_state": "Awaiting OTP",
     "state": "Approved"
@@ -156,9 +290,25 @@
     "state": "Approved"
    },
    {
+    "action": "Request Customer Approval",
+    "allow_self_approval": 1,
+    "allowed": "System Manager",
+    "condition": "doc.price_variance != 0 and doc.buyback_assessment",
+    "next_state": "Awaiting Customer Approval",
+    "state": "Approved"
+   },
+   {
     "action": "Customer Approve",
     "allow_self_approval": 1,
     "allowed": "Buyback Agent",
+    "condition": "doc.customer_approved == 1",
+    "next_state": "Customer Approved",
+    "state": "Awaiting Customer Approval"
+   },
+   {
+    "action": "Customer Approve",
+    "allow_self_approval": 1,
+    "allowed": "System Manager",
     "condition": "doc.customer_approved == 1",
     "next_state": "Customer Approved",
     "state": "Awaiting Customer Approval"
@@ -171,9 +321,23 @@
     "state": "Awaiting Customer Approval"
    },
    {
+    "action": "Reject",
+    "allow_self_approval": 1,
+    "allowed": "System Manager",
+    "next_state": "Rejected",
+    "state": "Awaiting Customer Approval"
+   },
+   {
     "action": "Send OTP",
     "allow_self_approval": 1,
     "allowed": "Buyback Agent",
+    "next_state": "Awaiting OTP",
+    "state": "Customer Approved"
+   },
+   {
+    "action": "Send OTP",
+    "allow_self_approval": 1,
+    "allowed": "System Manager",
     "next_state": "Awaiting OTP",
     "state": "Customer Approved"
    },
@@ -186,9 +350,24 @@
     "state": "Awaiting OTP"
    },
    {
+    "action": "Verify OTP",
+    "allow_self_approval": 1,
+    "allowed": "System Manager",
+    "condition": "doc.otp_verified == 1",
+    "next_state": "OTP Verified",
+    "state": "Awaiting OTP"
+   },
+   {
     "action": "Proceed to Payment",
     "allow_self_approval": 1,
     "allowed": "Buyback Agent",
+    "next_state": "Ready to Pay",
+    "state": "OTP Verified"
+   },
+   {
+    "action": "Proceed to Payment",
+    "allow_self_approval": 1,
+    "allowed": "System Manager",
     "next_state": "Ready to Pay",
     "state": "OTP Verified"
    },
@@ -201,9 +380,24 @@
     "state": "Ready to Pay"
    },
    {
+    "action": "Confirm Payment",
+    "allow_self_approval": 1,
+    "allowed": "System Manager",
+    "condition": "doc.payment_status == 'Paid'",
+    "next_state": "Paid",
+    "state": "Ready to Pay"
+   },
+   {
     "action": "Close",
     "allow_self_approval": 1,
     "allowed": "Buyback Manager",
+    "next_state": "Closed",
+    "state": "Paid"
+   },
+   {
+    "action": "Close",
+    "allow_self_approval": 1,
+    "allowed": "System Manager",
     "next_state": "Closed",
     "state": "Paid"
    },
@@ -217,7 +411,21 @@
    {
     "action": "Reject",
     "allow_self_approval": 1,
+    "allowed": "System Manager",
+    "next_state": "Rejected",
+    "state": "Draft"
+   },
+   {
+    "action": "Reject",
+    "allow_self_approval": 1,
     "allowed": "Buyback Manager",
+    "next_state": "Rejected",
+    "state": "Approved"
+   },
+   {
+    "action": "Reject",
+    "allow_self_approval": 1,
+    "allowed": "System Manager",
     "next_state": "Rejected",
     "state": "Approved"
    },
@@ -231,7 +439,21 @@
    {
     "action": "Cancel",
     "allow_self_approval": 1,
+    "allowed": "System Manager",
+    "next_state": "Cancelled",
+    "state": "Paid"
+   },
+   {
+    "action": "Cancel",
+    "allow_self_approval": 1,
     "allowed": "Buyback Manager",
+    "next_state": "Cancelled",
+    "state": "Closed"
+   },
+   {
+    "action": "Cancel",
+    "allow_self_approval": 1,
+    "allowed": "System Manager",
     "next_state": "Cancelled",
     "state": "Closed"
    }
@@ -258,7 +480,23 @@
     "update_value": "Draft"
    },
    {
+    "allow_edit": "System Manager",
+    "doc_status": "0",
+    "is_optional_state": 0,
+    "state": "Draft",
+    "update_field": "status",
+    "update_value": "Draft"
+   },
+   {
     "allow_edit": "Buyback Agent",
+    "doc_status": "1",
+    "is_optional_state": 0,
+    "state": "New Device Delivered",
+    "update_field": "status",
+    "update_value": "New Device Delivered"
+   },
+   {
+    "allow_edit": "System Manager",
     "doc_status": "1",
     "is_optional_state": 0,
     "state": "New Device Delivered",
@@ -274,7 +512,23 @@
     "update_value": "Awaiting Pickup"
    },
    {
+    "allow_edit": "System Manager",
+    "doc_status": "1",
+    "is_optional_state": 0,
+    "state": "Awaiting Pickup",
+    "update_field": "status",
+    "update_value": "Awaiting Pickup"
+   },
+   {
     "allow_edit": "Buyback Agent",
+    "doc_status": "1",
+    "is_optional_state": 0,
+    "state": "Old Device Received",
+    "update_field": "status",
+    "update_value": "Old Device Received"
+   },
+   {
+    "allow_edit": "System Manager",
     "doc_status": "1",
     "is_optional_state": 0,
     "state": "Old Device Received",
@@ -290,7 +544,23 @@
     "update_value": "Inspected"
    },
    {
+    "allow_edit": "System Manager",
+    "doc_status": "1",
+    "is_optional_state": 0,
+    "state": "Inspected",
+    "update_field": "status",
+    "update_value": "Inspected"
+   },
+   {
     "allow_edit": "Buyback Manager",
+    "doc_status": "1",
+    "is_optional_state": 0,
+    "state": "Settled",
+    "update_field": "status",
+    "update_value": "Settled"
+   },
+   {
+    "allow_edit": "System Manager",
     "doc_status": "1",
     "is_optional_state": 0,
     "state": "Settled",
@@ -306,7 +576,23 @@
     "update_value": "Closed"
    },
    {
+    "allow_edit": "System Manager",
+    "doc_status": "1",
+    "is_optional_state": 0,
+    "state": "Closed",
+    "update_field": "status",
+    "update_value": "Closed"
+   },
+   {
     "allow_edit": "Buyback Manager",
+    "doc_status": "2",
+    "is_optional_state": 0,
+    "state": "Cancelled",
+    "update_field": "status",
+    "update_value": "Cancelled"
+   },
+   {
+    "allow_edit": "System Manager",
     "doc_status": "2",
     "is_optional_state": 0,
     "state": "Cancelled",
@@ -323,9 +609,23 @@
     "state": "Draft"
    },
    {
+    "action": "Submit",
+    "allow_self_approval": 1,
+    "allowed": "System Manager",
+    "next_state": "New Device Delivered",
+    "state": "Draft"
+   },
+   {
     "action": "Mark Awaiting Pickup",
     "allow_self_approval": 1,
     "allowed": "Buyback Agent",
+    "next_state": "Awaiting Pickup",
+    "state": "New Device Delivered"
+   },
+   {
+    "action": "Mark Awaiting Pickup",
+    "allow_self_approval": 1,
+    "allowed": "System Manager",
     "next_state": "Awaiting Pickup",
     "state": "New Device Delivered"
    },
@@ -337,9 +637,23 @@
     "state": "Awaiting Pickup"
    },
    {
+    "action": "Receive Old Device",
+    "allow_self_approval": 1,
+    "allowed": "System Manager",
+    "next_state": "Old Device Received",
+    "state": "Awaiting Pickup"
+   },
+   {
     "action": "Complete Inspection",
     "allow_self_approval": 1,
     "allowed": "Buyback Agent",
+    "next_state": "Inspected",
+    "state": "Old Device Received"
+   },
+   {
+    "action": "Complete Inspection",
+    "allow_self_approval": 1,
+    "allowed": "System Manager",
     "next_state": "Inspected",
     "state": "Old Device Received"
    },
@@ -351,9 +665,23 @@
     "state": "Inspected"
    },
    {
+    "action": "Settle",
+    "allow_self_approval": 1,
+    "allowed": "System Manager",
+    "next_state": "Settled",
+    "state": "Inspected"
+   },
+   {
     "action": "Close",
     "allow_self_approval": 1,
     "allowed": "Buyback Manager",
+    "next_state": "Closed",
+    "state": "Settled"
+   },
+   {
+    "action": "Close",
+    "allow_self_approval": 1,
+    "allowed": "System Manager",
     "next_state": "Closed",
     "state": "Settled"
    },
@@ -366,8 +694,22 @@
    },
    {
     "action": "Cancel",
+    "allow_self_approval": 1,
+    "allowed": "System Manager",
+    "next_state": "Cancelled",
+    "state": "New Device Delivered"
+   },
+   {
+    "action": "Cancel",
     "allow_self_approval": 0,
     "allowed": "Buyback Manager",
+    "next_state": "Cancelled",
+    "state": "Awaiting Pickup"
+   },
+   {
+    "action": "Cancel",
+    "allow_self_approval": 0,
+    "allowed": "System Manager",
     "next_state": "Cancelled",
     "state": "Awaiting Pickup"
    }

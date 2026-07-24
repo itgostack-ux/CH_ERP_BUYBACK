@@ -14,30 +14,40 @@ Patterns followed (India Compliance / HRMS):
   - All user-facing strings wrapped in _()
 """
 
+import hashlib
+import hmac
 import json
+import re
 
 import frappe
 from frappe import _
 from frappe.rate_limiter import rate_limit
 from frappe.utils import flt, now_datetime
 
-from contextlib import contextmanager
-
 from buyback.exceptions import (
     BuybackStatusError,
     BuybackValidationError,
 )
-from buyback.utils import log_audit, validate_indian_phone
+from buyback.utils import (
+    assert_buyback_scope,
+    build_buyback_scope_sql,
+    clear_fixed_window,
+    get_buyback_data_scope,
+    get_int_setting,
+    increment_fixed_window,
+    is_privileged_user,
+    log_audit,
+    require_configured_role,
+    require_scoped_document_action,
+    validate_bounded_text,
+    validate_indian_phone,
+)
 
 
 # ---------------------------------------------------------------------------
 # Token security helpers (used by every guest endpoint that authenticates by
 # `approval_token`).  Centralised so TTL + single-use rules are consistent.
 # ---------------------------------------------------------------------------
-
-# Tokens are valid for this many hours after the order was last updated
-# (creation, or last token regeneration via resend_customer_approval_link).
-APPROVAL_TOKEN_TTL_HOURS = 72
 
 # Status set in which the approval link is still actionable. Anything outside
 # this set rejects the token (closed/paid/rejected orders cannot be replayed).
@@ -58,6 +68,12 @@ _PAYOUT_EDITABLE_STATUSES = {
 }
 
 
+def _require_app_read(action: str, *doctypes: str) -> None:
+    require_configured_role("app_access_roles", action=action)
+    for doctype in doctypes:
+        frappe.has_permission(doctype, ptype="read", throw=True)
+
+
 def _mask_phone(phone: str | None) -> str:
     """Return a masked phone safe to echo back to a guest endpoint."""
     digits = "".join(c for c in (phone or "") if c.isdigit())
@@ -66,28 +82,83 @@ def _mask_phone(phone: str | None) -> str:
     return f"{'*' * (len(digits) - 4)}{digits[-4:]}"
 
 
-def _resolve_token(token: str, *, require_payout_editable: bool = False) -> str:
+def _mask_identifier(value: str | None, visible: int = 4) -> str:
+    """Mask a customer identifier while retaining a recognition suffix."""
+    value = (value or "").strip()
+    if not value:
+        return ""
+    if len(value) <= visible:
+        return "*" * len(value)
+    return f"{'*' * (len(value) - visible)}{value[-visible:]}"
+
+
+def _mask_upi(value: str | None) -> str:
+    value = (value or "").strip()
+    if not value or "@" not in value:
+        return _mask_identifier(value)
+    local, handle = value.split("@", 1)
+    return f"{local[:1]}***@{handle}"
+
+
+def _mask_name(value: str | None) -> str:
+    parts = [part for part in (value or "").split() if part]
+    return " ".join(f"{part[:1]}***" for part in parts)
+
+
+def _payout_audit_snapshot(values: dict) -> dict:
+    return {
+        "customer_payout_mode": values.get("customer_payout_mode"),
+        "customer_cash_receiver_name": _mask_name(values.get("customer_cash_receiver_name")),
+        "customer_upi_id": _mask_upi(values.get("customer_upi_id")),
+        "customer_bank_account_holder": _mask_name(values.get("customer_bank_account_holder")),
+        "customer_bank_account_number": _mask_identifier(
+            values.get("customer_bank_account_number")
+        ),
+        "customer_bank_ifsc": _mask_identifier(values.get("customer_bank_ifsc"), visible=3),
+        "customer_bank_name": values.get("customer_bank_name"),
+        "has_payout_notes": bool(values.get("customer_payout_notes")),
+    }
+
+
+def _resolve_token(
+    token: str,
+    *,
+    require_payout_editable: bool = False,
+    for_update: bool = False,
+) -> str:
     """Validate `approval_token` and return the order name.
 
     Raises if:
       - token is missing / unknown / order cancelled (docstatus == 2)
       - order has moved past the active customer-approval phase
-      - token TTL (APPROVAL_TOKEN_TTL_HOURS hrs since `modified`) elapsed
+      - configured token TTL since token issuance elapsed
       - require_payout_editable=True and customer has already approved
         (single-use lock against bank-account hijack)
     """
     from frappe.utils import time_diff_in_hours
 
-    if not token:
-        frappe.throw(_("Invalid or expired approval link."), exc=frappe.DoesNotExistError, title=_("API Error"))
-
+    token = validate_bounded_text(token, _("Approval Token"), 256, required=True)
+    token_digest = hashlib.sha256(token.encode()).hexdigest()
+    fields = [
+        "name",
+        "status",
+        "creation",
+        "customer_approved",
+        "customer_approved_at",
+        "approval_token_digest",
+    ]
+    if frappe.get_meta("Buyback Order").has_field("approval_token_issued_at"):
+        fields.append("approval_token_issued_at")
     row = frappe.db.get_value(
         "Buyback Order",
-        {"approval_token": token, "docstatus": ["!=", 2]},
-        ["name", "status", "modified", "customer_approved", "customer_approved_at"],
+        {"approval_token_digest": token_digest, "docstatus": ["!=", 2]},
+        fields,
         as_dict=True,
+        for_update=for_update,
     )
     if not row:
+        frappe.throw(_("Invalid or expired approval link."), exc=frappe.DoesNotExistError, title=_("API Error"))
+    if not hmac.compare_digest(str(row.approval_token_digest or ""), token_digest):
         frappe.throw(_("Invalid or expired approval link."), exc=frappe.DoesNotExistError, title=_("API Error"))
 
     # Status gate — reject terminal / never-active orders
@@ -96,10 +167,15 @@ def _resolve_token(token: str, *, require_payout_editable: bool = False) -> str:
 
     # TTL gate
     try:
-        elapsed = time_diff_in_hours(now_datetime(), row.modified)
+        issued_at = row.get("approval_token_issued_at") or row.creation
+        elapsed = time_diff_in_hours(now_datetime(), issued_at)
     except Exception:
-        elapsed = 0
-    if elapsed > APPROVAL_TOKEN_TTL_HOURS:
+        frappe.throw(
+            _("This approval link has invalid issuance data. Please request a fresh link from the store."),
+            exc=BuybackStatusError,
+            title=_("Link Invalid"),
+        )
+    if elapsed < 0 or elapsed >= get_int_setting("approval_token_ttl_hours", 72):
         frappe.throw(
             _("This approval link has expired. Please request a fresh link from the store."),
             exc=BuybackStatusError,
@@ -119,57 +195,10 @@ def _resolve_token(token: str, *, require_payout_editable: bool = False) -> str:
 
     return row.name
 
-
-# @contextmanager
-# def _as_system_user():
-#     """Temporarily set session user to Administrator for guest API calls.
-
-#     Frappe's workflow engine reads frappe.session.user for permission
-#     checks.  Guest endpoints (allow_guest=True) have user=None which
-#     causes 'User None not found'.  This context manager sets a valid
-#     user so .save() / workflow transitions succeed, then restores the
-#     original user.
-#     """
-#     prev = (frappe.session.user or "").strip()
-#     restore_user = (
-#         prev
-#         if prev and prev != "None" and frappe.db.exists("User", prev)
-#         else "Guest"
-#     )
-
-#     if not prev or prev in {"Guest", "None"} or not frappe.db.exists("User", prev):
-#         frappe.set_user("Administrator")
-#     try:
-#         yield
-#     finally:
-#         frappe.set_user(restore_user)
-
-# updated _as_system_user
-@contextmanager
-def _as_system_user():
-    """Temporarily elevate permissions for guest API calls WITHOUT 
-    touching the session user (which would corrupt browser cookies
-    shared between POS tab and customer approval tab).
-    
-    We change only frappe.session.user in memory, NOT via 
-    frappe.set_user() which writes Set-Cookie headers.
-    """
-    prev_user = frappe.session.user
-    try:
-        # Change ONLY in-memory session user, no cookie writes
-        frappe.session.user = "Administrator"
-        frappe.local.session_obj = None  # force perm cache refresh
-        yield
-    finally:
-        # Restore in-memory only - no cookies touched
-        frappe.session.user = prev_user
-        frappe.local.session_obj = None
-
 # ── Step 1: Get Estimate ─────────────────────────────────────────
 
 
-@frappe.whitelist()
-def get_estimate(
+def _calculate_estimate(
     item_code: str,
     grade: str,
     warranty_status: str | None = None,
@@ -199,10 +228,39 @@ def get_estimate(
     )
 
 
+@frappe.whitelist()
+def get_estimate(
+    item_code: str,
+    grade: str,
+    warranty_status: str | None = None,
+    device_age_months: int | str | None = None,
+    responses: str | None = None,
+    brand: str | None = None,
+    item_group: str | None = None,
+) -> dict:
+    _require_app_read(
+        _("calculate a Buyback estimate"),
+        "Item",
+        "Grade Master",
+        "Buyback Price Master",
+        "Buyback Pricing Rule",
+    )
+    frappe.get_doc("Item", item_code).check_permission("read")
+    return _calculate_estimate(
+        item_code=item_code,
+        grade=grade,
+        warranty_status=warranty_status,
+        device_age_months=device_age_months,
+        responses=responses,
+        brand=brand,
+        item_group=item_group,
+    )
+
+
 # ── Step 2: Submit Assessment & Create Inspection ────────────────
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def submit_assessment(assessment_name: str) -> dict:
     """Submit a draft assessment."""
     doc = frappe.get_doc("Buyback Assessment", assessment_name)
@@ -216,7 +274,7 @@ def submit_assessment(assessment_name: str) -> dict:
     }
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def submit_assessment_imei_validation(assessment_name: str, status: str, screenshot: str | None = None,
                                        remarks: str | None = None) -> dict:
     """Record the manual Sanchar Saathi (CEIR) IMEI check at assessment/intake stage.
@@ -229,7 +287,7 @@ def submit_assessment_imei_validation(assessment_name: str, status: str, screens
     return doc.submit_imei_validation(status=status, screenshot=screenshot, remarks=remarks)
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def create_inspection_from_assessment(
     assessment_name: str,
     checklist_template: str | None = None,
@@ -254,8 +312,10 @@ def create_inspection_from_assessment(
 @frappe.whitelist()
 def get_assessment(assessment_name: str) -> dict:
     """Get assessment details including responses and linked inspection."""
+    require_configured_role("app_access_roles", action=_("view Buyback assessments"))
     doc = frappe.get_doc("Buyback Assessment", assessment_name)
     doc.check_permission("read")
+    assert_buyback_scope(store=doc.store, company=doc.company)
 
     return {
         "name": doc.name,
@@ -290,7 +350,7 @@ def get_assessment(assessment_name: str) -> dict:
 # ── Step 3: Create / Manage Inspection ───────────────────────────
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def create_inspection(
     assessment_name: str,
     checklist_template: str | None = None,
@@ -302,7 +362,7 @@ def create_inspection(
     return create_inspection_from_assessment(assessment_name, checklist_template)
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def start_inspection(inspection_name: str) -> dict:
     """Start an inspection."""
     doc = frappe.get_doc("Buyback Inspection", inspection_name)
@@ -311,7 +371,7 @@ def start_inspection(inspection_name: str) -> dict:
     return {"name": doc.name, "status": doc.status}
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def complete_inspection(
     inspection_name: str,
     condition_grade: str,
@@ -399,7 +459,7 @@ def _carry_forward_lock_clearance(buyback_inspection: str | None, order_doc) -> 
         order_doc.account_lock_check_notes = row.account_lock_check_notes
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def create_order(
     customer: str,
     mobile_no: str,
@@ -414,8 +474,76 @@ def create_order(
     brand: str | None = None,
 ) -> dict:
     """Create a Buyback Order (submittable)."""
+    require_configured_role("order_operation_roles", action=_("create Buyback orders"))
     frappe.has_permission("Buyback Order", ptype="create", throw=True)
     mobile_no = validate_indian_phone(mobile_no, "Mobile No")
+
+    customer_doc = frappe.get_doc("Customer", customer)
+    customer_doc.check_permission("read")
+    item_doc = frappe.get_doc("Item", item)
+    item_doc.check_permission("read")
+    grade_doc = frappe.get_doc("Grade Master", condition_grade)
+    grade_doc.check_permission("read")
+    store_doc = frappe.get_doc("Warehouse", store)
+    store_doc.check_permission("read")
+    if store_doc.is_group and not store_doc.get("ch_is_buyback_enabled"):
+        frappe.throw(_("The selected store is not enabled for Buyback."), frappe.PermissionError)
+    company = store_doc.company
+    assert_buyback_scope(warehouse=store, company=company)
+
+    known_phones = {
+        validate_indian_phone(phone, "Customer Mobile")
+        for phone in (
+            customer_doc.get("mobile_no"),
+            customer_doc.get("ch_alternate_phone"),
+            customer_doc.get("ch_whatsapp_number"),
+        )
+        if phone
+    }
+    if known_phones and mobile_no not in known_phones:
+        frappe.throw(_("Mobile number does not match the selected Customer."), frappe.PermissionError)
+
+    authoritative_price = 0
+    if buyback_inspection:
+        inspection = frappe.get_doc("Buyback Inspection", buyback_inspection)
+        inspection.check_permission("read")
+        assert_buyback_scope(store=inspection.store, company=inspection.company)
+        if inspection.status != "Completed":
+            frappe.throw(_("Buyback Inspection must be completed before order creation."))
+        if inspection.customer != customer or inspection.item != item or inspection.store != store:
+            frappe.throw(_("Inspection customer, item and store must match the order."), frappe.PermissionError)
+        if buyback_assessment and inspection.buyback_assessment != buyback_assessment:
+            frappe.throw(_("Inspection does not belong to the selected assessment."), frappe.PermissionError)
+        buyback_assessment = inspection.buyback_assessment or buyback_assessment
+        authoritative_price = flt(inspection.revised_price) or flt(inspection.quoted_price)
+    elif buyback_assessment:
+        assessment = frappe.get_doc("Buyback Assessment", buyback_assessment)
+        assessment.check_permission("read")
+        assert_buyback_scope(store=assessment.store, company=assessment.company)
+        if assessment.status not in {"Submitted", "Inspection Created", "Inspected", "Quoted"}:
+            frappe.throw(_("Assessment is not ready for order creation."))
+        if assessment.customer != customer or assessment.item != item or assessment.store != store:
+            frappe.throw(_("Assessment customer, item and store must match the order."), frappe.PermissionError)
+        authoritative_price = flt(assessment.quoted_price) or flt(assessment.estimated_price)
+    else:
+        from buyback.buyback.pricing.engine import calculate_estimated_price
+
+        pricing = calculate_estimated_price(
+            item_code=item,
+            grade=condition_grade,
+            warranty_status=warranty_status,
+            brand=brand or item_doc.brand,
+            item_group=item_doc.item_group,
+        )
+        authoritative_price = flt(pricing.get("estimated_price"))
+
+    if authoritative_price <= 0:
+        frappe.throw(_("An authoritative Buyback price could not be resolved."))
+    if abs(flt(final_price) - authoritative_price) > 0.01:
+        frappe.throw(
+            _("Final price must match the assessment, inspection, or configured pricing result."),
+            frappe.PermissionError,
+        )
 
     # Market-standard store gate (Cashify partner stores, Samsung Exchange
     # authorized centres, Best Buy Trade-In stores): the target Warehouse must
@@ -445,9 +573,10 @@ def create_order(
             "customer": customer,
             "mobile_no": mobile_no,
             "store": store,
+            "company": company,
             "item": item,
             "condition_grade": condition_grade,
-            "final_price": flt(final_price),
+            "final_price": authoritative_price,
             "buyback_assessment": buyback_assessment,
             "buyback_inspection": buyback_inspection,
             "imei_serial": imei_serial,
@@ -474,7 +603,7 @@ def create_order(
 # ── Step 6: Approve / Reject Order ───────────────────────────────
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def approve_order(order_name: str, remarks: str | None = None) -> dict:
     """Manager approves a buyback order."""
     doc = frappe.get_doc("Buyback Order", order_name)
@@ -483,7 +612,7 @@ def approve_order(order_name: str, remarks: str | None = None) -> dict:
     return {"name": doc.name, "status": doc.status, "approved_by": doc.approved_by}
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def reject_order(order_name: str, remarks: str | None = None) -> dict:
     """Manager rejects a buyback order."""
     doc = frappe.get_doc("Buyback Order", order_name)
@@ -495,7 +624,7 @@ def reject_order(order_name: str, remarks: str | None = None) -> dict:
 # ── Customer Approval + Settlement ───────────────────────────────
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def customer_approve_offer(
     order_name: str,
     method: str = "In-Store Signature",
@@ -505,8 +634,12 @@ def customer_approve_offer(
     Required when inspection price differs from the original quoted price.
     """
     doc = frappe.get_doc("Buyback Order", order_name)
-    doc.check_permission("write")
-    doc.customer_approve(method)
+    require_scoped_document_action(
+        doc, "order_operation_roles", _("record customer Buyback approval")
+    )
+    if method != "In-Store Signature":
+        frappe.throw(_("Staff approval must use the in-store signature flow."), frappe.PermissionError)
+    doc.customer_approve("In-Store Signature")
     return {
         "name": doc.name,
         "status": doc.status,
@@ -515,19 +648,20 @@ def customer_approve_offer(
     }
 
 
-@frappe.whitelist(allow_guest=True)
+@frappe.whitelist(allow_guest=True, methods=["POST"])
 @rate_limit(limit=20, seconds=60, methods=["POST"], ip_based=True)
 def customer_approve_via_token(token: str, method: str = "SMS Link") -> dict:
     """Customer approves offer via the token-based approval link (no login).
 
     Used from the customer-facing approval page.
     """
-    order_name = _resolve_token(token)
+    method = validate_bounded_text(method, _("Approval Method"), 30, required=True)
+    order_name = _resolve_token(token, for_update=True)
 
     doc = frappe.get_doc("Buyback Order", order_name)
-    doc.flags.ignore_permissions = True
-    with _as_system_user():
-        doc.customer_approve(method)
+    if method != "SMS Link":
+        frappe.throw(_("Approval-link confirmations must use SMS Link."), frappe.PermissionError)
+    doc.customer_approve("SMS Link", token_authorized=True)
     return {
         "name": doc.name,
         "status": doc.status,
@@ -546,7 +680,7 @@ def _validate_customer_payout_inputs(
     payout_notes: str | None = None,
 ) -> dict:
     """Validate and normalize customer payout preference input."""
-    mode = (payout_mode or "").strip()
+    mode = validate_bounded_text(payout_mode, _("Payout Mode"), 30, required=True)
     allowed_modes = {"Cash", "UPI", "Bank Transfer"}
     if mode not in allowed_modes:
         frappe.throw(
@@ -556,13 +690,23 @@ def _validate_customer_payout_inputs(
 
     data = {
         "customer_payout_mode": mode,
-        "customer_cash_receiver_name": (cash_receiver_name or "").strip(),
-        "customer_upi_id": (upi_id or "").strip(),
-        "customer_bank_account_holder": (bank_account_holder or "").strip(),
-        "customer_bank_account_number": (bank_account_number or "").strip(),
-        "customer_bank_ifsc": (bank_ifsc or "").strip().upper(),
-        "customer_bank_name": (bank_name or "").strip(),
-        "customer_payout_notes": (payout_notes or "").strip(),
+        "customer_cash_receiver_name": validate_bounded_text(
+            cash_receiver_name, _("Receiver Name"), 140
+        ),
+        "customer_upi_id": validate_bounded_text(upi_id, _("UPI ID"), 140),
+        "customer_bank_account_holder": validate_bounded_text(
+            bank_account_holder, _("Account Holder Name"), 140
+        ),
+        "customer_bank_account_number": validate_bounded_text(
+            bank_account_number, _("Account Number"), 34
+        ),
+        "customer_bank_ifsc": validate_bounded_text(
+            bank_ifsc, _("IFSC Code"), 11
+        ).upper(),
+        "customer_bank_name": validate_bounded_text(bank_name, _("Bank Name"), 140),
+        "customer_payout_notes": validate_bounded_text(
+            payout_notes, _("Payout Notes"), 500
+        ),
     }
 
     if mode == "Cash" and not data["customer_cash_receiver_name"]:
@@ -570,14 +714,41 @@ def _validate_customer_payout_inputs(
             _("Receiver name is required for Cash payout."),
             exc=BuybackValidationError,
         )
+    if mode == "Cash":
+        data.update(
+            {
+                "customer_upi_id": "",
+                "customer_bank_account_holder": "",
+                "customer_bank_account_number": "",
+                "customer_bank_ifsc": "",
+                "customer_bank_name": "",
+            }
+        )
 
     if mode == "UPI" and not data["customer_upi_id"]:
         frappe.throw(
             _("UPI ID is required for UPI payout."),
             exc=BuybackValidationError,
         )
+    if data["customer_upi_id"] and not re.fullmatch(
+        r"[A-Za-z0-9._-]{2,100}@[A-Za-z][A-Za-z0-9._-]{1,38}",
+        data["customer_upi_id"],
+    ):
+        frappe.throw(_("Enter a valid UPI ID."), exc=BuybackValidationError)
+    if mode == "UPI":
+        data.update(
+            {
+                "customer_cash_receiver_name": "",
+                "customer_bank_account_holder": "",
+                "customer_bank_account_number": "",
+                "customer_bank_ifsc": "",
+                "customer_bank_name": "",
+            }
+        )
 
     if mode == "Bank Transfer":
+        data["customer_cash_receiver_name"] = ""
+        data["customer_upi_id"] = ""
         missing = []
         if not data["customer_bank_account_holder"]:
             missing.append(_("Account Holder Name"))
@@ -590,42 +761,18 @@ def _validate_customer_payout_inputs(
                 _("Missing required bank details: {0}").format(", ".join(missing)),
                 exc=BuybackValidationError,
             )
+        if not re.fullmatch(r"[0-9]{6,34}", data["customer_bank_account_number"]):
+            frappe.throw(
+                _("Bank account number must contain 6 to 34 digits."),
+                exc=BuybackValidationError,
+            )
+        if not re.fullmatch(r"[A-Z]{4}0[A-Z0-9]{6}", data["customer_bank_ifsc"]):
+            frappe.throw(_("Enter a valid IFSC code."), exc=BuybackValidationError)
 
     return data
 
 
-def _normalize_kyc_id_type(id_type: str | None) -> str:
-    """Normalize incoming KYC ID labels to Buyback Order select options."""
-    raw = (id_type or "").strip()
-    if not raw:
-        return ""
-
-    alias_map = {
-        "aadhaar": "Aadhar Card",
-        "aadhar": "Aadhar Card",
-        "aadhar card": "Aadhar Card",
-        "aadhaar card": "Aadhar Card",
-        "pan": "PAN Card",
-        "pan card": "PAN Card",
-        "driving licence": "Driving License",
-        "driving license": "Driving License",
-        "voter id": "Voter ID",
-        "passport": "Passport",
-    }
-    normalized = alias_map.get(raw.casefold(), raw)
-
-    allowed = {"Aadhar Card", "PAN Card", "Driving License", "Voter ID", "Passport"}
-    if normalized not in allowed:
-        frappe.throw(
-            _("Invalid ID Proof Type. Allowed values: {0}").format(
-                ", ".join(sorted(allowed))
-            ),
-            exc=BuybackValidationError,
-        )
-    return normalized
-
-
-@frappe.whitelist(allow_guest=True)
+@frappe.whitelist(allow_guest=True, methods=["POST"])
 @rate_limit(limit=20, seconds=60, methods=["POST"], ip_based=True)
 def save_customer_payout_preference(
     token: str,
@@ -643,7 +790,11 @@ def save_customer_payout_preference(
     This captures customer payout preference for the accounts team before
     payment processing.
     """
-    order_name = _resolve_token(token, require_payout_editable=True)
+    order_name = _resolve_token(
+        token,
+        require_payout_editable=True,
+        for_update=True,
+    )
 
     doc = frappe.get_doc("Buyback Order", order_name)
     allowed_status = {"Approved", "Awaiting Customer Approval", "Awaiting OTP", "OTP Verified"}
@@ -675,13 +826,16 @@ def save_customer_payout_preference(
         "customer_payout_notes": doc.customer_payout_notes,
     }
 
-    doc.flags.ignore_permissions = True
-    for key, value in data.items():
-        setattr(doc, key, value)
-    doc.customer_payout_updated_at = now_datetime()
-    doc.customer_payout_updated_by = "Customer (via approval link)"
-    with _as_system_user():
-        doc.save(ignore_permissions=True)
+    updated_at = now_datetime()
+    doc.db_set(
+        {
+            **data,
+            "customer_payout_updated_at": updated_at,
+            "customer_payout_updated_by": "Customer (via approval link)",
+        },
+        update_modified=True,
+    )
+    doc.reload()
 
     new_values = {
         "customer_payout_mode": doc.customer_payout_mode,
@@ -698,8 +852,8 @@ def save_customer_payout_preference(
             "Customer Payout Updated",
             "Buyback Order",
             doc.name,
-            old_value=old_values,
-            new_value=new_values,
+            old_value=_payout_audit_snapshot(old_values),
+            new_value=_payout_audit_snapshot(new_values),
             reason="Updated via approval link",
         )
 
@@ -711,7 +865,7 @@ def save_customer_payout_preference(
     }
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def select_settlement_type(
     order_name: str,
     settlement_type: str,
@@ -727,7 +881,9 @@ def select_settlement_type(
         new_device_price: Optional — price of new device (auto-fetched if omitted)
     """
     doc = frappe.get_doc("Buyback Order", order_name)
-    doc.check_permission("write")
+    require_scoped_document_action(
+        doc, "order_operation_roles", _("select a Buyback settlement type")
+    )
     doc.select_settlement_type(
         settlement_type,
         new_item=new_item,
@@ -745,7 +901,7 @@ def select_settlement_type(
 # ── Step 7: OTP Verification ─────────────────────────────────────
 
 
-@frappe.whitelist(allow_guest=True)
+@frappe.whitelist(allow_guest=True, methods=["POST"])
 @rate_limit(limit=3, seconds=300, methods=["POST"], ip_based=True)
 def send_otp(order_name: str = None, token: str = None) -> dict:
     """Send OTP for buyback order confirmation.
@@ -758,93 +914,111 @@ def send_otp(order_name: str = None, token: str = None) -> dict:
         order_name = _resolve_token(token)
     elif not order_name:
         frappe.throw(_("order_name or token is required."))
+    elif frappe.session.user == "Guest":
+        frappe.throw(_("An approval token is required."), frappe.PermissionError)
+    else:
+        order_name = validate_bounded_text(
+            order_name, _("Buyback Order"), 140, required=True
+        )
 
-    # Per-order send cap (defends against multi-IP rate-limit bypass).
-    send_key = f"otp_send:{order_name}"
-    sent = int(frappe.cache().get_value(send_key) or 0)
-    if sent >= 5:
+    doc = frappe.get_doc("Buyback Order", order_name)
+    if not token:
+        doc.check_permission("write")
+
+    # Reserve the per-order send before dispatch. Redis INCRBY prevents
+    # parallel workers from all observing the same stale count.
+    sent = increment_fixed_window("otp-send", order_name, 3600)
+    send_limit = get_int_setting("otp_send_limit_per_hour", 5)
+    if sent > send_limit:
         frappe.throw(
             _("OTP send limit reached for this order. Please contact the store."),
             frappe.PermissionError,
             title=_("Rate Limit Exceeded"),
         )
+    doc.send_otp(token_authorized=bool(token))
 
-    doc = frappe.get_doc("Buyback Order", order_name)
-    if not token:
-        doc.check_permission("write")
-    doc.flags.ignore_permissions = True
-    with _as_system_user():
-        doc.send_otp()
-
-    frappe.cache().set_value(send_key, sent + 1, expires_in_sec=3600)
     # NEVER echo the full mobile number — leaks PII to anyone with a token.
     return {"status": "sent", "message": _("OTP sent to {0}").format(_mask_phone(doc.mobile_no))}
 
 
-@frappe.whitelist(allow_guest=True)
+@frappe.whitelist(allow_guest=True, methods=["POST"])
 @rate_limit(limit=10, seconds=300, methods=["POST"], ip_based=True)
 def verify_otp(order_name: str = None, otp_code: str = "", token: str = None) -> dict:
     """Verify customer OTP for a buyback order.
 
     Accepts either order_name (for logged-in users) or token (for guest approval page).
-    Two-tier rate limit:
-      - Per (order, IP) : 5 attempts / 15 min  (defeats single-host brute force)
-      - Per order       : 20 attempts / 15 min (defeats multi-IP brute force)
+    Attempt limits and the counter window are read from Buyback Settings.
     """
+    otp_code = validate_bounded_text(otp_code, _("OTP"), 10, required=True)
     if token:
         order_name = _resolve_token(token)
     elif not order_name:
         frappe.throw(_("order_name or token is required."))
+    elif frappe.session.user == "Guest":
+        frappe.throw(_("An approval token is required."), frappe.PermissionError)
+    else:
+        order_name = validate_bounded_text(
+            order_name, _("Buyback Order"), 140, required=True
+        )
 
     source_ip = frappe.local.request.remote_addr if frappe.local.request else "unknown"
 
-    # Per-order+IP attempt counter — 5 per 15 min
-    ip_key = f"otp_attempts:{order_name}:{source_ip}"
-    ip_attempts = int(frappe.cache().get_value(ip_key) or 0)
-    if ip_attempts >= 5:
-        frappe.throw(
-            _("Too many OTP attempts from this IP. Please wait 15 minutes."),
-            frappe.PermissionError,
-            title=_("Rate Limit Exceeded"),
-        )
-
-    # Per-order global counter — 20 per 15 min (defeats multi-IP attacker)
-    order_key = f"otp_attempts:{order_name}"
-    order_attempts = int(frappe.cache().get_value(order_key) or 0)
-    if order_attempts >= 20:
-        frappe.throw(
-            _("Too many OTP attempts for this order. "
-              "Please wait 15 minutes before trying again."),
-            frappe.PermissionError,
-            title=_("Rate Limit Exceeded"),
-        )
+    ip_attempt_limit = get_int_setting("otp_attempt_limit_per_ip", 5)
+    order_attempt_limit = get_int_setting("otp_attempt_limit_per_order", 20)
+    attempt_window_minutes = get_int_setting("otp_attempt_window_minutes", 15)
+    attempt_window_seconds = attempt_window_minutes * 60
 
     doc = frappe.get_doc("Buyback Order", order_name)
     if not token:
         doc.check_permission("write")
-    doc.flags.ignore_permissions = True
-    with _as_system_user():
-        result = doc.verify_otp(otp_code)
+
+    # Reserve both attempts before verifying. This closes the check/update
+    # race while preserving the per-order+IP and global per-order scopes.
+    ip_identity = f"{order_name}:{source_ip}"
+    ip_attempts = increment_fixed_window(
+        "otp-verify-ip", ip_identity, attempt_window_seconds
+    )
+    if ip_attempts > ip_attempt_limit:
+        frappe.throw(
+            _("Too many OTP attempts from this IP. Please wait {0} minutes.").format(
+                attempt_window_minutes
+            ),
+            frappe.PermissionError,
+            title=_("Rate Limit Exceeded"),
+        )
+
+    order_attempts = increment_fixed_window(
+        "otp-verify-order", order_name, attempt_window_seconds
+    )
+    if order_attempts > order_attempt_limit:
+        frappe.throw(
+            _("Too many OTP attempts for this order. "
+              "Please wait {0} minutes before trying again.").format(
+                attempt_window_minutes
+            ),
+            frappe.PermissionError,
+            title=_("Rate Limit Exceeded"),
+        )
+
+    result = doc.verify_otp(otp_code)
 
     if result.get("valid"):
         # Clear counters on successful verification
-        frappe.cache().delete_value(ip_key)
-        frappe.cache().delete_value(order_key)
-    else:
-        # Increment both counters
-        frappe.cache().set_value(ip_key, ip_attempts + 1, expires_in_sec=900)
-        frappe.cache().set_value(order_key, order_attempts + 1, expires_in_sec=900)
+        clear_fixed_window("otp-verify-ip", ip_identity)
+        clear_fixed_window("otp-verify-order", order_name)
 
     return result
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def resend_customer_approval_link(order_name: str, reason: str | None = None) -> dict:
     """Regenerate and resend approval link, keeping an audit history."""
     from buyback.buyback.whatsapp_notifications import _notify_awaiting_customer_approval
 
     doc = frappe.get_doc("Buyback Order", order_name)
-    doc.check_permission("write")
+    require_scoped_document_action(
+        doc, "order_operation_roles", _("resend a customer approval link")
+    )
 
     if doc.status not in {"Approved", "Awaiting Customer Approval", "Awaiting OTP", "OTP Verified"}:
         frappe.throw(
@@ -853,9 +1027,12 @@ def resend_customer_approval_link(order_name: str, reason: str | None = None) ->
         )
 
     old_token = doc.approval_token
-    doc.flags.ignore_permissions = True
+    doc.flags.ch_token_rotation_authorized = True
     doc.approval_token = frappe.generate_hash(length=32)
-    doc.save(ignore_permissions=True)
+    doc.approval_token_digest = hashlib.sha256(doc.approval_token.encode()).hexdigest()
+    if doc.meta.has_field("approval_token_issued_at"):
+        doc.approval_token_issued_at = now_datetime()
+    doc.save()
 
     phone = doc.mobile_no
     if phone:
@@ -866,8 +1043,8 @@ def resend_customer_approval_link(order_name: str, reason: str | None = None) ->
         "Customer Approval Link Resent",
         "Buyback Order",
         doc.name,
-        old_value={"approval_token": old_token},
-        new_value={"approval_token": doc.approval_token, "approval_url": approval_url},
+        old_value={"had_active_token": bool(old_token)},
+        new_value={"token_rotated": True, "issued_at": str(now_datetime())},
         reason=(reason or "Manual resend from desk"),
     )
 
@@ -879,14 +1056,16 @@ def resend_customer_approval_link(order_name: str, reason: str | None = None) ->
     }
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def request_price_exception(order_name: str, requested_price: float | str, reason: str) -> dict:
     """Raise a manager-governed exception for negotiated buyback price changes."""
     if not reason or not str(reason).strip():
         frappe.throw(_("Reason is required to request a price exception."), exc=BuybackValidationError)
 
     doc = frappe.get_doc("Buyback Order", order_name)
-    doc.check_permission("write")
+    require_scoped_document_action(
+        doc, "order_operation_roles", _("request a Buyback price exception")
+    )
 
     current_price = flt(doc.final_price)
     requested = flt(requested_price)
@@ -942,7 +1121,7 @@ def request_price_exception(order_name: str, requested_price: float | str, reaso
 # ── Step 8: Payment ──────────────────────────────────────────────
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def record_payment(
     order_name: str,
     payment_method: str,
@@ -1003,7 +1182,9 @@ def record_payment(
         )
 
     doc = frappe.get_doc("Buyback Order", order_name)
-    doc.check_permission("write")
+    require_scoped_document_action(
+        doc, "payment_operation_roles", _("record a Buyback payment")
+    )
 
     # ── Idempotency on (method, reference) ───────────────────────
     if ref:
@@ -1030,6 +1211,8 @@ def record_payment(
             "payment_date": frappe.utils.now_datetime(),
         },
     )
+    doc.flags.ch_evidence_update_authorized = True
+    doc._refresh_lifecycle_evidence()
     doc.save()
 
     if doc.payment_status == "Paid":
@@ -1047,11 +1230,13 @@ def record_payment(
 # ── Step 9: Close Order ──────────────────────────────────────────
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def close_order(order_name: str) -> dict:
     """Close a fully paid buyback order."""
     doc = frappe.get_doc("Buyback Order", order_name)
-    doc.check_permission("write")
+    require_scoped_document_action(
+        doc, "order_operation_roles", _("close a Buyback order")
+    )
     doc.close()
     return {"name": doc.name, "status": doc.status}
 
@@ -1059,7 +1244,7 @@ def close_order(order_name: str) -> dict:
 # ── Exchange Endpoints (DEPRECATED — use select_settlement_type) ──
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def create_exchange(
     buyback_order: str,
     customer: str,
@@ -1085,8 +1270,24 @@ def create_exchange(
         DeprecationWarning,
         stacklevel=2,
     )
+    require_configured_role("exchange_creation_roles", action=_("create Buyback exchanges"))
     frappe.has_permission("Buyback Exchange Order", ptype="create", throw=True)
     mobile_no = validate_indian_phone(mobile_no, "Mobile No")
+    source_order = frappe.get_doc("Buyback Order", buyback_order)
+    source_order.check_permission("read")
+    assert_buyback_scope(store=source_order.store, company=source_order.company)
+    if (
+        source_order.customer != customer
+        or source_order.store != store
+        or source_order.item != old_item
+        or abs(flt(source_order.final_price) - flt(buyback_amount)) > 0.01
+    ):
+        frappe.throw(
+            _("Exchange customer, store, old item and Buyback amount must match the source order."),
+            frappe.PermissionError,
+        )
+    new_item_doc = frappe.get_doc("Item", new_item)
+    new_item_doc.check_permission("read")
 
     doc = frappe.get_doc(
         {
@@ -1116,7 +1317,7 @@ def create_exchange(
     }
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def advance_exchange(exchange_name: str, action: str) -> dict:
     """Advance an exchange order through its workflow.
 
@@ -1124,7 +1325,9 @@ def advance_exchange(exchange_name: str, action: str) -> dict:
         action: one of 'deliver', 'receive', 'inspect', 'settle', 'close'
     """
     doc = frappe.get_doc("Buyback Exchange Order", exchange_name)
-    doc.check_permission("write")
+    require_scoped_document_action(
+        doc, "exchange_creation_roles", _("advance a Buyback exchange")
+    )
 
     actions = {
         "deliver": doc.deliver_new_device,
@@ -1148,7 +1351,7 @@ def advance_exchange(exchange_name: str, action: str) -> dict:
 # ── Master Data Lookups (for mobile app) ─────────────────────────
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def submit_mobile_diagnostic(
     mobile_no: str,
     item_code: str,
@@ -1181,10 +1384,21 @@ def submit_mobile_diagnostic(
     Returns:
         dict with inspection name, inspection_id, status
     """
+    require_configured_role(
+        "assessment_operation_roles", action=_("submit a mobile Buyback diagnostic")
+    )
     frappe.has_permission("Buyback Inspection", ptype="create", throw=True)
+    frappe.has_permission("Item", ptype="read", throw=True)
     mobile_no = validate_indian_phone(mobile_no, "Mobile No")
 
     diag_list = json.loads(diagnostic_results) if isinstance(diagnostic_results, str) else diagnostic_results
+    if not isinstance(diag_list, list):
+        frappe.throw(_("Diagnostic results must be a list."))
+    diagnostic_limit = min(get_int_setting("max_diagnostic_rows", 100), 500)
+    if not diag_list or len(diag_list) > diagnostic_limit:
+        frappe.throw(_("Diagnostic results must contain between 1 and {0} rows.").format(diagnostic_limit))
+    if any(not isinstance(row, dict) for row in diag_list):
+        frappe.throw(_("Every diagnostic result must be an object."))
 
     # Look up customer by mobile number
     customer = frappe.db.get_value("Customer", {"mobile_no": mobile_no}, "name")
@@ -1196,8 +1410,13 @@ def submit_mobile_diagnostic(
     store_name = None
     company = None
     if store:
+        store_doc = frappe.get_doc("Warehouse", store)
+        store_doc.check_permission("read")
         store_name = store
-        company = frappe.db.get_value("Warehouse", store, "company")
+        company = store_doc.company
+    if not store_name and not is_privileged_user():
+        frappe.throw(_("Store is required."), frappe.PermissionError)
+    assert_buyback_scope(warehouse=store_name, company=company)
 
     # Build inspection result rows from diagnostic data
     result_rows = []
@@ -1277,20 +1496,42 @@ def get_inspections_by_phone(mobile_no: str) -> list[dict]:
     Used by store agents to find pending mobile diagnostics that need
     physical inspection.
     """
+    require_configured_role("customer_lookup_roles", action=_("find customer inspections"))
+    for doctype in ("Buyback Inspection", "Customer", "Item"):
+        if not frappe.has_permission(doctype, ptype="read"):
+            frappe.throw(
+                _("You do not have read permission for {0}.").format(doctype),
+                frappe.PermissionError,
+            )
     mobile_no = validate_indian_phone(mobile_no, "Mobile No")
-    return frappe.get_all(
-        "Buyback Inspection",
-        filters={"mobile_no": mobile_no},
-        fields=[
-            "name", "inspection_id", "customer", "customer_name",
-            "item", "item_name", "status", "diagnostic_source",
-            "mobile_diagnostic_id", "creation",
-        ],
-        order_by="creation desc",
+    scope_sql, scope_params = build_buyback_scope_sql(
+        store_field="bi.store",
+        company_field="bi.company",
+        prefix="inspection_lookup",
+    )
+    params = {
+        "mobile_no": mobile_no,
+        "limit": get_int_setting("customer_lookup_limit", 50),
+        **scope_params,
+    }
+    return frappe.db.sql(
+        f"""
+        SELECT
+            bi.name, bi.inspection_id, bi.customer, bi.customer_name,
+            bi.item, bi.item_name, bi.status, bi.diagnostic_source,
+            bi.mobile_diagnostic_id, bi.creation
+        FROM `tabBuyback Inspection` bi
+        WHERE bi.mobile_no = %(mobile_no)s
+          AND ({scope_sql})
+        ORDER BY bi.creation DESC
+        LIMIT %(limit)s
+        """,
+        params,
+        as_dict=True,
     )
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def submit_imei_validation(order_name: str, status: str, screenshot: str | None = None,
                             remarks: str | None = None) -> dict:
     """Record the manual Sanchar Saathi (CEIR) IMEI check result for a Buyback Order.
@@ -1306,11 +1547,13 @@ def submit_imei_validation(order_name: str, status: str, screenshot: str | None 
     return doc.submit_imei_validation(status=status, screenshot=screenshot, remarks=remarks)
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def verify_kyc(order_name: str) -> dict:
     """Verify KYC documents for a buyback order."""
     doc = frappe.get_doc("Buyback Order", order_name)
-    doc.check_permission("write")
+    require_scoped_document_action(
+        doc, "order_operation_roles", _("verify Buyback KYC")
+    )
     doc.verify_kyc()
     return {
         "name": doc.name,
@@ -1337,10 +1580,55 @@ def _get_question_applicable_categories(question_name: str, legacy_category: str
     return []
 
 
+def _get_question_categories(question_names: list[str]) -> dict[str, set[str]]:
+    """Batch-load the applicable Item Groups for Question Bank rows."""
+    names = list(dict.fromkeys(name for name in question_names if name))
+    if not names:
+        return {}
+    categories: dict[str, set[str]] = {name: set() for name in names}
+    for row in frappe.get_all(
+        "Buyback Question Applicable Category",
+        filters={
+            "parent": ["in", names],
+            "parenttype": "Buyback Question Bank",
+            "parentfield": "applies_to_categories",
+        },
+        fields=["parent", "item_group"],
+    ):
+        if row.item_group:
+            categories.setdefault(row.parent, set()).add(row.item_group)
+    return categories
+
+
+def _get_options_by_question(question_names: list[str]) -> dict[str, list[dict]]:
+    """Batch-load ordered options for a set of Question Bank rows."""
+    names = list(dict.fromkeys(name for name in question_names if name))
+    if not names:
+        return {}
+    options: dict[str, list[dict]] = {name: [] for name in names}
+    for row in frappe.get_all(
+        "Buyback Question Option",
+        filters={"parent": ["in", names]},
+        fields=[
+            "parent", "option_label", "option_value",
+            "price_impact_percent", "is_default", "idx",
+        ],
+        order_by="parent asc, idx asc",
+    ):
+        options.setdefault(row.parent, []).append({
+            "option_label": row.option_label,
+            "option_value": row.option_value,
+            "price_impact_percent": row.price_impact_percent,
+            "is_default": row.is_default,
+        })
+    return options
+
+
 @frappe.whitelist()
 def get_questions(category: str | None = None) -> list[dict]:
     """Get active questions for a category (or all)."""
-    questions = frappe.get_all(
+    _require_app_read(_("view Buyback questions"), "Buyback Question Bank")
+    questions = frappe.get_list(
         "Buyback Question Bank",
         filters={"disabled": 0},
         fields=[
@@ -1348,26 +1636,26 @@ def get_questions(category: str | None = None) -> list[dict]:
             "question_type", "display_order", "is_mandatory", "applies_to_category",
         ],
         order_by="display_order asc, question_id asc",
+        limit_page_length=500,
     )
 
+    question_names = [q["name"] for q in questions]
     if category:
+        categories = _get_question_categories(question_names)
         filtered = []
         for q in questions:
-            applicable = _get_question_applicable_categories(q["name"], q.get("applies_to_category"))
+            applicable = categories.get(q["name"]) or (
+                {q.get("applies_to_category")} if q.get("applies_to_category") else set()
+            )
             # No category set means "global" question, applicable to all categories.
             if not applicable or category in applicable:
                 filtered.append(q)
         questions = filtered
 
-    # Attach options
+    options_by_question = _get_options_by_question([q["name"] for q in questions])
     for q in questions:
         q.pop("applies_to_category", None)
-        q["options"] = frappe.get_all(
-            "Buyback Question Option",
-            filters={"parent": q["name"]},
-            fields=["option_label", "option_value", "price_impact_percent", "is_default"],
-            order_by="idx asc",
-        )
+        q["options"] = options_by_question.get(q["name"], [])
 
     return questions
 
@@ -1375,11 +1663,13 @@ def get_questions(category: str | None = None) -> list[dict]:
 @frappe.whitelist()
 def get_grades() -> list[dict]:
     """Get all active grades."""
-    return frappe.get_all(
+    _require_app_read(_("view Buyback grades"), "Grade Master")
+    return frappe.get_list(
         "Grade Master",
         filters={"disabled": 0},
         fields=["name", "grade_id", "grade_name", "description", "display_order"],
         order_by="display_order asc",
+        limit_page_length=100,
     )
 
 
@@ -1389,13 +1679,27 @@ def get_stores(
     buyback_enabled: int | str | None = None,
 ) -> list[dict]:
     """Get active stores, optionally filtered."""
+    _require_app_read(_("view Buyback stores"), "Warehouse")
     filters: dict = {"disabled": 0, "is_group": 0}
     if company:
         filters["company"] = company
     if buyback_enabled:
         filters["ch_is_buyback_enabled"] = 1
 
-    return frappe.get_all(
+    scope = get_buyback_data_scope()
+    if not scope["bypass"]:
+        locations = sorted(scope["warehouses"] | scope["stores"])
+        companies = sorted(scope["companies"])
+        if locations:
+            filters["name"] = ["in", locations]
+        elif companies:
+            filters["company"] = ["in", companies]
+        else:
+            return []
+        if company and company not in companies and not locations:
+            frappe.throw(_("Company is outside your configured scope."), frappe.PermissionError)
+
+    return frappe.get_list(
         "Warehouse",
         filters=filters,
         fields=[
@@ -1404,32 +1708,25 @@ def get_stores(
             "company", "city", "state", "pin as pincode",
         ],
         order_by="warehouse_name asc",
+        limit_page_length=200,
     )
 
 
 @frappe.whitelist()
 def get_payment_methods() -> list[dict]:
     """Get active payment methods (standard ERPNext Mode of Payment)."""
-    return frappe.get_all(
+    _require_app_read(_("view Buyback payment methods"), "Mode of Payment")
+    return frappe.get_list(
         "Mode of Payment",
         filters={"enabled": 1},
         fields=["name", "mode_of_payment", "type"],
         order_by="name asc",
+        limit_page_length=100,
     )
 
 
 # ── Helpers ───────────────────────────────────────────────────────
 
-
-def _get_question_name(question_code: str | None) -> str | None:
-    """Look up Buyback Question Bank name from question_code."""
-    if not question_code:
-        return None
-    return frappe.db.get_value(
-        "Buyback Question Bank",
-        {"question_code": question_code},
-        "name",
-    )
 
 def _map_diagnostic_to_responses(diag_list: list[dict]) -> list[dict]:
     """Map mobile diagnostic results to question-style responses for pricing.
@@ -1440,6 +1737,16 @@ def _map_diagnostic_to_responses(diag_list: list[dict]) -> list[dict]:
     We attempt to match diagnostic codes to question bank codes.
     Unmatched diagnostics are skipped (pricing engine ignores unknown codes).
     """
+    codes = list(dict.fromkeys(
+        str(d.get("code") or "").strip()
+        for d in (diag_list or [])
+        if isinstance(d, dict) and str(d.get("code") or "").strip()
+    ))
+    valid_codes = set(frappe.get_all(
+        "Buyback Question Bank",
+        filters={"question_code": ["in", codes], "disabled": 0},
+        pluck="question_code",
+    )) if codes else set()
     responses = []
     for d in diag_list:
         code = d.get("code", "")
@@ -1447,7 +1754,7 @@ def _map_diagnostic_to_responses(diag_list: list[dict]) -> list[dict]:
         # Map Pass/Fail to yes/no answer values
         answer = "yes" if status == "pass" else "no" if status == "fail" else status
         # Only include if a matching question code exists
-        if code and frappe.db.exists("Buyback Question Bank", {"question_code": code}):
+        if code in valid_codes:
             responses.append({"question_code": code, "answer_value": answer})
     return responses
 
@@ -1470,6 +1777,7 @@ def search_items(
     Used by the mobile app to browse/search buyback-eligible items.
     Returns items with all hierarchy IDs for API consumption.
     """
+    _require_app_read(_("search Buyback items"), "Item")
     filters: dict = {"disabled": 0, "is_stock_item": 1}
     if brand:
         filters["brand"] = brand
@@ -1490,7 +1798,8 @@ def search_items(
             "ch_display_name": ["like", f"%{search_text}%"],
         }
 
-    return frappe.get_all(
+    result_limit = min(max(int(limit or 20), 1), 50)
+    return frappe.get_list(
         "Item",
         filters=filters,
         or_filters=or_filters or None,
@@ -1502,7 +1811,7 @@ def search_items(
             "ch_item_group_id", "image",
         ],
         order_by="item_name asc",
-        limit_page_length=int(limit),
+        limit_page_length=result_limit,
     )
 
 
@@ -1511,17 +1820,30 @@ def search_items(
 
 @frappe.whitelist()
 def get_assessments_by_phone(mobile_no: str) -> list[dict]:
-    """Look up all Buyback Assessments for a given mobile number."""
+    """Look up Buyback Assessments within the caller's assigned stores."""
+    require_configured_role("customer_lookup_roles", action=_("look up buyback customers"))
+    frappe.has_permission("Buyback Assessment", "read", throw=True)
     mobile_no = validate_indian_phone(mobile_no, "Mobile No")
-    return frappe.get_all(
-        "Buyback Assessment",
-        filters={"mobile_no": mobile_no},
-        fields=[
-            "name", "assessment_id", "source", "item",
-            "estimated_grade", "estimated_price", "status",
-            "buyback_inspection", "expires_on", "creation",
-        ],
-        order_by="creation desc",
+    return _query_assessments_by_phone(mobile_no, enforce_user_scope=True)
+
+
+def _query_assessments_by_phone(mobile_no: str, *, enforce_user_scope: bool, limit: int = 50) -> list[dict]:
+    scope_sql, scope_params = ("1=1", {})
+    if enforce_user_scope:
+        scope_sql, scope_params = build_buyback_scope_sql(
+            store_field="ba.store", company_field="ba.company", prefix="assessment_phone"
+        )
+    limit = min(max(int(limit or 1), 1), get_int_setting("customer_lookup_limit", 50))
+    return frappe.db.sql(
+        f"""SELECT ba.name, ba.assessment_id, ba.source, ba.item,
+                   ba.estimated_grade, ba.estimated_price, ba.status,
+                   ba.buyback_inspection, ba.expires_on, ba.creation
+              FROM `tabBuyback Assessment` ba
+             WHERE ba.mobile_no = %(mobile_no)s AND {scope_sql}
+             ORDER BY ba.creation DESC
+             LIMIT {limit}""",
+        {"mobile_no": mobile_no, **scope_params},
+        as_dict=True,
     )
 
 
@@ -1531,18 +1853,43 @@ def get_orders_by_phone(mobile_no: str) -> list[dict]:
 
     Used by store agents to find existing orders for a customer.
     """
+    require_configured_role("customer_lookup_roles", action=_("look up buyback customers"))
+    frappe.has_permission("Buyback Order", "read", throw=True)
     mobile_no = validate_indian_phone(mobile_no, "Mobile No")
-    return frappe.get_all(
-        "Buyback Order",
-        filters={"mobile_no": mobile_no},
-        fields=[
-            "name", "order_id", "customer", "customer_name",
-            "item", "item_name", "imei_serial", "final_price",
-            "condition_grade", "status", "payment_status",
-            "workflow_state", "creation",
-        ],
-        order_by="creation desc",
+    return _query_orders_by_phone(mobile_no, enforce_user_scope=True)
+
+
+def _query_orders_by_phone(mobile_no: str, *, enforce_user_scope: bool, limit: int = 50) -> list[dict]:
+    scope_sql, scope_params = ("1=1", {})
+    if enforce_user_scope:
+        scope_sql, scope_params = build_buyback_scope_sql(
+            store_field="bo.store", company_field="bo.company", prefix="order_phone"
+        )
+    limit = min(max(int(limit or 1), 1), get_int_setting("customer_lookup_limit", 50))
+    return frappe.db.sql(
+        f"""SELECT bo.name, bo.order_id, bo.customer, bo.customer_name,
+                   bo.item, bo.item_name, bo.imei_serial, bo.final_price,
+                   bo.condition_grade, bo.status, bo.payment_status,
+                   bo.workflow_state, bo.creation
+              FROM `tabBuyback Order` bo
+             WHERE bo.mobile_no = %(mobile_no)s AND {scope_sql}
+             ORDER BY bo.creation DESC
+             LIMIT {limit}""",
+        {"mobile_no": mobile_no, **scope_params},
+        as_dict=True,
     )
+
+
+def get_customer_portal_buyback_history(mobile_no: str, limit: int = 20) -> dict:
+    """Private helper for an already OTP-authenticated customer portal session."""
+    mobile_no = validate_indian_phone(mobile_no, "Mobile No")
+    limit = min(max(int(limit or 1), 1), 20)
+    return {
+        "assessments": _query_assessments_by_phone(
+            mobile_no, enforce_user_scope=False, limit=limit
+        ),
+        "orders": _query_orders_by_phone(mobile_no, enforce_user_scope=False, limit=limit),
+    }
 
 
 # ── IMEI History API ────────────────────────────────────────────
@@ -1556,6 +1903,7 @@ def get_imei_history(imei: str) -> dict:
     and returns a unified timeline view. Reuses ERPNext's Serial No
     DocType — no separate IMEI History DocType needed.
     """
+    require_configured_role("imei_history_roles", action=_("view IMEI history"))
     from buyback.serial_no_utils import get_imei_history as _get_history
     return _get_history(imei)
 
@@ -1572,12 +1920,7 @@ def get_buyback_approval_details(token: str) -> dict:
     Customer sees: item details, price, store, photos, and can
     trigger OTP verification from the approval page.
     """
-    order_name = frappe.db.get_value(
-        "Buyback Order", {"approval_token": token, "docstatus": ["!=", 2]}, "name"
-    )
-    if not order_name:
-        frappe.throw(_("Invalid or expired approval link."), exc=frappe.DoesNotExistError, title=_("API Error"))
-
+    order_name = _resolve_token(token)
     order = frappe.get_doc("Buyback Order", order_name)
 
     return {
@@ -1599,22 +1942,18 @@ def get_buyback_approval_details(token: str) -> dict:
         "device_photo_back": order.device_photo_back,
         "otp_verified": order.otp_verified,
         "warranty_status": order.warranty_status,
+        "mobile_no_masked": _mask_phone(order.mobile_no),
         "customer_payout_mode": order.customer_payout_mode,
-        "customer_cash_receiver_name": order.customer_cash_receiver_name,
-        "customer_upi_id": order.customer_upi_id,
-        "customer_bank_account_holder": order.customer_bank_account_holder,
-        "customer_bank_account_number": order.customer_bank_account_number,
-        "customer_bank_ifsc": order.customer_bank_ifsc,
+        "customer_cash_receiver_name_masked": _mask_name(order.customer_cash_receiver_name),
+        "customer_upi_id_masked": _mask_upi(order.customer_upi_id),
+        "customer_bank_account_holder_masked": _mask_name(order.customer_bank_account_holder),
+        "customer_bank_account_number_masked": _mask_identifier(order.customer_bank_account_number),
+        "customer_bank_ifsc_masked": _mask_identifier(order.customer_bank_ifsc, visible=3),
         "customer_bank_name": order.customer_bank_name,
-        "customer_payout_notes": order.customer_payout_notes,
         "customer_payout_updated_at": str(order.customer_payout_updated_at) if order.customer_payout_updated_at else "",
-        "customer_photo": order.customer_photo,
         "customer_id_type": order.customer_id_type,
-        "customer_id_number": order.customer_id_number,
-        "customer_id_front": order.customer_id_front,
-        "customer_id_back": order.customer_id_back,
+        "customer_id_number_masked": _mask_identifier(order.customer_id_number),
         "kyc_verified": order.kyc_verified,
-        "kyc_verified_by": order.kyc_verified_by,
         "kyc_verified_at": str(order.kyc_verified_at) if order.kyc_verified_at else "",
     }
 
@@ -1630,8 +1969,10 @@ def get_diagnostic_comparison(inspection_name: str) -> dict:
     Returns a list of items, each with:
       test_name, code, mobile_result, mobile_status, store_result, match
     """
+    _require_app_read(_("view Buyback diagnostic comparisons"), "Buyback Inspection")
     doc = frappe.get_doc("Buyback Inspection", inspection_name)
     doc.check_permission("read")
+    assert_buyback_scope(store=doc.store, company=doc.company)
 
     comparison = []
 
@@ -1708,6 +2049,9 @@ def get_question_options(question_name: str) -> list:
     if not question_name:
         return []
 
+    _require_app_read(_("view Buyback question options"), "Buyback Question Bank")
+    frappe.get_doc("Buyback Question Bank", question_name).check_permission("read")
+
     options = frappe.get_all(
         "Buyback Question Option",
         filters={"parent": question_name},
@@ -1759,8 +2103,7 @@ def _normalize_automated_test_options(options: list[dict]) -> list[dict]:
             },
         ]
 
-    #updated
-    # Legacy Pass/Fail/Partial — FIXED mapping
+    # Legacy Pass/Fail/Partial mapping
     # Yes = defect exists → use Fail (or Partial) impact
     # No  = no defect    → use Pass impact (usually 0)
     fail_impact = by_value.get("fail", {}).get("price_impact_percent", 0)
@@ -1796,6 +2139,15 @@ def get_reference_prices(item_code: str) -> dict:
     if not item_code:
         return {"market_price": 0, "vendor_price": 0}
 
+    require_configured_role("assessment_operation_roles", action=_("view reference prices"))
+    item_doc = frappe.get_doc("Item", item_code)
+    for doctype, doc in (("Item", item_doc), ("Buyback Price Master", None)):
+        if not frappe.has_permission(doctype, ptype="read", doc=doc):
+            frappe.throw(
+                _("You do not have read permission for {0}.").format(doctype),
+                frappe.PermissionError,
+            )
+
     bpm = frappe.db.get_value(
         "Buyback Price Master",
         {"item_code": item_code},
@@ -1814,92 +2166,6 @@ def get_reference_prices(item_code: str) -> dict:
 
 # ── Live Estimate Calculator ─────────────────────────────────────
 
-# @frappe.whitelist()
-# def calculate_live_estimate(
-#     item_code: str,
-#     warranty_status: str = None,
-#     device_age_months: str = None,
-#     diagnostic_tests: str = None,
-#     responses: str = None,
-#     brand: str = None,
-#     item_group: str = None,
-# ) -> dict:
-#     """Calculate estimated price and auto-determine grade from diagnostic results.
-
-#     Called live from the Assessment form as the user fills in answers.
-#     Returns grade + price breakdown so the form can update without a full save.
-#     """
-#     import json
-#     from frappe.utils import flt
-
-#     diag_data = json.loads(diagnostic_tests or "[]")
-#     resp_data = json.loads(responses or "[]")
-
-#     # ── Auto-determine grade from diagnostic results ──────────
-#     grade = _auto_determine_grade(diag_data)
-#     grade_id = frappe.db.get_value("Grade Master", {"grade_name": grade}, "name") or ""
-
-#     from buyback.buyback.pricing.engine import calculate_estimated_price
-
-#     result = calculate_estimated_price(
-#         item_code=item_code,
-#         grade=grade_id,
-#         warranty_status=warranty_status,
-#         device_age_months=device_age_months,
-#         responses=resp_data,
-#         diagnostic_tests=diag_data,
-#         brand=brand,
-#         item_group=item_group,
-#     )
-
-#     result["grade"] = grade
-#     result["grade_id"] = grade_id
-#     return result
-
-
-# def _auto_determine_grade(diagnostic_tests: list) -> str:
-#     """Determine device grade based on diagnostic test results.
-
-#     Grade rules:
-#         A  – all tests Pass (or no tests)
-#         B  – all Pass or Partial, at most 2 Partial, zero Fail
-#         C  – some Fail but fewer than half
-#         D  – half or more Fail
-#     """
-#     if not diagnostic_tests:
-#         return "A"
-
-#     results = [d.get("result", "") for d in diagnostic_tests if d.get("result")]
-#     if not results:
-#         return "A"
-
-#     normalized = []
-#     for r in results:
-#         token = str(r).strip().lower()
-#         if token == "yes":
-#             normalized.append("pass")
-#         elif token == "no":
-#             normalized.append("fail")
-#         else:
-#             normalized.append(token)
-
-#     total = len(normalized)
-#     fail_count = sum(1 for r in normalized if r == "fail")
-#     partial_count = sum(1 for r in normalized if r == "partial")
-
-#     if fail_count == 0 and partial_count == 0:
-#         return "A"
-#     elif fail_count == 0 and partial_count <= 2:
-#         return "B"
-#     elif fail_count < total / 2:
-#         return "C"
-#     else:
-#         return "D"
-
-
-
-
-#update calculate_live_estimate
 @frappe.whitelist()
 def calculate_live_estimate(
     item_code: str,
@@ -1914,8 +2180,22 @@ def calculate_live_estimate(
     """Calculate estimated price + grade."""
     import json
 
+    _require_app_read(
+        _("calculate a Buyback estimate"),
+        "Item",
+        "Grade Master",
+        "Buyback Price Master",
+        "Buyback Pricing Rule",
+    )
+    frappe.get_doc("Item", item_code).check_permission("read")
+
     diag_data = json.loads(diagnostic_tests or "[]")
     resp_data = json.loads(responses or "[]")
+    if not isinstance(diag_data, list) or not isinstance(resp_data, list):
+        frappe.throw(_("Diagnostic tests and responses must be lists."))
+    input_limit = min(get_int_setting("max_diagnostic_rows", 100), 500)
+    if len(diag_data) > input_limit or len(resp_data) > input_limit:
+        frappe.throw(_("Estimate inputs may contain at most {0} rows each.").format(input_limit))
 
     provisional_grade_id = frappe.db.get_value(
         "Grade Master", {"grade_name": "A"}, "name"
@@ -2044,6 +2324,8 @@ def get_diagnostic_tests_for_item(item_code: str) -> list:
     """
     if not item_code:
         return []
+    _require_app_read(_("view Buyback diagnostic tests"), "Item", "Buyback Question Bank")
+    frappe.get_doc("Item", item_code).check_permission("read")
 
     mapped_names = _get_mapped_question_names(item_code, "Automated Test")
 
@@ -2053,11 +2335,12 @@ def get_diagnostic_tests_for_item(item_code: str) -> list:
             return []  # Mapping exists but has no automated tests
         filters["name"] = ("in", mapped_names)
 
-    tests = frappe.get_all(
+    tests = frappe.get_list(
         "Buyback Question Bank",
         filters=filters,
         fields=["name", "question_code", "question_text"],
         order_by="idx asc, name asc",
+        limit_page_length=500,
     )
 
     # If mapped, preserve mapping order
@@ -2065,14 +2348,10 @@ def get_diagnostic_tests_for_item(item_code: str) -> list:
         order_map = {n: i for i, n in enumerate(mapped_names)}
         tests.sort(key=lambda t: order_map.get(t.name, 999))
 
+    options_by_question = _get_options_by_question([t.name for t in tests])
     result = []
     for t in tests:
-        options = frappe.get_all(
-            "Buyback Question Option",
-            filters={"parent": t.name},
-            fields=["option_value", "option_label", "price_impact_percent"],
-            order_by="idx asc",
-        )
+        options = options_by_question.get(t.name, [])
         normalized_options = _normalize_automated_test_options(options)
         result.append({
             "name": t.name,
@@ -2105,6 +2384,8 @@ def get_customer_questions_for_item(item_code: str) -> list:
     """
     if not item_code:
         return []
+    _require_app_read(_("view Buyback customer questions"), "Item", "Buyback Question Bank")
+    frappe.get_doc("Item", item_code).check_permission("read")
 
     mapped_names = _get_mapped_question_names(item_code, "Customer Question")
 
@@ -2114,11 +2395,12 @@ def get_customer_questions_for_item(item_code: str) -> list:
             return []  # Mapping exists but has no customer questions
         filters["name"] = ("in", mapped_names)
 
-    questions = frappe.get_all(
+    questions = frappe.get_list(
         "Buyback Question Bank",
         filters=filters,
         fields=["name", "question_code", "question_text"],
         order_by="idx asc, name asc",
+        limit_page_length=500,
     )
 
     # If mapped, preserve mapping order
@@ -2126,23 +2408,19 @@ def get_customer_questions_for_item(item_code: str) -> list:
         order_map = {n: i for i, n in enumerate(mapped_names)}
         questions.sort(key=lambda q: order_map.get(q.name, 999))
 
+    options_by_question = _get_options_by_question([q.name for q in questions])
     result = []
     for q in questions:
-        options = frappe.get_all(
-            "Buyback Question Option",
-            filters={"parent": q.name},
-            fields=["option_value", "option_label", "price_impact_percent"],
-            order_by="idx asc",
-        )
+        options = options_by_question.get(q.name, [])
         result.append({
             "name": q.name,
             "question_code": q.question_code,
             "question_text": q.question_text,
             "options": [
                 {
-                    "value": o.option_value,
-                    "label": o.option_label or o.option_value,
-                    "impact": o.price_impact_percent or 0,
+                    "value": o.get("option_value"),
+                    "label": o.get("option_label") or o.get("option_value"),
+                    "impact": o.get("price_impact_percent") or 0,
                 }
                 for o in options
             ],
@@ -2177,7 +2455,11 @@ def get_open_exchange_orders_for_customer(
     Returns:
         List of dicts with exchange order details and amount to credit.
     """
+    require_configured_role("app_access_roles", action=_("view Buyback exchanges"))
     frappe.has_permission("Buyback Exchange Order", ptype="read", throw=True)
+    customer_doc = frappe.get_doc("Customer", customer) if customer else None
+    if customer_doc:
+        customer_doc.check_permission("read")
 
     CREDITABLE_STATUSES = (
         "New Device Delivered",
@@ -2203,7 +2485,18 @@ def get_open_exchange_orders_for_customer(
             title=_("Exchange Lookup Error"),
         )
 
-    orders = frappe.get_all(
+    scope = get_buyback_data_scope()
+    if not scope["bypass"]:
+        locations = sorted(scope["stores"] | scope["warehouses"])
+        companies = sorted(scope["companies"])
+        if locations:
+            filters["store"] = ["in", locations]
+        elif companies:
+            filters["company"] = ["in", companies]
+        else:
+            return []
+
+    orders = frappe.get_list(
         "Buyback Exchange Order",
         filters=filters,
         fields=[
@@ -2220,7 +2513,7 @@ def get_open_exchange_orders_for_customer(
     return orders
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def apply_exchange_to_invoice(
     exchange_order: str,
     sales_invoice: str,
@@ -2242,11 +2535,20 @@ def apply_exchange_to_invoice(
     Returns:
         dict with exchange_order, sales_invoice, buyback_amount, amount_to_pay
     """
-    frappe.has_permission("Buyback Exchange Order", ptype="write", throw=True)
-    frappe.has_permission("Sales Invoice", ptype="write", throw=True)
-
     exo = frappe.get_doc("Buyback Exchange Order", exchange_order)
     si  = frappe.get_doc("Sales Invoice", sales_invoice)
+    require_configured_role("exchange_creation_roles", action=_("apply Buyback exchange credit"))
+    exo.check_permission("write")
+    si.check_permission("write")
+    assert_buyback_scope(store=exo.store, company=exo.company)
+    if exo.company != si.company:
+        frappe.throw(_("Exchange Order and Sales Invoice companies must match."), frappe.PermissionError)
+    if si.docstatus != 0:
+        frappe.throw(_("Exchange credit can only be applied to a Draft Sales Invoice."))
+    frappe.db.get_value("Buyback Exchange Order", exo.name, "name", for_update=True)
+    frappe.db.get_value("Sales Invoice", si.name, "name", for_update=True)
+    exo.reload()
+    si.reload()
 
     # ── Guard 1: customer must match ──────────────────────────────
     if exo.customer != si.customer:
@@ -2328,8 +2630,6 @@ def apply_exchange_to_invoice(
         },
         update_modified=True,
     )
-    frappe.db.commit()
-
     log_audit(
         "Exchange Applied to Invoice",
         "Buyback Exchange Order",
@@ -2355,7 +2655,7 @@ def apply_exchange_to_invoice(
     }
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def raise_buyback_exception(
     order: str,
     requested_price: float,
@@ -2365,7 +2665,7 @@ def raise_buyback_exception(
     """Store staff request a buyback **price override** on a Buyback Order.
 
     Mirrors the POS 'Discount Override' pattern: the proposed price and the
-    order's current price are captured so the Buyback Manager sees the change
+    order's current price are captured so the configured approver sees the change
     and the CH Exception framework can route by the requested amount. Tracked as
     a CH Exception Request linked back to this order.
     """
@@ -2377,8 +2677,12 @@ def raise_buyback_exception(
         frappe.throw(_("Requested buyback price must be greater than zero."),
                      title=_("Invalid Price"), exc=BuybackValidationError)
 
+    if exception_type != "Buyback Price Override":
+        frappe.throw(_("Unsupported Buyback exception type."), frappe.PermissionError)
     o = frappe.get_doc("Buyback Order", order)
-    o.check_permission("read")
+    require_scoped_document_action(
+        o, "order_operation_roles", _("raise a Buyback price exception")
+    )
 
     # Current buyback price = manager-approved if present, else the computed
     # final price (base − deductions), else base price.

@@ -29,10 +29,30 @@
  "module": "BuyBack",
  "name": "Store Credit Wallet",
  "permissions": [
-  {"role": "System Manager", "read": 1, "write": 1, "create": 1, "delete": 1},
-  {"role": "Buyback Manager", "read": 1, "write": 1, "create": 1},
-  {"role": "Buyback Store Manager", "read": 1, "write": 1, "create": 1},
-  {"role": "Accounts Manager", "read": 1}
+  {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "import": 1
+  },
+  {
+   "role": "Buyback Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1
+  },
+  {
+   "role": "Buyback Store Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1
+  },
+  {
+   "role": "Accounts Manager",
+   "read": 1
+  }
  ],
  "sort_field": "modified",
  "sort_order": "DESC",

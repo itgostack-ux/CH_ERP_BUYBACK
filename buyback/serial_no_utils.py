@@ -13,8 +13,9 @@ Functions:
 from __future__ import annotations
 
 import frappe
-from frappe import _
 from frappe.utils import nowdate, cint, flt
+
+from buyback.utils import get_buyback_data_scope
 
 
 def update_serial_buyback_status(
@@ -104,7 +105,7 @@ def sync_buyback_to_lifecycle(
 
     try:
         from ch_item_master.ch_item_master.doctype.ch_serial_lifecycle.ch_serial_lifecycle import (
-            update_lifecycle_status,
+            update_lifecycle_status_for_document as update_lifecycle_status,
         )
         kwargs = {}
         if order_name:
@@ -179,7 +180,7 @@ def sync_exchange_to_lifecycle(
 
     try:
         from ch_item_master.ch_item_master.doctype.ch_serial_lifecycle.ch_serial_lifecycle import (
-            update_lifecycle_status,
+            update_lifecycle_status_for_document as update_lifecycle_status,
         )
         kwargs = {}
         if exchange_name:
@@ -250,11 +251,28 @@ def get_imei_history(imei: str) -> dict:
         dict with keys: serial_info, quotes, inspections, orders, exchanges,
                         timeline (comments), audit_log
     """
+    scope = get_buyback_data_scope()
+    locations = scope["stores"] | scope["warehouses"]
+    companies = scope["companies"]
+
+    def scoped_filters(doctype: str, base: dict) -> dict:
+        filters = dict(base)
+        if scope["bypass"]:
+            return filters
+        meta = frappe.get_meta(doctype)
+        if locations and meta.has_field("store"):
+            filters["store"] = ["in", sorted(locations)]
+        elif companies and meta.has_field("company"):
+            filters["company"] = ["in", sorted(companies)]
+        else:
+            filters["name"] = "__buyback_scope_denied__"
+        return filters
+
     result = {
         "imei": imei,
         "serial_exists": False,
         "serial_info": {},
-        "quotes": [],
+        "assessments": [],
         "inspections": [],
         "orders": [],
         "exchanges": [],
@@ -263,7 +281,17 @@ def get_imei_history(imei: str) -> dict:
     }
 
     # Serial No info
-    if frappe.db.exists("Serial No", imei):
+    serial_warehouse = frappe.db.get_value("Serial No", imei, "warehouse")
+    serial_company = (
+        frappe.db.get_value("Warehouse", serial_warehouse, "company")
+        if serial_warehouse else None
+    )
+    serial_in_scope = bool(
+        scope["bypass"]
+        or (serial_warehouse and serial_warehouse in locations)
+        or (not locations and serial_company and serial_company in companies)
+    )
+    if frappe.db.exists("Serial No", imei) and serial_in_scope:
         result["serial_exists"] = True
         sn = frappe.db.get_value(
             "Serial No", imei,
@@ -293,7 +321,7 @@ def get_imei_history(imei: str) -> dict:
     # Assessments
     result["assessments"] = frappe.get_all(
         "Buyback Assessment",
-        filters={"imei_serial": imei},
+        filters=scoped_filters("Buyback Assessment", {"imei_serial": imei}),
         fields=[
             "name", "assessment_id", "customer", "customer_name", "store",
             "item", "item_name", "quoted_price", "estimated_price", "status", "creation",
@@ -304,7 +332,7 @@ def get_imei_history(imei: str) -> dict:
     # Inspections
     result["inspections"] = frappe.get_all(
         "Buyback Inspection",
-        filters={"imei_serial": imei},
+        filters=scoped_filters("Buyback Inspection", {"imei_serial": imei}),
         fields=[
             "name", "inspection_id", "customer", "customer_name",
             "item", "item_name", "status", "condition_grade",
@@ -316,7 +344,7 @@ def get_imei_history(imei: str) -> dict:
     # Orders
     result["orders"] = frappe.get_all(
         "Buyback Order",
-        filters={"imei_serial": imei},
+        filters=scoped_filters("Buyback Order", {"imei_serial": imei}),
         fields=[
             "name", "order_id", "customer", "customer_name", "store",
             "item", "item_name", "final_price", "condition_grade",
@@ -328,7 +356,7 @@ def get_imei_history(imei: str) -> dict:
     # Exchanges
     result["exchanges"] = frappe.get_all(
         "Buyback Exchange Order",
-        filters={"old_imei_serial": imei},
+        filters=scoped_filters("Buyback Exchange Order", {"old_imei_serial": imei}),
         fields=[
             "name", "exchange_id", "customer", "old_item",
             "new_item", "buyback_amount", "amount_to_pay",

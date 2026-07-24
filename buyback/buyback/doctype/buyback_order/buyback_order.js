@@ -5,32 +5,37 @@ frappe.ui.form.on("Buyback Order", {
 	    refresh(frm) {
 	        frm.clear_custom_buttons();
 	        if (frm.doc.docstatus !== 1) return;
-	        const can_manager_approve = frappe.session.user === "Administrator"
-	            || frappe.user.has_role("Buyback Manager")
-	            || frappe.user.has_role("Buyback Admin")
-	            || frappe.user.has_role("System Manager");
 
-	        if (frm.doc.status === "Awaiting Approval" && can_manager_approve) {
-	            frm.add_custom_button(__("Approve"), () => {
-                frappe.prompt({
-                    label: "Remarks",
-                    fieldname: "remarks",
-                    fieldtype: "Small Text",
-                }, (values) => {
-                    frm.call("approve", { remarks: values.remarks }).then(() => frm.reload_doc());
-                });
-            }, __("Actions"));
-            frm.add_custom_button(__("Reject"), () => {
-                frappe.prompt({
-                    label: "Rejection Reason",
-                    fieldname: "remarks",
-                    fieldtype: "Small Text",
-                    reqd: 1,
-                }, (values) => {
-                    frm.call("reject", { remarks: values.remarks }).then(() => frm.reload_doc());
-                });
-            }, __("Actions"));
-        }
+	        if (frm.doc.status === "Awaiting Approval") {
+	            const request_id = (frm.__buyback_capability_request || 0) + 1;
+	            frm.__buyback_capability_request = request_id;
+	            frm.call("get_ui_capabilities").then((r) => {
+	                if (frm.__buyback_capability_request !== request_id
+	                    || frm.doc.status !== "Awaiting Approval"
+	                    || !r.message?.can_manager_approve) {
+	                    return;
+	                }
+	                frm.add_custom_button(__("Approve"), () => {
+	                    frappe.prompt({
+	                        label: "Remarks",
+	                        fieldname: "remarks",
+	                        fieldtype: "Small Text",
+	                    }, (values) => {
+	                        frm.call("approve", { remarks: values.remarks }).then(() => frm.reload_doc());
+	                    });
+	                }, __("Actions"));
+	                frm.add_custom_button(__("Reject"), () => {
+	                    frappe.prompt({
+	                        label: "Rejection Reason",
+	                        fieldname: "remarks",
+	                        fieldtype: "Small Text",
+	                        reqd: 1,
+	                    }, (values) => {
+	                        frm.call("reject", { remarks: values.remarks }).then(() => frm.reload_doc());
+	                    });
+	                }, __("Actions"));
+	            });
+	        }
 
         if (frm.doc.status === "Approved") {
             frm.add_custom_button(__("Send OTP"), () => {
@@ -178,7 +183,7 @@ frappe.ui.form.on("Buyback Order", {
 });
 
 // Store staff can request a buyback PRICE OVERRIDE on any saved order → routes
-// to the Buyback Manager via the shared CH Exception framework. Kept in its own
+// to the configured approver via the shared CH Exception framework. Kept in its own
 // form handler so it shows regardless of order status/docstatus.
 frappe.ui.form.on("Buyback Order", {
     refresh(frm) {
@@ -207,10 +212,10 @@ frappe.ui.form.on("Buyback Order", {
                         fieldtype: "Small Text",
                         label: __("Reason for the price change"),
                         reqd: 1,
-                        description: __("Routed to the Buyback Manager for approval."),
+                        description: __("Routed to the configured approver."),
                     },
                 ],
-                primary_action_label: __("Submit to Buyback Manager"),
+                primary_action_label: __("Submit for Approval"),
                 primary_action: (v) => {
                     d.hide();
                     frappe.call({
@@ -225,7 +230,7 @@ frappe.ui.form.on("Buyback Order", {
                         callback: (r) => {
                             if (r.message && r.message.name) {
                                 frappe.show_alert({
-                                    message: __("Price override {0} raised — routed to Buyback Manager.",
+                                    message: __("Price override {0} raised — routed for approval.",
                                         [r.message.name]),
                                     indicator: "orange",
                                 }, 7);

@@ -3,7 +3,11 @@ from frappe import _
 from frappe.model.document import Document
 from frappe.utils import now_datetime, flt
 
-from buyback.utils import validate_indian_phone
+from buyback.utils import (
+    next_numeric_external_id,
+    require_scoped_document_action,
+    validate_indian_phone,
+)
 
 from buyback.exceptions import BuybackStatusError
 from buyback.utils import log_audit
@@ -11,15 +15,9 @@ from buyback.utils import log_audit
 
 class BuybackInspection(Document):
     def before_insert(self):
-        """Auto-assign sequential integer ID using advisory lock."""
-        frappe.db.sql("SELECT GET_LOCK('buyback_inspection_id', 10)")
-        try:
-            last = frappe.db.sql(
-                "SELECT MAX(inspection_id) FROM `tabBuyback Inspection`"
-            )[0][0] or 0
-            self.inspection_id = last + 1
-        finally:
-            frappe.db.sql("SELECT RELEASE_LOCK('buyback_inspection_id')")
+        self.inspection_id = next_numeric_external_id(
+            "Buyback Inspection", "inspection_id"
+        )
 
         self.status = "Draft"
 
@@ -199,9 +197,12 @@ class BuybackInspection(Document):
             if impact is not None:
                 r.inspector_impact = impact
 
-    @frappe.whitelist()
+    @frappe.whitelist(methods=["POST"])
     def start_inspection(self):
         """Begin the inspection process."""
+        require_scoped_document_action(
+            self, "inspection_operation_roles", _("start a Buyback inspection")
+        )
         if self.status != "Draft":
             frappe.throw(_("Can only start inspection from Draft status."), exc=BuybackStatusError, title=_("Buyback Inspection Error"))
         self.status = "In Progress"
@@ -210,9 +211,12 @@ class BuybackInspection(Document):
         self.save()
         log_audit("Inspection Started", "Buyback Inspection", self.name)
 
-    @frappe.whitelist()
+    @frappe.whitelist(methods=["POST"])
     def complete_inspection(self):
         """Complete the inspection with results."""
+        require_scoped_document_action(
+            self, "inspection_operation_roles", _("complete a Buyback inspection")
+        )
         # Concurrency guard (P0-5): take a row-level lock on this
         # inspection (and its parent assessment) so that two
         # near-simultaneous "complete inspection" calls (double-click
@@ -424,23 +428,27 @@ class BuybackInspection(Document):
 
             # Fall back to checklist results → question mapping if new table empty
             if not inspector_responses:
+                result_codes = {
+                    row.check_code for row in (self.results or []) if row.check_code
+                }
+                valid_codes = set(frappe.get_all(
+                    "Buyback Question Bank",
+                    filters={"question_code": ["in", sorted(result_codes)], "disabled": 0},
+                    pluck="question_code",
+                )) if result_codes else set()
                 for row in (self.results or []):
                     code = row.check_code
-                    if not code:
+                    if not code or code not in valid_codes:
                         continue
-                    q_name = frappe.db.get_value(
-                        "Buyback Question Bank", {"question_code": code}, "name"
-                    )
-                    if q_name:
-                        answer = (row.result or "").strip()
-                        if answer.lower() in ("pass", "yes"):
-                            answer = "yes"
-                        elif answer.lower() in ("fail", "no"):
-                            answer = "no"
-                        inspector_responses.append({
-                            "question_code": code,
-                            "answer_value": answer,
-                        })
+                    answer = (row.result or "").strip()
+                    if answer.lower() in ("pass", "yes"):
+                        answer = "yes"
+                    elif answer.lower() in ("fail", "no"):
+                        answer = "no"
+                    inspector_responses.append({
+                        "question_code": code,
+                        "answer_value": answer,
+                    })
 
             # Final fallback: use assessment responses as-is
             if not inspector_responses:
@@ -475,9 +483,12 @@ class BuybackInspection(Document):
                 title=f"Inspection price recalc failed for {self.name}",
             )
 
-    @frappe.whitelist()
+    @frappe.whitelist(methods=["POST"])
     def reject_device(self, reason=None):
         """Reject the device during inspection."""
+        require_scoped_document_action(
+            self, "inspection_operation_roles", _("reject a Buyback device")
+        )
         if self.status not in ("Draft", "In Progress"):
             frappe.throw(
                 _("Cannot reject — inspection is already {0}.").format(self.status),
@@ -491,7 +502,7 @@ class BuybackInspection(Document):
         log_audit("Inspection Rejected", "Buyback Inspection", self.name,
                   new_value={"status": "Rejected", "reason": reason})
 
-    @frappe.whitelist()
+    @frappe.whitelist(methods=["POST"])
     def populate_checklist(self):
         """Auto-populate inspection results from the selected checklist template."""
         if not self.checklist_template:
@@ -506,11 +517,16 @@ class BuybackInspection(Document):
                 "result": "",
             })
 
-    @frappe.whitelist()
+    @frappe.whitelist(methods=["POST"])
     def recalculate_grade_and_price(self):
         """Force re-run grade determination and price recalculation.
         Clears grade_changed_reason so auto-grade from diagnostics takes effect.
         """
+        require_scoped_document_action(
+            self,
+            "inspection_operation_roles",
+            _("recalculate a Buyback inspection"),
+        )
         self.grade_changed_reason = None
         qbank_cache = self._load_question_bank_cache()
         self._fill_inspector_diagnostic_impacts(qbank_cache)
@@ -524,4 +540,3 @@ class BuybackInspection(Document):
             "condition_grade": self.condition_grade,
             "revised_price": self.revised_price,
         }
-

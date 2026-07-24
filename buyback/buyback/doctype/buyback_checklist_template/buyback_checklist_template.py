@@ -1,18 +1,14 @@
 import frappe
 from frappe.model.document import Document
 
+from buyback.utils import next_numeric_external_id
+
 
 class BuybackChecklistTemplate(Document):
     def before_insert(self):
-        """Auto-assign sequential integer ID using advisory lock."""
-        frappe.db.sql("SELECT GET_LOCK('buyback_checklist_template_id', 10)")
-        try:
-            last = frappe.db.sql(
-                "SELECT MAX(checklist_id) FROM `tabBuyback Checklist Template`"
-            )[0][0] or 0
-            self.checklist_id = last + 1
-        finally:
-            frappe.db.sql("SELECT RELEASE_LOCK('buyback_checklist_template_id')")
+        self.checklist_id = next_numeric_external_id(
+            "Buyback Checklist Template", "checklist_id"
+        )
 
     def validate(self):
         # Validate check_codes are unique within template

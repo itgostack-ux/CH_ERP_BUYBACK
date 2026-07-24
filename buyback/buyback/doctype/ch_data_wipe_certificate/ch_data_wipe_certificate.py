@@ -20,13 +20,39 @@ from frappe import _
 from frappe.model.document import Document
 from frappe.utils import now_datetime
 
+from buyback.utils import assert_buyback_scope, is_privileged_user, require_configured_role
+
 
 class CHDataWipeCertificate(Document):
-    def autoname(self):
-        # Certificate number == doc name (Frappe autoname handles the series).
-        pass
+    def before_insert(self):
+        require_configured_role(
+            "inspection_operation_roles", action=_("record a Buyback data wipe")
+        )
+        order = frappe.get_doc("Buyback Order", self.buyback_order)
+        if not is_privileged_user():
+            order.check_permission("read")
+        assert_buyback_scope(store=order.store, company=order.company)
+        self.customer = order.customer
+        self.item = order.item
+        self.imei_serial = order.imei_serial
+        self.brand = order.brand
+        self.wiped_by = frappe.session.user
+        self.wiped_at = now_datetime()
+        self.wipe_verified = 0
+        self.verified_by = None
+        self.verified_at = None
+        self.verification_method = None
+        self.status = "Draft"
 
     def validate(self):
+        previous = self.get_doc_before_save()
+        if previous and not self.flags.get("ch_verification_authorized"):
+            protected = ("wipe_verified", "verified_by", "verified_at", "verification_method")
+            if any(str(self.get(field) or "") != str(previous.get(field) or "") for field in protected):
+                frappe.throw(
+                    _("Wipe verification can only be recorded through the Verify Data Wipe action."),
+                    frappe.PermissionError,
+                )
         if self.wiped_at and self.wiped_at > now_datetime():
             frappe.throw(_("Wipe timestamp cannot be in the future."))
 
@@ -35,7 +61,7 @@ class CHDataWipeCertificate(Document):
                 frappe.throw(_("Verified By is required when Wipe Verified is checked."))
             if not self.verified_at:
                 self.verified_at = now_datetime()
-            if self.verified_by == self.wiped_by:
+            if self.verified_by == self.wiped_by and not is_privileged_user(self.verified_by):
                 frappe.throw(
                     _(
                         "Wipe verifier must be a different user than the person "
@@ -54,7 +80,7 @@ class CHDataWipeCertificate(Document):
             self.certificate_number = self.name
 
     def on_submit(self):
-        self.db_set("status", "Verified" if self.wipe_verified else "Submitted")
+        self.db_set("status", "Submitted")
         # Stamp the parent Buyback Order for quick lookup and gates.
         if self.buyback_order:
             frappe.db.set_value(
@@ -106,4 +132,8 @@ class CHDataWipeCertificate(Document):
                     update_modified=False,
                 )
             except Exception:
-                pass
+                frappe.log_error(
+                    frappe.get_traceback(),
+                    f"Data-wipe reversal failed for serial {self.serial_no}",
+                )
+                raise

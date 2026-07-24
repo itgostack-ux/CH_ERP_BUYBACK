@@ -1,3 +1,4 @@
+import frappe
 from frappe import _
 
 
@@ -14,7 +15,7 @@ def get_dashboard_for_customer(data):
         from ch_item_master.ch_item_master.overrides.customer_dashboard import get_data
         data = get_data(data)
     except Exception:
-        pass  # ch_item_master not installed or changed — degrade gracefully
+        frappe.log_error(frappe.get_traceback(), "Customer dashboard extension failed")
 
     # ── Buyback's own additions ──
     data["transactions"].append(

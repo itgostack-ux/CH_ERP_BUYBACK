@@ -55,7 +55,7 @@ from frappe.rate_limiter import rate_limit
 from frappe.utils import flt
 
 from buyback.exceptions import BuybackStatusError, BuybackValidationError
-from buyback.utils import log_audit
+from buyback.utils import assert_buyback_scope, log_audit, require_configured_role
 
 
 # ---------------------------------------------------------------------------
@@ -90,13 +90,14 @@ _RETRYABLE_BPR_STATUSES = ("Failed", "Rejected")
 # ---------------------------------------------------------------------------
 
 
-def _load_order(buyback_order: str) -> "frappe.Document":
+def _load_order(buyback_order: str, permission_type: str = "read") -> "frappe.Document":
     """Fetch the Buyback Order and enforce read permission."""
     if not buyback_order:
         frappe.throw(_("Buyback Order is required"), exc=BuybackValidationError)
 
     order = frappe.get_doc("Buyback Order", buyback_order)
-    order.check_permission("read")
+    order.check_permission(permission_type)
+    assert_buyback_scope(store=order.store, company=order.company)
     return order
 
 
@@ -167,31 +168,17 @@ def _serialize_bpr(bpr_name: str) -> dict:
     if not bpr_name:
         return {}
 
-    row = frappe.db.get_value(
-        "Bank Payment Request",
-        bpr_name,
-        [
-            "name",
-            "docstatus",
-            "payment_status",
-            "payment_mode",
-            "transaction_amount",
-            "customer_txn_ref",
-            "bank_ref",
-            "cms_ref",
-            "utr_number",
-            "dd_number",
-            "value_date",
-            "bank_error_code",
-            "bank_error_description",
-            "retry_count",
-            "last_inquired_at",
-            "payment_entry",
-        ],
-        as_dict=True,
-    )
-    if not row:
+    bpr = frappe.get_doc("Bank Payment Request", bpr_name)
+    bpr.check_permission("read")
+    if not bpr:
         return {}
+    fields = (
+        "name", "docstatus", "payment_status", "payment_mode", "transaction_amount",
+        "customer_txn_ref", "bank_ref", "cms_ref", "utr_number", "dd_number",
+        "value_date", "bank_error_code", "bank_error_description", "retry_count",
+        "last_inquired_at", "payment_entry",
+    )
+    row = frappe._dict({field: bpr.get(field) for field in fields})
     row["bpr"] = row.pop("name")
     return row
 
@@ -201,7 +188,7 @@ def _serialize_bpr(bpr_name: str) -> dict:
 # ---------------------------------------------------------------------------
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 @rate_limit(limit=30, seconds=60, ip_based=False)
 def initiate_payout(buyback_order: str, bank_profile: str | None = None) -> dict:
     """Create a draft Bank Payment Request for the buyback amount.
@@ -221,7 +208,8 @@ def initiate_payout(buyback_order: str, bank_profile: str | None = None) -> dict
         Dict with ``bpr`` (name), ``payment_status``, ``transaction_amount``,
         ``payment_mode``, ``customer_txn_ref`` and ``already_existed`` flag.
     """
-    order = _load_order(buyback_order)
+    require_configured_role("payment_operation_roles", action=_("initiate Buyback payouts"))
+    order = _load_order(buyback_order, "write")
     _validate_payout_eligibility(order)
 
     existing = _find_existing_bpr(order.name)
@@ -260,7 +248,7 @@ def initiate_payout(buyback_order: str, bank_profile: str | None = None) -> dict
     return out
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 @rate_limit(limit=30, seconds=60, ip_based=False)
 def approve_and_send_payout(bpr: str) -> dict:
     """Submit the Bank Payment Request and push it to the bank.
@@ -274,6 +262,7 @@ def approve_and_send_payout(bpr: str) -> dict:
     Returns:
         Dict with the updated BPR snapshot (status / bank_ref / utr / cms_ref).
     """
+    require_configured_role("payment_operation_roles", action=_("approve Buyback payouts"))
     if not bpr:
         frappe.throw(_("Bank Payment Request name is required"), exc=BuybackValidationError)
 
@@ -287,6 +276,7 @@ def approve_and_send_payout(bpr: str) -> dict:
             _("Bank Payment Request {0} is not linked to a Buyback Order").format(bpr),
             exc=BuybackValidationError,
         )
+    _load_order(source_name, "write")
 
     if bpr_doc.docstatus == 0:
         bpr_doc.submit()           # raises if maker == checker
@@ -320,6 +310,7 @@ def get_payout_status(buyback_order: str) -> dict:
         the same fields as :func:`_serialize_bpr` plus the local
         ``payment_status`` on the order itself.
     """
+    require_configured_role("app_access_roles", action=_("view Buyback payout status"))
     order = _load_order(buyback_order)
 
     bpr_name = _find_existing_bpr(order.name)
@@ -343,11 +334,12 @@ def get_payout_status(buyback_order: str) -> dict:
     return out
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 @rate_limit(limit=30, seconds=60, ip_based=False)
 def refresh_payout_status(buyback_order: str) -> dict:
     """Call the bank's inquiry API for this order's latest payout and return the updated status."""
-    order = _load_order(buyback_order)
+    require_configured_role("payment_operation_roles", action=_("refresh Buyback payouts"))
+    order = _load_order(buyback_order, "write")
 
     bpr_name = _find_existing_bpr(order.name)
     if not bpr_name:
@@ -365,9 +357,10 @@ def refresh_payout_status(buyback_order: str) -> dict:
 @frappe.whitelist()
 def list_payouts(buyback_order: str) -> list[dict]:
     """Return the full history of payouts (BPRs) created for a Buyback Order."""
+    require_configured_role("app_access_roles", action=_("view Buyback payouts"))
     order = _load_order(buyback_order)
 
-    rows = frappe.db.get_all(
+    rows = frappe.get_list(
         "Bank Payment Request",
         filters={"source_doctype": "Buyback Order", "source_document": order.name},
         fields=[
@@ -385,17 +378,19 @@ def list_payouts(buyback_order: str) -> list[dict]:
             "retry_count",
         ],
         order_by="creation desc",
+        limit_page_length=50,
     )
     for r in rows:
         r["bpr"] = r.pop("name")
     return rows
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 @rate_limit(limit=10, seconds=60, ip_based=False)
 def retry_payout(buyback_order: str) -> dict:
     """Retry the most recent failed/rejected payout for this Buyback Order."""
-    order = _load_order(buyback_order)
+    require_configured_role("payment_operation_roles", action=_("retry Buyback payouts"))
+    order = _load_order(buyback_order, "write")
 
     bpr_name = frappe.db.get_value(
         "Bank Payment Request",

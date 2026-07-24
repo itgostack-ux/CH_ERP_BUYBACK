@@ -4,16 +4,21 @@ from frappe.model.document import Document
 from frappe.utils import nowdate, add_days, getdate, now_datetime
 
 from buyback.exceptions import BuybackStatusError
-from buyback.utils import log_audit, validate_indian_phone
+from buyback.utils import (
+    log_audit,
+    next_numeric_external_id,
+    require_scoped_document_action,
+    sync_customer_identity,
+    update_customer_mobile_if_missing,
+    validate_indian_phone,
+)
 
 
 class BuybackAssessment(Document):
     def before_insert(self):
-        """Auto-assign sequential integer ID."""
-        last = frappe.db.sql(
-            "SELECT MAX(assessment_id) FROM `tabBuyback Assessment`"
-        )[0][0] or 0
-        self.assessment_id = last + 1
+        self.assessment_id = next_numeric_external_id(
+            "Buyback Assessment", "assessment_id"
+        )
 
         self.status = "Draft"
 
@@ -34,16 +39,20 @@ class BuybackAssessment(Document):
         self._ensure_mobile_no()
         if self.mobile_no:
             self.mobile_no = validate_indian_phone(self.mobile_no, "Mobile No")
-        self._update_customer_mobile()
+        update_customer_mobile_if_missing(self.customer, self.mobile_no)
         self._check_imei_blacklist()
         self._check_duplicate_active_assessment()
         self._resolve_customer_from_mobile()
-        self._sync_customer_id()
+        sync_customer_identity(self)
         self._auto_fill_item_details()
+        impact_cache = (
+            self._load_question_impact_cache()
+            if self.diagnostic_tests or self.responses else None
+        )
         if self.diagnostic_tests:
-            self._fill_diagnostic_impacts()
+            self._fill_diagnostic_impacts(impact_cache)
         if self.responses:
-            self._fill_response_impacts()
+            self._fill_response_impacts(impact_cache)
         if self.item:
             # Price whenever the item is known — the base grade/warranty/age
             # price must populate even with no responses or diagnostic tests.
@@ -69,21 +78,6 @@ class BuybackAssessment(Document):
             self.estimated_grade = frappe.db.get_value(
                 "Grade Master", {"grade_name": "A"}, "name"
             )
-
-    def _sync_customer_id(self):
-        """Populate ch_customer_id / ch_membership_id from Customer master."""
-        if not self.customer or (self.ch_customer_id and self.ch_membership_id):
-            return
-        cust = frappe.db.get_value(
-            "Customer", self.customer,
-            ["ch_customer_id", "ch_membership_id"],
-            as_dict=True,
-        )
-        if cust:
-            if not self.ch_customer_id:
-                self.ch_customer_id = cust.ch_customer_id
-            if not self.ch_membership_id:
-                self.ch_membership_id = cust.ch_membership_id
 
     def before_save(self):
         if self.is_new():
@@ -119,14 +113,6 @@ class BuybackAssessment(Document):
         )
         if cust:
             self.mobile_no = cust.mobile_no or cust.ch_alternate_phone or cust.ch_whatsapp_number
-
-    def _update_customer_mobile(self):
-        """Write mobile_no back to Customer if Customer has none."""
-        if not self.mobile_no or not self.customer:
-            return
-        cust_mobile = frappe.db.get_value("Customer", self.customer, "mobile_no")
-        if not cust_mobile:
-            frappe.db.set_value("Customer", self.customer, "mobile_no", self.mobile_no)
 
     def _check_duplicate_active_assessment(self):
         """BB-1 fix: Prevent duplicate active buyback assessments for the same IMEI/serial."""
@@ -184,100 +170,133 @@ class BuybackAssessment(Document):
             if not self.item_name:
                 self.item_name = item.item_name
 
-    def _get_question_applicable_categories(self, question_name: str, legacy_category: str | None = None) -> list[str]:
-        rows = frappe.get_all(
+    def _load_question_impact_cache(self) -> dict:
+        """Resolve all response/diagnostic question options in bounded queries."""
+        response_rows = list(self.responses or [])
+        diagnostic_rows = list(self.diagnostic_tests or [])
+        linked_names = {
+            row.question
+            for row in response_rows
+            if row.question and not row.question_code
+        } | {
+            row.test
+            for row in diagnostic_rows
+            if row.test and not row.test_code
+        }
+        code_by_name = {}
+        if linked_names:
+            code_by_name = {
+                row.name: row.question_code
+                for row in frappe.get_all(
+                    "Buyback Question Bank",
+                    filters={"name": ["in", sorted(linked_names)]},
+                    fields=["name", "question_code"],
+                )
+            }
+        for row in response_rows:
+            if not row.question_code and row.question:
+                row.question_code = code_by_name.get(row.question)
+        for row in diagnostic_rows:
+            if not row.test_code and row.test:
+                row.test_code = code_by_name.get(row.test)
+
+        codes = sorted({
+            code
+            for code in (
+                [row.question_code for row in response_rows]
+                + [row.test_code for row in diagnostic_rows]
+            )
+            if code
+        })
+        if not codes:
+            return {"question_by_code": {}, "impacts": {}}
+
+        questions = frappe.get_all(
+            "Buyback Question Bank",
+            filters={"question_code": ["in", codes], "disabled": 0},
+            fields=[
+                "name", "question_code", "display_order", "question_id",
+                "applies_to_category",
+            ],
+            order_by="question_code asc, display_order asc, question_id asc",
+        )
+        if not questions:
+            return {"question_by_code": {}, "impacts": {}}
+
+        categories: dict[str, set[str]] = {row.name: set() for row in questions}
+        for row in frappe.get_all(
             "Buyback Question Applicable Category",
             filters={
-                "parent": question_name,
+                "parent": ["in", [row.name for row in questions]],
                 "parenttype": "Buyback Question Bank",
                 "parentfield": "applies_to_categories",
             },
-            pluck="item_group",
-        )
-        cleaned = [r for r in (rows or []) if r]
-        if cleaned:
-            return cleaned
-        if legacy_category:
-            return [legacy_category]
-        return []
+            fields=["parent", "item_group"],
+        ):
+            if row.item_group:
+                categories.setdefault(row.parent, set()).add(row.item_group)
 
-    def _resolve_question_bank_name(self, question_code: str, category: str | None) -> str | None:
-        """Resolve question by category-specific match first, then global match.
-
-        Ordering is deterministic by display_order, then question_id, so repeated
-        runs return the same question even when multiple rows share a code.
-        """
-        candidates = frappe.get_all(
-            "Buyback Question Bank",
-            filters={"question_code": question_code, "disabled": 0},
-            fields=["name", "display_order", "question_id", "applies_to_category"],
-            order_by="display_order asc, question_id asc",
-        )
-        if not candidates:
-            return None
-        if not category:
-            return candidates[0].name
-
-        specific = None
-        global_q = None
-        for c in candidates:
-            applicable = self._get_question_applicable_categories(c.name, c.get("applies_to_category"))
-            if not applicable and not global_q:
-                global_q = c.name
-            if category in applicable and not specific:
-                specific = c.name
-
-        return specific or global_q or candidates[0].name
-
-    def _fill_response_impacts(self):
-        """Look up price_impact_percent from Question Bank options for each response."""
         category = self.get("item_group") or self.get("category")
-        for r in self.responses:
-            # fetch_from runs after validate, so resolve manually
-            if not r.question_code and r.question:
-                r.question_code = frappe.db.get_value(
-                    "Buyback Question Bank", r.question, "question_code"
+        candidates_by_code: dict[str, list] = {}
+        for row in questions:
+            candidates_by_code.setdefault(row.question_code, []).append(row)
+        question_by_code = {}
+        for code, candidates in candidates_by_code.items():
+            selected = None
+            global_question = None
+            for candidate in candidates:
+                applicable = categories.get(candidate.name) or (
+                    {candidate.applies_to_category}
+                    if candidate.applies_to_category else set()
                 )
+                if category and category in applicable and selected is None:
+                    selected = candidate.name
+                if not applicable and global_question is None:
+                    global_question = candidate.name
+            question_by_code[code] = selected or global_question or candidates[0].name
+
+        selected_names = sorted(set(question_by_code.values()))
+        impacts = {
+            (row.parent, row.option_value): row.price_impact_percent
+            for row in frappe.get_all(
+                "Buyback Question Option",
+                filters={"parent": ["in", selected_names]},
+                fields=["parent", "option_value", "price_impact_percent"],
+            )
+        }
+        return {"question_by_code": question_by_code, "impacts": impacts}
+
+    def _fill_response_impacts(self, cache=None):
+        """Look up price_impact_percent from Question Bank options for each response."""
+        cache = cache or self._load_question_impact_cache()
+        for r in self.responses:
             if not r.question_code or not r.answer_value:
                 continue
 
-            qname = self._resolve_question_bank_name(r.question_code, category)
+            qname = cache["question_by_code"].get(r.question_code)
             if not qname:
                 continue
 
-            impact = frappe.db.get_value(
-                "Buyback Question Option",
-                {"parent": qname, "option_value": r.answer_value},
-                "price_impact_percent",
-            )
+            impact = cache["impacts"].get((qname, r.answer_value))
             if impact is not None:
                 r.price_impact_percent = impact
 
-    def _fill_diagnostic_impacts(self):
+    def _fill_diagnostic_impacts(self, cache=None):
         """Look up depreciation_percent from Question Bank options for each diagnostic test.
 
         Automated tests store results as Pass/Fail/Partial which map to
         option_value in the Question Bank options table.
         """
-        category = self.get("item_group") or self.get("category")
+        cache = cache or self._load_question_impact_cache()
         for d in self.diagnostic_tests:
-            # fetch_from runs after validate, so resolve manually
-            if not d.test_code and d.test:
-                d.test_code = frappe.db.get_value(
-                    "Buyback Question Bank", d.test, "question_code"
-                )
             if not d.test_code or not d.result:
                 continue
 
-            qname = self._resolve_question_bank_name(d.test_code, category)
+            qname = cache["question_by_code"].get(d.test_code)
             if not qname:
                 continue
 
-            impact = frappe.db.get_value(
-                "Buyback Question Option",
-                {"parent": qname, "option_value": d.result},
-                "price_impact_percent",
-            )
+            impact = cache["impacts"].get((qname, d.result))
             if impact is not None:
                 d.depreciation_percent = abs(impact)
 
@@ -347,6 +366,9 @@ class BuybackAssessment(Document):
 
     def submit_assessment(self):
         """Customer finalises the self-assessment."""
+        require_scoped_document_action(
+            self, "assessment_operation_roles", _("submit a Buyback assessment")
+        )
         if self.status != "Draft":
             frappe.throw(
                 _("Can only submit a Draft assessment."),
@@ -364,7 +386,7 @@ class BuybackAssessment(Document):
         self.save()
         log_audit("Assessment Submitted", "Buyback Assessment", self.name)
 
-    @frappe.whitelist()
+    @frappe.whitelist(methods=["POST"])
     def submit_imei_validation(self, status: str, screenshot: str | None = None, remarks: str | None = None) -> dict:
         """Record the manual Sanchar Saathi (CEIR) IMEI check result at intake.
 
@@ -375,6 +397,11 @@ class BuybackAssessment(Document):
         later created from this assessment, the result is carried forward
         automatically so staff don't have to repeat the check.
         """
+        require_scoped_document_action(
+            self,
+            "assessment_operation_roles",
+            _("record an assessment IMEI validation result"),
+        )
         allowed = {"Verified Clean", "Blacklisted", "Duplicate IMEI", "Already In Use", "Could Not Verify"}
         status = (status or "").strip()
         if status not in allowed:
@@ -447,6 +474,10 @@ class BuybackAssessment(Document):
 
         Returns the new Buyback Inspection doc.
         """
+        require_scoped_document_action(
+            self, "assessment_operation_roles", _("create a Buyback inspection")
+        )
+        frappe.has_permission("Buyback Inspection", ptype="create", throw=True)
         if self.status not in ("Draft", "Submitted"):
             frappe.throw(
                 _("Can only create inspection from a Draft or Submitted assessment."),
@@ -533,12 +564,12 @@ class BuybackAssessment(Document):
             inspection.revised_price = self.quoted_price or self.estimated_price
             inspection.inspector = frappe.session.user
 
-        inspection.insert(ignore_permissions=True)
+        inspection.insert()
 
         if checklist_template:
             inspection.populate_checklist()
             inspection.flags.ignore_mandatory = True
-            inspection.save(ignore_permissions=True)
+            inspection.save()
             inspection.flags.ignore_mandatory = False
 
         # Update self
@@ -580,7 +611,7 @@ class BuybackAssessment(Document):
             return False
         return True
 
-    @frappe.whitelist()
+    @frappe.whitelist(methods=["POST"])
     def mark_customer_interested(self):
         """Called when customer taps 'Sell Now' in the mobile app or kiosk.
 
@@ -588,6 +619,11 @@ class BuybackAssessment(Document):
         Returns the current assessment state so the caller can read
         quoted_price, expires_on, etc. in a single round trip.
         """
+        require_scoped_document_action(
+            self,
+            "assessment_operation_roles",
+            _("mark a customer interested in a Buyback quote"),
+        )
         if not self.customer_interested:
             self.customer_interested = 1
             self.interested_at = now_datetime()
@@ -617,7 +653,7 @@ class BuybackAssessment(Document):
         }
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def mark_interested(assessment_name):
     """REST-friendly wrapper — callable without a document instance.
 

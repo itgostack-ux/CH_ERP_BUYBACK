@@ -14,6 +14,8 @@
   "settlement_type",
   "customer",
   "customer_name",
+  "ch_customer_id",
+  "ch_membership_id",
   "mobile_no",
   "column_break_01",
   "store",
@@ -87,6 +89,7 @@
   "journal_entry",
   "column_break_acct",
   "stock_entry",
+  "sales_invoice",
   "imei_validation_section",
   "imei_validation_status",
   "imei_validation_checked_by",
@@ -124,7 +127,11 @@
   "column_break_loyalty",
   "loyalty_point_entry",
   "remarks_section",
-  "remarks"
+  "remarks",
+  "approval_token",
+  "approval_token_digest",
+  "approval_token_issued_at",
+  "lifecycle_evidence_signature"
  ],
  "fields": [
   {
@@ -957,10 +964,39 @@
    "label": "Approval Token",
    "fieldtype": "Data",
    "hidden": 1,
+   "permlevel": 1,
    "read_only": 1,
    "no_copy": 1,
    "unique": 0,
    "description": "Token for customer-facing approval page URL. Auto-generated on order creation."
+  },
+  {
+   "fieldname": "approval_token_digest",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "Approval Token Digest",
+   "no_copy": 1,
+   "permlevel": 1,
+   "read_only": 1,
+   "unique": 1
+  },
+  {
+   "fieldname": "approval_token_issued_at",
+   "fieldtype": "Datetime",
+   "hidden": 1,
+   "label": "Approval Token Issued At",
+   "no_copy": 1,
+   "permlevel": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "lifecycle_evidence_signature",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "Lifecycle Evidence Signature",
+   "no_copy": 1,
+   "permlevel": 1,
+   "read_only": 1
   }
  ],
  "index_web_pages_for_search": 1,
@@ -973,80 +1009,87 @@
  "owner": "Administrator",
  "permissions": [
   {
-   "amend": 1,
-   "cancel": 1,
-   "create": 1,
-   "delete": 1,
-   "email": 1,
-   "export": 1,
-   "print": 1,
-   "read": 1,
-   "report": 1,
    "role": "System Manager",
-   "share": 1,
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
    "submit": 1,
+   "cancel": 1,
+   "amend": 1,
+   "email": 1,
+   "export": 1,
+   "import": 1,
+   "print": 1,
+   "report": 1,
+   "share": 1
+  },
+  {
+   "role": "System Manager",
+   "permlevel": 1,
+   "read": 1,
    "write": 1
   },
   {
-   "create": 1,
-   "email": 1,
-   "export": 1,
-   "print": 1,
-   "read": 1,
-   "report": 1,
    "role": "Buyback Agent",
-   "submit": 1,
-   "write": 1
-  },
-  {
-   "amend": 1,
-   "cancel": 1,
+   "read": 1,
+   "write": 1,
    "create": 1,
-   "delete": 1,
+   "submit": 1,
    "email": 1,
    "export": 1,
    "print": 1,
-   "read": 1,
-   "report": 1,
+   "report": 1
+  },
+  {
    "role": "Buyback Manager",
-   "share": 1,
-   "submit": 1,
-   "write": 1
-  },
-  {
-   "email": 1,
-   "export": 1,
-   "print": 1,
    "read": 1,
-   "report": 1,
-   "role": "Buyback Auditor"
-  },
-  {
-   "amend": 1,
-   "cancel": 1,
+   "write": 1,
    "create": 1,
    "delete": 1,
+   "submit": 1,
+   "cancel": 1,
+   "amend": 1,
    "email": 1,
    "export": 1,
    "print": 1,
-   "read": 1,
    "report": 1,
-   "role": "Buyback Admin",
-   "share": 1,
-   "submit": 1,
-   "write": 1
+   "share": 1
   },
   {
-   "create": 1,
+   "role": "Buyback Auditor",
+   "read": 1,
    "email": 1,
    "export": 1,
    "print": 1,
+   "report": 1
+  },
+  {
+   "role": "Buyback Admin",
    "read": 1,
-   "report": 1,
-   "role": "Buyback Store Manager",
-   "share": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
    "submit": 1,
-   "write": 1
+   "cancel": 1,
+   "amend": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "report": 1,
+   "share": 1
+  },
+  {
+   "role": "Buyback Store Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "submit": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "report": 1,
+   "share": 1
   }
  ],
  "search_fields": "customer_name,item_name,status,store",

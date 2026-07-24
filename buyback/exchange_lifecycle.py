@@ -18,8 +18,10 @@ from __future__ import annotations
 import frappe
 from frappe import _
 
+from buyback.utils import assert_buyback_scope, is_privileged_user, require_configured_role
 
-@frappe.whitelist()
+
+@frappe.whitelist(methods=["POST"])
 def ensure_exchange_order_from_assessment(
     assessment_name: str,
     customer: str | None = None,
@@ -45,12 +47,27 @@ def ensure_exchange_order_from_assessment(
     if not assessment_name:
         frappe.throw(_("assessment_name is required"))
 
+    require_configured_role(
+        "exchange_creation_roles", action=_("create a Buyback Exchange Order")
+    )
+
     if not frappe.db.exists("Buyback Assessment", assessment_name):
         frappe.throw(
             _("Buyback Assessment {0} not found").format(frappe.bold(assessment_name))
         )
 
     assessment = frappe.get_doc("Buyback Assessment", assessment_name)
+    if not is_privileged_user():
+        assessment.check_permission("write")
+    assert_buyback_scope(
+        store=getattr(assessment, "store", None),
+        company=getattr(assessment, "company", None),
+    )
+    frappe.db.sql(
+        "SELECT name FROM `tabBuyback Assessment` WHERE name = %s FOR UPDATE",
+        (assessment.name,),
+    )
+    assessment.reload()
 
     # ── 1. Reuse ────────────────────────────────────────────────────────
     existing = getattr(assessment, "linked_exchange_order", None)
@@ -73,6 +90,12 @@ def ensure_exchange_order_from_assessment(
 
     if buyback_order:
         bo = frappe.get_doc("Buyback Order", buyback_order)
+        if not is_privileged_user():
+            bo.check_permission("write")
+        assert_buyback_scope(
+            store=getattr(bo, "store", None),
+            company=getattr(bo, "company", None),
+        )
         # Prefer BO's built-in idempotent creator when settlement is Exchange.
         creator = getattr(bo, "_ensure_exchange_order_exists", None)
         if callable(creator):
@@ -106,8 +129,22 @@ def ensure_exchange_order_from_assessment(
         getattr(assessment, "quoted_price", None)
         or getattr(assessment, "estimated_price", None)
     )
-    exch_customer = customer or getattr(assessment, "customer", None)
-    exch_mobile = mobile_no or getattr(assessment, "mobile_no", None)
+    assessment_customer = getattr(assessment, "customer", None)
+    if customer and assessment_customer and customer != assessment_customer:
+        frappe.throw(_("Customer does not match the Buyback Assessment."), frappe.PermissionError)
+    exch_customer = assessment_customer or customer
+    if exch_customer and not is_privileged_user():
+        frappe.has_permission("Customer", ptype="read", doc=exch_customer, throw=True)
+    customer_mobile = (
+        frappe.db.get_value("Customer", exch_customer, "mobile_no")
+        if exch_customer
+        else None
+    )
+    assessment_mobile = getattr(assessment, "mobile_no", None)
+    trusted_mobile = assessment_mobile or customer_mobile
+    if mobile_no and trusted_mobile and str(mobile_no).strip() != str(trusted_mobile).strip():
+        frappe.throw(_("Mobile number does not match the Buyback Assessment."), frappe.PermissionError)
+    exch_mobile = trusted_mobile
 
     if not exch_customer:
         frappe.throw(
@@ -136,7 +173,7 @@ def ensure_exchange_order_from_assessment(
             "buyback_amount": price,
         }
     )
-    doc.insert(ignore_permissions=True)
+    doc.insert()
     _link_back_to_assessment(assessment, doc.name)
     return {
         "exchange_order": doc.name,
@@ -147,26 +184,9 @@ def ensure_exchange_order_from_assessment(
 
 
 def _link_back_to_assessment(assessment, exchange_order_name: str) -> None:
-    """Best-effort back-link on Buyback Assessment for future reuse.
-
-    Silent if the target field isn't present — this lets the helper work on
-    older sites that haven't picked up the Phase B custom field yet.
-    """
+    """Persist the canonical exchange-order link when the field is available."""
     if not hasattr(assessment, "linked_exchange_order"):
         return
     if getattr(assessment, "linked_exchange_order", None) == exchange_order_name:
         return
-    try:
-        frappe.db.set_value(
-            "Buyback Assessment",
-            assessment.name,
-            "linked_exchange_order",
-            exchange_order_name,
-            update_modified=False,
-        )
-    except Exception:
-        # Not fatal for POS.
-        frappe.log_error(
-            frappe.get_traceback(),
-            "exchange_lifecycle: linked_exchange_order backfill failed",
-        )
+    assessment.db_set("linked_exchange_order", exchange_order_name, update_modified=False)

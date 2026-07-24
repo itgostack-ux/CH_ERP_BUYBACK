@@ -9,11 +9,22 @@ SLA tracking architecture:
 - Warning = 80% of target elapsed
 """
 
+import hashlib
+
 import frappe
 from frappe import _
 from frappe.utils import (
     now_datetime, get_datetime, time_diff_in_seconds, cint,
-    add_to_date, nowdate, get_url_to_form,
+    add_days, add_to_date, getdate, nowdate, get_url_to_form,
+)
+
+from buyback.utils import (
+    assert_buyback_scope,
+    claim_scheduler_alert,
+    get_int_setting,
+    is_privileged_user,
+    new_scheduler_alert_budget,
+    require_configured_role,
 )
 
 # ─── Default SLA targets (minutes) ──────────────────────────────────────────
@@ -26,6 +37,64 @@ DEFAULT_SLAS = {
     "exchange_delivery_to_pickup": 2880,  # 48 hours
     "variance_approval": 20,
 }
+
+
+def _sla_target(sla_name):
+    _settings, rules = get_sla_settings()
+    configured = cint((rules.get(sla_name) or {}).get("target_minutes"))
+    return configured or DEFAULT_SLAS[sla_name]
+
+
+def _configured_sla_targets():
+    _settings, rules = get_sla_settings()
+    return {
+        name: cint((rules.get(name) or {}).get("target_minutes")) or default
+        for name, default in DEFAULT_SLAS.items()
+    }
+
+
+def _rotating_sla_rows(doctype, filters, fields, cache_key, batch_limit):
+    cursor = frappe.cache.get_value(cache_key)
+    if isinstance(cursor, bytes):
+        cursor = cursor.decode()
+
+    def fetch(name_filter, limit):
+        row_filters = dict(filters)
+        if name_filter:
+            row_filters["name"] = name_filter
+        return frappe.get_all(
+            doctype,
+            filters=row_filters,
+            fields=fields,
+            order_by="name asc",
+            limit_page_length=limit,
+        )
+
+    rows = fetch((">", cursor) if cursor else None, batch_limit)
+    if cursor and len(rows) < batch_limit:
+        rows.extend(fetch(("<=", cursor), batch_limit - len(rows)))
+    if rows:
+        frappe.cache.set_value(cache_key, rows[-1].name, expires_in_sec=7 * 86400)
+    return rows
+
+
+def _require_sla_read(doctype, doc=None):
+    if not is_privileged_user() and not frappe.has_permission(doctype, ptype="read", doc=doc):
+        frappe.throw(
+            _("You do not have read permission for {0}.").format(doctype),
+            frappe.PermissionError,
+        )
+
+
+def _scoped_linked_doc(doctype, name, order):
+    linked = frappe.get_doc(doctype, name)
+    _require_sla_read(doctype, linked)
+    if linked.get("company") and linked.company != order.company:
+        frappe.throw(_("The linked SLA document has an invalid company."), frappe.ValidationError)
+    if linked.get("store") and order.store and linked.store != order.store:
+        frappe.throw(_("The linked SLA document has an invalid store."), frappe.ValidationError)
+    assert_buyback_scope(store=linked.get("store"), company=linked.get("company"))
+    return linked
 
 
 def get_sla_settings():
@@ -87,117 +156,131 @@ def evaluate_all_slas():
     """Scheduled job — runs every 5 minutes.
     Evaluates SLA for all in-progress transactions.
     """
-    _evaluate_order_slas()
-    _evaluate_exchange_slas()
-    _evaluate_inspection_slas()
+    targets = _configured_sla_targets()
+    alert_budget = new_scheduler_alert_budget()
+    _evaluate_order_slas(targets, alert_budget)
+    _evaluate_exchange_slas(targets, alert_budget)
+    _evaluate_inspection_slas(targets, alert_budget)
 
 
-def _evaluate_order_slas():
+def _evaluate_order_slas(targets=None, alert_budget=None):
     """Evaluate SLAs on open Buyback Orders."""
-    open_orders = frappe.get_all(
+    targets = targets or _configured_sla_targets()
+    batch_limit = min(get_int_setting("scheduler_batch_limit", 500), 5000)
+    open_orders = _rotating_sla_rows(
         "Buyback Order",
-        filters={"docstatus": ["<", 2], "status": ["not in", ["Closed", "Cancelled", "Rejected"]]},
-        fields=["name", "status", "creation", "approval_date",
-                "otp_verified_at", "modified"],
-        limit=500,
+        {"docstatus": ["<", 2], "status": ["not in", ["Closed", "Cancelled", "Rejected"]]},
+        ["name", "status", "creation", "approval_date", "otp_verified_at", "store", "company"],
+        "buyback_sla_order_cursor",
+        batch_limit,
     )
 
     for order in open_orders:
-        sla_data = {}
-
         # SLA 1: Approval → Payment (applies when status = Approved or later)
         if order.status in ("Approved", "Awaiting OTP", "OTP Verified", "Ready to Pay"):
+            target = targets["approval_to_payment"]
             sla = calculate_sla_status(
                 order.approval_date or order.creation,
                 None,
-                DEFAULT_SLAS["approval_to_payment"]
+                target,
             )
             _create_sla_log(
                 "Buyback Order", order.name, "approval_to_payment",
                 sla["minutes_taken"], breached=(sla["status"] == "Breach"),
                 start_time=order.approval_date or order.creation,
-                expected_minutes=DEFAULT_SLAS["approval_to_payment"],
+                expected_minutes=target, store=order.store, company=order.company,
+                status=sla["status"],
             )
             if sla["status"] == "Breach":
                 _fire_sla_alert("Buyback Order", order.name,
-                                "approval_to_payment", sla["minutes_taken"])
+                                "approval_to_payment", sla["minutes_taken"], target, alert_budget)
 
         # SLA 2: Order creation → OTP/Payment completion
         if order.status == "Awaiting Approval":
-            # Pending approval — check variance approval SLA
+            target = targets["variance_approval"]
             sla = calculate_sla_status(
                 order.creation,
                 order.approval_date,
-                DEFAULT_SLAS["variance_approval"]
+                target,
             )
             _create_sla_log(
                 "Buyback Order", order.name, "variance_approval",
                 sla["minutes_taken"], breached=(sla["status"] == "Breach"),
                 start_time=order.creation, end_time=order.approval_date,
-                expected_minutes=DEFAULT_SLAS["variance_approval"],
+                expected_minutes=target, store=order.store, company=order.company,
+                status=sla["status"],
             )
             if sla["status"] == "Breach":
                 _fire_sla_alert("Buyback Order", order.name,
-                                "variance_approval", sla["minutes_taken"])
+                                "variance_approval", sla["minutes_taken"], target, alert_budget)
 
 
-def _evaluate_exchange_slas():
+def _evaluate_exchange_slas(targets=None, alert_budget=None):
     """Evaluate SLAs on open Exchange Orders."""
-    open_exchanges = frappe.get_all(
+    targets = targets or _configured_sla_targets()
+    batch_limit = min(get_int_setting("scheduler_batch_limit", 500), 5000)
+    open_exchanges = _rotating_sla_rows(
         "Buyback Exchange Order",
-        filters={"docstatus": ["<", 2], "status": ["not in", ["Closed", "Cancelled"]]},
-        fields=["name", "status", "new_device_delivered_at",
-                "old_device_received_at", "creation"],
-        limit=500,
+        {"docstatus": ["<", 2], "status": ["not in", ["Closed", "Cancelled"]]},
+        ["name", "status", "new_device_delivered_at", "old_device_received_at", "creation", "store", "company"],
+        "buyback_sla_exchange_cursor",
+        batch_limit,
     )
 
     for ex in open_exchanges:
         if ex.status in ("New Device Delivered", "Awaiting Pickup") and ex.new_device_delivered_at:
+            target = targets["exchange_delivery_to_pickup"]
             sla = calculate_sla_status(
                 ex.new_device_delivered_at,
                 ex.old_device_received_at,
-                DEFAULT_SLAS["exchange_delivery_to_pickup"]
+                target,
             )
             _create_sla_log(
                 "Buyback Exchange Order", ex.name, "exchange_delivery_to_pickup",
                 sla["minutes_taken"], breached=(sla["status"] == "Breach"),
                 start_time=ex.new_device_delivered_at, end_time=ex.old_device_received_at,
-                expected_minutes=DEFAULT_SLAS["exchange_delivery_to_pickup"],
+                expected_minutes=target, store=ex.store, company=ex.company,
+                status=sla["status"],
             )
             if sla["status"] == "Breach":
                 _fire_sla_alert("Buyback Exchange Order", ex.name,
-                                "exchange_delivery_to_pickup", sla["minutes_taken"])
+                                "exchange_delivery_to_pickup", sla["minutes_taken"], target, alert_budget)
 
 
-def _evaluate_inspection_slas():
+def _evaluate_inspection_slas(targets=None, alert_budget=None):
     """Evaluate SLAs on open Inspections."""
-    open_inspections = frappe.get_all(
+    targets = targets or _configured_sla_targets()
+    batch_limit = min(get_int_setting("scheduler_batch_limit", 500), 5000)
+    open_inspections = _rotating_sla_rows(
         "Buyback Inspection",
-        filters={"status": "In Progress"},
-        fields=["name", "inspection_started_at", "inspection_completed_at"],
-        limit=500,
+        {"status": "In Progress"},
+        ["name", "inspection_started_at", "inspection_completed_at", "store", "company"],
+        "buyback_sla_inspection_cursor",
+        batch_limit,
     )
 
     for insp in open_inspections:
         if insp.inspection_started_at:
+            target = targets["quote_to_inspection"]
             sla = calculate_sla_status(
                 insp.inspection_started_at,
                 insp.inspection_completed_at,
-                DEFAULT_SLAS["quote_to_inspection"]
+                target,
             )
             _create_sla_log(
                 "Buyback Inspection", insp.name, "inspection_delay",
                 sla["minutes_taken"], breached=(sla["status"] == "Breach"),
                 start_time=insp.inspection_started_at,
                 end_time=insp.inspection_completed_at,
-                expected_minutes=DEFAULT_SLAS["quote_to_inspection"],
+                expected_minutes=target, store=insp.store, company=insp.company,
+                status=sla["status"],
             )
             if sla["status"] == "Breach":
                 _fire_sla_alert("Buyback Inspection", insp.name,
-                                "inspection_delay", sla["minutes_taken"])
+                                "inspection_delay", sla["minutes_taken"], target, alert_budget)
 
 
-def _fire_sla_alert(doctype, name, sla_type, minutes_taken):
+def _fire_sla_alert(doctype, name, sla_type, minutes_taken, target_minutes=None, alert_budget=None):
     """Create an alert for SLA breach.
 
     Notification scoping (was: broadcast to doc.owner, causing toast spam to
@@ -208,8 +291,7 @@ def _fire_sla_alert(doctype, name, sla_type, minutes_taken):
         WhatsApp) is delegated to `alerts.alert_sla_breach()`, which resolves
         recipients through `notification_router.get_scoped_users()` and
         filters by:
-            - Roles: Buyback Manager, Buyback Store Manager, Buyback Admin
-              ("respective store / Buyback Team / manager / executives").
+            - Roles: the configured Buyback Settings SLA alert role set.
             - Store: only users whose CH User Scope covers the order's
               store get the toast. Bypass users (National Head, COO, etc.)
               see all stores. Mirrors SAP S/4HANA plant-based notification
@@ -227,6 +309,8 @@ def _fire_sla_alert(doctype, name, sla_type, minutes_taken):
     # Avoid duplicate alerts in same hour
     if frappe.cache.get_value(alert_key):
         return
+    if not claim_scheduler_alert(alert_budget):
+        return
 
     # Always log the breach (audit), even if recipient resolution fails.
     try:
@@ -235,7 +319,7 @@ def _fire_sla_alert(doctype, name, sla_type, minutes_taken):
         frappe.log_error(title="SLA breach logging failed")
 
     # Dispatch user-facing notification through the scoped path.
-    target_minutes = DEFAULT_SLAS.get(sla_type, 0)
+    target_minutes = target_minutes or DEFAULT_SLAS.get(sla_type, 0)
     try:
         from buyback.buyback.alerts import alert_sla_breach
         alert_sla_breach(doctype, name, sla_type, minutes_taken, target_minutes)
@@ -246,95 +330,78 @@ def _fire_sla_alert(doctype, name, sla_type, minutes_taken):
     frappe.cache.set_value(alert_key, 1, expires_in_sec=3600)
 
 
-def _get_company_zone_location_context(doc):
-    """Resolve basic Company/Zone/Location context for alert messages."""
-    company = (getattr(doc, "company", "") or "").strip()
-    zone = (
-        getattr(doc, "zone", "")
-        or getattr(doc, "ch_zone", "")
-        or ""
-    ).strip()
-
-    store = (
-        getattr(doc, "store", "")
-        or getattr(doc, "source_warehouse", "")
-        or getattr(doc, "warehouse", "")
-        or ""
-    ).strip()
-    location = store
-
-    if store and frappe.db.exists("Warehouse", store):
-        wh = frappe.db.get_value(
-            "Warehouse",
-            store,
-            ["company", "ch_zone", "warehouse_name"],
-            as_dict=True,
-        ) or {}
-        if not company:
-            company = (wh.get("company") or "").strip()
-        if not zone:
-            zone = (wh.get("ch_zone") or "").strip()
-        location = (wh.get("warehouse_name") or store or "").strip()
-
-    return {
-        "company": company or "-",
-        "zone": zone or "-",
-        "location": location or "-",
-    }
-
-
 def _log_sla_breach(doctype, name, sla_type, minutes_taken):
-    """Log SLA breach to Buyback Audit Log and Buyback SLA Log."""
-    if frappe.db.exists("DocType", "Buyback Audit Log"):
-        frappe.get_doc({
-            "doctype": "Buyback Audit Log",
-            "action": "SLA Breach" if "SLA Breach" in (
-                frappe.get_meta("Buyback Audit Log").get_field("action").options or ""
-            ) else "Order Created",
-            "reference_doctype": doctype,
-            "reference_name": name,
-            "reason": f"SLA Breach: {sla_type} — {minutes_taken:.0f} minutes elapsed",
-        }).insert(ignore_permissions=True)
-
-    _create_sla_log(doctype, name, sla_type, minutes_taken, breached=True)
+    """Log one SLA breach audit record."""
+    frappe.get_doc({
+        "doctype": "Buyback Audit Log",
+        "action": "SLA Breach" if "SLA Breach" in (
+            frappe.get_meta("Buyback Audit Log").get_field("action").options or ""
+        ) else "Order Created",
+        "reference_doctype": doctype,
+        "reference_name": name,
+        "reason": f"SLA Breach: {sla_type} — {minutes_taken:.0f} minutes elapsed",
+    }).insert(ignore_permissions=True)
 
 
 def _create_sla_log(doctype, name, sla_type, actual_minutes, breached=False,
-                    start_time=None, end_time=None, expected_minutes=None):
-    """Create a Buyback SLA Log record for tracking and reporting."""
-    if not frappe.db.exists("DocType", "Buyback SLA Log"):
-        return
-
+                    start_time=None, end_time=None, expected_minutes=None,
+                    store=None, company=None, status=None):
+    """Upsert the current SLA stage snapshot without growing one row per poll."""
     target = expected_minutes or DEFAULT_SLAS.get(sla_type, 0)
-
-    # Avoid duplicate log for this doc+stage in the same evaluation window
-    cache_key = f"sla_log_{doctype}_{name}_{sla_type}"
-    if frappe.cache.get_value(cache_key):
-        return
-    frappe.cache.set_value(cache_key, 1, expires_in_sec=300)  # 5-min window
-
+    actual = round(actual_minutes, 1) if actual_minutes else 0
+    status = status or ("Breach" if breached else "On Time")
+    breached = cint(status == "Breach" or breached)
+    log_name = "SLA-" + hashlib.sha256(
+        f"{doctype}\0{name}\0{sla_type}".encode()
+    ).hexdigest()[:32]
+    timestamp = now_datetime()
+    user = frappe.session.user
     try:
-        doc = frappe.get_doc(doctype, name)
-        store = getattr(doc, "store", None)
-        company = getattr(doc, "company", None)
-    except frappe.DoesNotExistError:
-        store = None
-        company = None
-
-    frappe.get_doc({
-        "doctype": "Buyback SLA Log",
-        "sla_stage": sla_type,
-        "reference_doctype": doctype,
-        "reference_name": name,
-        "store": store,
-        "company": company,
-        "start_time": start_time,
-        "end_time": end_time,
-        "expected_minutes": target,
-        "actual_minutes": round(actual_minutes, 1) if actual_minutes else 0,
-        "breached": cint(breached),
-        "status": "Breach" if breached else "On Time",
-    }).insert(ignore_permissions=True)
+        frappe.db.sql(
+            """
+            INSERT INTO `tabBuyback SLA Log`
+                (name, creation, modified, owner, modified_by, docstatus, idx,
+                 sla_stage, reference_doctype, reference_name, store, company,
+                 start_time, end_time, expected_minutes, actual_minutes,
+                 exceeded_by, breached, status)
+            VALUES
+                (%(name)s, %(timestamp)s, %(timestamp)s, %(user)s, %(user)s, 0, 0,
+                 %(sla_stage)s, %(reference_doctype)s, %(reference_name)s, %(store)s, %(company)s,
+                 %(start_time)s, %(end_time)s, %(expected_minutes)s, %(actual_minutes)s,
+                 %(exceeded_by)s, %(breached)s, %(status)s)
+            ON DUPLICATE KEY UPDATE
+                modified = VALUES(modified),
+                modified_by = VALUES(modified_by),
+                store = VALUES(store),
+                company = VALUES(company),
+                start_time = COALESCE(VALUES(start_time), start_time),
+                end_time = COALESCE(VALUES(end_time), end_time),
+                expected_minutes = VALUES(expected_minutes),
+                actual_minutes = VALUES(actual_minutes),
+                exceeded_by = VALUES(exceeded_by),
+                breached = VALUES(breached),
+                status = VALUES(status)
+            """,
+            {
+                "name": log_name,
+                "timestamp": timestamp,
+                "user": user,
+                "sla_stage": sla_type,
+                "reference_doctype": doctype,
+                "reference_name": name,
+                "store": store,
+                "company": company,
+                "start_time": start_time,
+                "end_time": end_time,
+                "expected_minutes": target,
+                "actual_minutes": actual,
+                "exceeded_by": round(actual - target, 1),
+                "breached": breached,
+                "status": status,
+            },
+        )
+    except Exception:
+        frappe.log_error(frappe.get_traceback(), f"SLA log creation failed for {doctype} {name}")
 
 
 # ─── SLA computation for a single document ───────────────────────────────────
@@ -342,26 +409,29 @@ def _create_sla_log(doctype, name, sla_type, actual_minutes, breached=False,
 @frappe.whitelist()
 def get_order_sla_summary(order_name) -> dict:
     """Get SLA status for all stages of a Buyback Order."""
+    require_configured_role("dashboard_roles", action=_("view order SLA details"))
     doc = frappe.get_doc("Buyback Order", order_name)
+    _require_sla_read("Buyback Order", doc)
+    assert_buyback_scope(store=doc.store, company=doc.company)
 
     # Assessment → Inspection (if linked)
     assessment_to_inspection = {}
     if doc.buyback_assessment and doc.buyback_inspection:
-        a = frappe.get_doc("Buyback Assessment", doc.buyback_assessment)
-        i = frappe.get_doc("Buyback Inspection", doc.buyback_inspection)
+        a = _scoped_linked_doc("Buyback Assessment", doc.buyback_assessment, doc)
+        i = _scoped_linked_doc("Buyback Inspection", doc.buyback_inspection, doc)
         assessment_to_inspection = calculate_sla_status(
             a.creation, i.creation,
-            DEFAULT_SLAS["quote_to_inspection"]
+            _sla_target("quote_to_inspection")
         )
         assessment_to_inspection["label"] = "Assessment → Inspection"
 
     # Inspection → Confirmation
     insp_to_confirm = {}
     if doc.buyback_inspection:
-        i = frappe.get_doc("Buyback Inspection", doc.buyback_inspection)
+        i = _scoped_linked_doc("Buyback Inspection", doc.buyback_inspection, doc)
         insp_to_confirm = calculate_sla_status(
             i.inspection_completed_at, doc.creation,
-            DEFAULT_SLAS["inspection_to_confirmation"]
+            _sla_target("inspection_to_confirmation")
         )
         insp_to_confirm["label"] = "Inspection → Order Created"
 
@@ -369,7 +439,7 @@ def get_order_sla_summary(order_name) -> dict:
     order_to_approval = calculate_sla_status(
         doc.creation,
         doc.approval_date,
-        DEFAULT_SLAS["confirmation_to_approval"]
+        _sla_target("confirmation_to_approval")
     )
     order_to_approval["label"] = "Order → Approval"
 
@@ -385,12 +455,12 @@ def get_order_sla_summary(order_name) -> dict:
         approval_to_payment = calculate_sla_status(
             doc.approval_date,
             first_payment,
-            DEFAULT_SLAS["approval_to_payment"]
+            _sla_target("approval_to_payment")
         )
         approval_to_payment["label"] = "Approval → Payment"
 
     return {
-        "quote_to_inspection": quote_to_inspection,
+        "quote_to_inspection": assessment_to_inspection,
         "inspection_to_confirmation": insp_to_confirm,
         "order_to_approval": order_to_approval,
         "approval_to_payment": approval_to_payment,
@@ -400,16 +470,42 @@ def get_order_sla_summary(order_name) -> dict:
 @frappe.whitelist()
 def get_branch_sla_summary(store, date=None) -> dict:
     """Get SLA summary for a branch on a given date."""
-    date = date or nowdate()
+    require_configured_role("dashboard_roles", action=_("view branch SLA details"))
+    _require_sla_read("Buyback Order")
+    _require_sla_read("CH Store")
+    store_row = frappe.db.get_value(
+        "CH Store",
+        store,
+        ["name", "warehouse", "company", "disabled"],
+        as_dict=True,
+    )
+    if not store_row:
+        store_row = frappe.db.get_value(
+            "CH Store",
+            {"warehouse": store, "disabled": 0},
+            ["name", "warehouse", "company", "disabled"],
+            as_dict=True,
+        )
+    if not store_row or store_row.disabled:
+        frappe.throw(_("The selected store is missing or disabled."), frappe.ValidationError)
+    assert_buyback_scope(
+        store=store_row.name,
+        warehouse=store_row.warehouse,
+        company=store_row.company,
+    )
+    date = getdate(date or nowdate())
+    next_date = add_days(date, 1)
+    order_limit = get_int_setting("sla_summary_order_limit", 500)
 
     orders = frappe.get_all(
         "Buyback Order",
         filters={
-            "store": store,
-            "creation": (">=", f"{date} 00:00:00"),
+            "store": ("in", [store_row.name, store_row.warehouse]),
+            "creation": ("between", [f"{date} 00:00:00", f"{next_date} 00:00:00"]),
             "docstatus": ["<", 2],
         },
         fields=["name", "status", "creation", "approval_date", "otp_verified_at"],
+        limit_page_length=order_limit,
     )
 
     total = len(orders)
@@ -421,12 +517,12 @@ def get_branch_sla_summary(store, date=None) -> dict:
         if order.approval_date:
             sla = calculate_sla_status(
                 order.creation, order.approval_date,
-                DEFAULT_SLAS["confirmation_to_approval"]
+                _sla_target("confirmation_to_approval")
             )
         else:
             sla = calculate_sla_status(
                 order.creation, None,
-                DEFAULT_SLAS["confirmation_to_approval"]
+                _sla_target("confirmation_to_approval")
             )
 
         if sla["status"] == "Breach":
@@ -437,8 +533,8 @@ def get_branch_sla_summary(store, date=None) -> dict:
             on_time += 1
 
     return {
-        "store": store,
-        "date": date,
+        "store": store_row.name,
+        "date": str(date),
         "total_orders": total,
         "on_time": on_time,
         "warnings": warnings,

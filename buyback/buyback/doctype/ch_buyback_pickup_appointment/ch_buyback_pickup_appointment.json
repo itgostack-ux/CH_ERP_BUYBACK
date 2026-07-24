@@ -225,9 +225,44 @@
  "naming_rule": "By \"Naming Series\" field",
  "owner": "Administrator",
  "permissions": [
-  {"role": "System Manager", "create": 1, "read": 1, "write": 1, "delete": 1, "submit": 1, "cancel": 1, "amend": 1, "email": 1, "print": 1, "share": 1, "report": 1},
-  {"role": "Buyback Manager", "create": 1, "read": 1, "write": 1, "submit": 1, "cancel": 1, "amend": 1, "email": 1, "print": 1, "report": 1, "share": 1},
-  {"role": "Buyback User", "create": 1, "read": 1, "write": 1, "submit": 1, "email": 1, "print": 1, "report": 1}
+  {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "submit": 1,
+   "cancel": 1,
+   "amend": 1,
+   "email": 1,
+   "import": 1,
+   "print": 1,
+   "report": 1,
+   "share": 1
+  },
+  {
+   "role": "Buyback Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "submit": 1,
+   "cancel": 1,
+   "amend": 1,
+   "email": 1,
+   "print": 1,
+   "report": 1,
+   "share": 1
+  },
+  {
+   "role": "Buyback User",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "submit": 1,
+   "email": 1,
+   "print": 1,
+   "report": 1
+  }
  ],
  "sort_field": "modified",
  "sort_order": "DESC",

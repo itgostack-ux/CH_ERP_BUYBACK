@@ -210,10 +210,17 @@ def _notify_awaiting_customer_approval(doc, phone, customer_name):
                 customer_email = frappe.db.get_value("Customer", {"mobile_no": doc.mobile_no}, "email_id")
 
             if customer_email:
-                subject = f"Congruence Holdings | GoGizmo Buyback Approval | {doc.name}"
+                company_label = (
+                    frappe.get_cached_value("Company", doc.company, "company_name")
+                    or doc.company
+                    or frappe._("Our Store")
+                )
+                company_subject = str(company_label).replace("\r", " ").replace("\n", " ")
+                company_html = escape_html(company_label)
+                subject = f"{company_subject} | Buyback Approval | {doc.name}"
                 html = f"""
                 <div style="font-family:Segoe UI,Arial,sans-serif;max-width:620px;margin:auto;border:1px solid #e5e7eb;border-radius:10px;overflow:hidden">
-                    <div style="background:#0f172a;color:#ffffff;padding:12px 16px;font-weight:600">Congruence Holdings - GoGizmo Buyback</div>
+                    <div style="background:#0f172a;color:#ffffff;padding:12px 16px;font-weight:600">{company_html} - Buyback</div>
                     <div style="padding:16px">
                     <h2 style="color:#1a1a2e;margin-top:0">Buyback Offer for Your Approval</h2>
                     <p>Hi {escape_html(customer_name)},</p>

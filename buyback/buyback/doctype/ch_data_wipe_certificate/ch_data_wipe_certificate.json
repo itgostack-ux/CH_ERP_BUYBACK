@@ -152,13 +152,15 @@
    "fieldtype": "Link",
    "options": "User",
    "label": "Wiped By",
-   "reqd": 1
+   "reqd": 1,
+   "read_only": 1
   },
   {
    "fieldname": "wiped_at",
    "fieldtype": "Datetime",
    "label": "Wiped At",
-   "reqd": 1
+   "reqd": 1,
+   "read_only": 1
   },
   {
    "fieldname": "wipe_duration_minutes",
@@ -172,28 +174,35 @@
    "fieldtype": "Check",
    "label": "Wipe Verified",
    "default": "0",
-   "description": "Second-person check that the wipe completed successfully."
+   "description": "Second-person check that the wipe completed successfully.",
+   "read_only": 1
   },
   {
    "fieldname": "verified_by",
    "fieldtype": "Link",
    "options": "User",
    "label": "Verified By",
-   "depends_on": "wipe_verified"
+   "depends_on": "wipe_verified",
+   "permlevel": 1,
+   "read_only": 1
   },
   {"fieldname": "column_break_verify", "fieldtype": "Column Break"},
   {
    "fieldname": "verified_at",
    "fieldtype": "Datetime",
    "label": "Verified At",
-   "depends_on": "wipe_verified"
+   "depends_on": "wipe_verified",
+   "permlevel": 1,
+   "read_only": 1
   },
   {
    "fieldname": "verification_method",
    "fieldtype": "Select",
    "label": "Verification Method",
    "options": "\nVisual — Fresh Boot Screen\nTool Report\nHash Comparison\nCryptographic Key Destruction",
-   "depends_on": "wipe_verified"
+   "depends_on": "wipe_verified",
+   "permlevel": 1,
+   "read_only": 1
   },
   {"fieldname": "evidence_section", "fieldtype": "Section Break", "label": "Evidence"},
   {
@@ -223,9 +232,50 @@
  "naming_rule": "By \"Naming Series\" field",
  "owner": "Administrator",
  "permissions": [
-  {"role": "System Manager", "create": 1, "read": 1, "write": 1, "delete": 1, "submit": 1, "cancel": 1, "amend": 1, "email": 1, "print": 1, "share": 1, "report": 1},
-  {"role": "Buyback Manager", "create": 1, "read": 1, "write": 1, "submit": 1, "cancel": 1, "amend": 1, "email": 1, "print": 1, "report": 1, "share": 1},
-  {"role": "Buyback User", "create": 1, "read": 1, "write": 1, "submit": 1, "email": 1, "print": 1, "report": 1}
+  {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "submit": 1,
+   "cancel": 1,
+   "amend": 1,
+   "email": 1,
+   "import": 1,
+   "print": 1,
+   "report": 1,
+   "share": 1
+  },
+  {
+   "role": "System Manager",
+   "permlevel": 1,
+   "read": 1,
+   "write": 1
+  },
+  {
+   "role": "Buyback Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "submit": 1,
+   "cancel": 1,
+   "amend": 1,
+   "email": 1,
+   "print": 1,
+   "report": 1,
+   "share": 1
+  },
+  {
+   "role": "Buyback User",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "submit": 1,
+   "email": 1,
+   "print": 1,
+   "report": 1
+  }
  ],
  "sort_field": "modified",
  "sort_order": "DESC",

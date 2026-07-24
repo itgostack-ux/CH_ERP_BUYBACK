@@ -5,6 +5,7 @@ Creates custom roles and seed data required by the buyback workflow.
 
 import frappe
 from frappe import _
+from frappe.utils import cint
 
 
 BUYBACK_ROLES = [
@@ -55,6 +56,32 @@ def after_install():
     from buyback.custom_fields import setup_custom_fields
     setup_custom_fields()
     create_reporting_indexes()
+    ensure_default_permissions()
+
+
+def ensure_default_permissions():
+    from ch_erp15.ch_erp15.default_permissions import seed_default_docperms
+
+    operational_roles = (
+        "Buyback Agent",
+        "Buyback Store Manager",
+        "Buyback Manager",
+        "Buyback Admin",
+    )
+    pickup_roles = (
+        "Buyback Store Manager",
+        "Buyback Manager",
+        "Buyback Admin",
+    )
+    seed_default_docperms({
+        "Customer": {role: {"read"} for role in operational_roles},
+        "Material Request": {
+            role: {"read", "create", "submit"} for role in pickup_roles
+        },
+        "Item": {role: {"read"} for role in pickup_roles},
+        "Warehouse": {role: {"read"} for role in pickup_roles},
+        "Sales Invoice": {role: {"read"} for role in pickup_roles},
+    })
 
 
 def before_install():
@@ -76,6 +103,7 @@ def _ensure_system_settings_ready():
             sync_system_settings,
         )
     except Exception:
+        frappe.log_error(frappe.get_traceback(), "System Settings helpers import failed")
         clear_system_settings_cache = None  # type: ignore[assignment]
         sync_system_settings = None  # type: ignore[assignment]
 
@@ -83,13 +111,13 @@ def _ensure_system_settings_ready():
         try:
             sync_system_settings()
         except Exception:
-            pass
+            frappe.log_error(frappe.get_traceback(), "System Settings synchronization failed")
 
     # Materialize singleton doc in this request context.
     try:
         frappe.get_single("System Settings")
     except Exception:
-        pass
+        frappe.log_error(frappe.get_traceback(), "System Settings materialization failed")
 
     # Keep timezone non-empty for now()/ZoneInfo during fixture import.
     try:
@@ -101,13 +129,13 @@ def _ensure_system_settings_ready():
                 update_modified=False,
             )
     except Exception:
-        pass
+        frappe.log_error(frappe.get_traceback(), "System Settings timezone initialization failed")
 
     if clear_system_settings_cache:
         try:
             clear_system_settings_cache()
         except Exception:
-            pass
+            frappe.log_error(frappe.get_traceback(), "System Settings cache clear failed")
 
     frappe.db.commit()
 
@@ -144,6 +172,60 @@ def sync_default_settings():
     _create_default_settings()
 
 
+def ensure_workflow_system_manager_parity():
+    for workflow_name in ("Buyback Order Workflow", "Buyback Exchange Order Workflow"):
+        if not frappe.db.exists("Workflow", workflow_name):
+            continue
+        workflow = frappe.get_doc("Workflow", workflow_name)
+        changed = False
+
+        system_states = {
+            (row.state, cint(row.doc_status))
+            for row in workflow.states
+            if row.allow_edit == "System Manager"
+        }
+        for row in list(workflow.states):
+            signature = (row.state, cint(row.doc_status))
+            if row.allow_edit == "System Manager" or signature in system_states:
+                continue
+            workflow.append("states", {
+                "state": row.state,
+                "doc_status": row.doc_status,
+                "allow_edit": "System Manager",
+                "is_optional_state": row.is_optional_state,
+                "update_field": row.update_field,
+                "update_value": row.update_value,
+            })
+            system_states.add(signature)
+            changed = True
+
+        def transition_signature(row):
+            return (row.state, row.action, row.next_state, row.condition or "")
+
+        system_transitions = {
+            transition_signature(row)
+            for row in workflow.transitions
+            if row.allowed == "System Manager"
+        }
+        for row in list(workflow.transitions):
+            signature = transition_signature(row)
+            if row.allowed == "System Manager" or signature in system_transitions:
+                continue
+            workflow.append("transitions", {
+                "state": row.state,
+                "action": row.action,
+                "next_state": row.next_state,
+                "allowed": "System Manager",
+                "allow_self_approval": row.allow_self_approval,
+                "condition": row.condition,
+            })
+            system_transitions.add(signature)
+            changed = True
+
+        if changed:
+            workflow.save(ignore_permissions=True)
+
+
 def _create_default_settings():
     """Seed Buyback Settings with sensible defaults (if empty)."""
     settings = frappe.get_single("Buyback Settings")
@@ -159,6 +241,10 @@ def _create_default_settings():
         settings.otp_expiry_minutes = 10
     if not settings.max_otp_attempts:
         settings.max_otp_attempts = 3
+    if not settings.max_pickup_attempts:
+        settings.max_pickup_attempts = 3
+    if settings.meta.has_field("sla_summary_order_limit") and not settings.sla_summary_order_limit:
+        settings.sla_summary_order_limit = 500
     if not settings.require_manager_approval_above:
         settings.require_manager_approval_above = 50000
     company = settings.default_company or frappe.defaults.get_global_default("company")

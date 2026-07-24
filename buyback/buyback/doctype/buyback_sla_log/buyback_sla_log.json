@@ -151,15 +151,19 @@
  "owner": "Administrator",
  "permissions": [
   {
-   "read": 1,
-   "report": 1,
    "role": "System Manager",
-   "export": 1
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "export": 1,
+   "import": 1,
+   "report": 1
   },
   {
+   "role": "Buyback Manager",
    "read": 1,
-   "report": 1,
-   "role": "Buyback Manager"
+   "report": 1
   }
  ],
  "search_fields": "sla_stage,reference_name,store",

@@ -3,6 +3,8 @@ from frappe import _
 from frappe.model.document import Document
 from frappe.utils import flt
 
+from buyback.utils import next_numeric_external_id
+
 
 # Fields that can only be written via the CH Price Upload Batch (maker/checker)
 _PRICE_FIELDS = [
@@ -24,15 +26,10 @@ _PRICE_FIELDS = [
 
 class BuybackPriceMaster(Document):
     def before_insert(self):
-        frappe.db.sql("SELECT GET_LOCK('buyback_price_master_id', 10)")
-        try:
-            last = frappe.db.sql("""
-                SELECT MAX(buyback_price_id) FROM `tabBuyback Price Master`
-            """)[0][0] or 0
-            self.buyback_price_id = last + 1
-            self.sku_id = self.buyback_price_id
-        finally:
-            frappe.db.sql("SELECT RELEASE_LOCK('buyback_price_master_id')")
+        self.buyback_price_id = next_numeric_external_id(
+            "Buyback Price Master", "buyback_price_id"
+        )
+        self.sku_id = self.buyback_price_id
 
     def _is_programmatic_price_update(self):
         """Allow price writes from approved CH Price Upload Batch or Ready Reckoner."""

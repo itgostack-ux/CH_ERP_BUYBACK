@@ -11,6 +11,15 @@
   "quote_validity_days",
   "max_otp_attempts",
   "otp_expiry_minutes",
+  "approval_token_ttl_hours",
+  "otp_send_limit_per_hour",
+  "otp_attempt_limit_per_ip",
+  "otp_attempt_limit_per_order",
+  "otp_attempt_window_minutes",
+  "public_quote_otp_rate_limit",
+  "public_quote_submit_rate_limit",
+  "public_quote_rate_window_seconds",
+  "public_quote_service_user",
   "pricing_section",
   "enable_auto_pricing",
   "price_rounding",
@@ -18,21 +27,66 @@
   "min_buyback_amount",
   "max_buyback_amount",
   "approval_section",
+  "app_access_roles",
   "require_manager_approval_above",
+  "manager_approval_roles",
+  "order_operation_roles",
+  "payment_operation_roles",
+  "exchange_creation_roles",
+  "otp_bypass_roles",
+  "imei_validation_roles",
+  "pickup_request_roles",
+  "assessment_operation_roles",
+  "inspection_operation_roles",
+  "max_diagnostic_rows",
+  "question_code_lock_timeout_seconds",
+  "question_code_suffix_retry_limit",
+  "portal_preview_roles",
+  "dashboard_roles",
+  "dashboard_suspicious_override_threshold",
+  "hub_stuck_otp_alert_threshold",
+  "hub_active_backlog_alert_threshold",
+  "hub_rejection_rate_alert_pct",
+  "hub_rejection_min_decisions",
+  "sla_summary_order_limit",
+  "scorecard_roles",
+  "scorecard_max_range_days",
+  "store_scorecard_configuration",
+  "inspector_scorecard_configuration",
+  "executive_scorecard_configuration",
+  "scorecard_grade_thresholds",
+  "imei_history_roles",
+  "customer_lookup_roles",
+  "customer_lookup_limit",
+  "refurbishment_creation_roles",
+  "refurbishment_operation_roles",
+  "refurbishment_restock_roles",
+  "max_refurbishment_rows",
   "require_ownership_proof_above",
   "require_otp_verification",
   "column_break_approval",
   "auto_expire_quotes",
   "payment_section",
   "default_payment_method",
+  "max_payment_rows",
   "column_break_pay",
   "enable_split_payment",
   "default_bank_profile",
   "notification_section",
   "send_sms_on_quote",
   "send_sms_on_order",
+  "sla_alert_roles",
+  "approval_alert_roles",
+  "fraud_alert_roles",
+  "alert_recipient_limit",
+  "scheduler_alert_limit",
+  "cash_limit_alert_pct",
+  "conversion_alert_lookback_days",
+  "conversion_alert_min_assessments",
   "column_break_notif",
   "send_email_on_order",
+  "cash_alert_roles",
+  "performance_alert_roles",
   "accounting_section",
   "buyback_expense_account",
     "buyback_liability_account",
@@ -47,12 +101,16 @@
   "logistics_section",
   "buyback_warehouse",
   "auto_create_pickup_request",
+  "max_pickup_attempts",
   "column_break_logistics",
   "pickup_notify_role",
   "require_buyback_enabled_store",
   "compliance_section",
   "require_indemnity_before_paid",
-  "require_data_wipe_before_restock"
+  "require_data_wipe_before_restock",
+  "scheduler_batch_limit",
+  "public_payload_max_chars",
+  "public_response_row_limit"
  ],
  "fields": [
   {
@@ -97,6 +155,74 @@
    "label": "OTP Expiry (Minutes)"
   },
   {
+   "default": "72",
+   "fieldname": "approval_token_ttl_hours",
+   "fieldtype": "Int",
+   "label": "Approval Token Validity (Hours)",
+   "non_negative": 1
+  },
+  {
+   "default": "5",
+   "fieldname": "otp_send_limit_per_hour",
+   "fieldtype": "Int",
+   "label": "OTP Send Limit Per Hour",
+   "non_negative": 1
+  },
+  {
+   "default": "5",
+   "fieldname": "otp_attempt_limit_per_ip",
+   "fieldtype": "Int",
+   "label": "OTP Attempts Per IP",
+   "non_negative": 1
+  },
+  {
+   "default": "20",
+   "fieldname": "otp_attempt_limit_per_order",
+   "fieldtype": "Int",
+   "label": "OTP Attempts Per Order",
+   "non_negative": 1
+  },
+  {
+   "default": "15",
+   "fieldname": "otp_attempt_window_minutes",
+   "fieldtype": "Int",
+   "label": "OTP Attempt Window (Minutes)",
+   "non_negative": 1
+  },
+  {
+   "default": "10",
+   "description": "Maximum public quote OTP sends per normalized mobile and client IP in one window.",
+   "fieldname": "public_quote_otp_rate_limit",
+   "fieldtype": "Int",
+   "label": "Public Quote OTP Rate Limit",
+   "non_negative": 1,
+   "reqd": 1
+  },
+  {
+   "default": "10",
+   "description": "Maximum public quote submission attempts per normalized mobile and client IP in one window.",
+   "fieldname": "public_quote_submit_rate_limit",
+   "fieldtype": "Int",
+   "label": "Public Quote Submit Rate Limit",
+   "non_negative": 1,
+   "reqd": 1
+  },
+  {
+   "default": "300",
+   "fieldname": "public_quote_rate_window_seconds",
+   "fieldtype": "Int",
+   "label": "Public Quote Rate Window (Seconds)",
+   "non_negative": 1,
+   "reqd": 1
+  },
+  {
+   "description": "Enabled System User with create permission on Buyback Assessment used after public OTP verification.",
+   "fieldname": "public_quote_service_user",
+   "fieldtype": "Link",
+   "label": "Public Quote Service User",
+   "options": "User"
+  },
+  {
    "fieldname": "pricing_section",
    "fieldtype": "Section Break",
    "label": "Pricing"
@@ -137,11 +263,249 @@
    "label": "Approval & Verification"
   },
   {
+   "default": "Buyback Agent\nBuyback Store Manager\nBuyback Manager\nBuyback Auditor\nBuyback Admin",
+   "fieldname": "app_access_roles",
+   "fieldtype": "Small Text",
+   "label": "App Access Roles"
+  },
+  {
    "default": "50000",
    "fieldname": "require_manager_approval_above",
    "fieldtype": "Currency",
    "label": "Require Manager Approval Above",
    "description": "Orders above this amount need manager approval"
+  },
+  {
+   "default": "Buyback Manager\nBuyback Admin\nSystem Manager",
+   "fieldname": "manager_approval_roles",
+   "fieldtype": "Small Text",
+   "label": "Manager Approval Roles"
+  },
+  {
+   "default": "Buyback Agent\nBuyback Store Manager\nBuyback Manager\nBuyback Admin",
+   "fieldname": "order_operation_roles",
+   "fieldtype": "Small Text",
+   "label": "Order Operation Roles"
+  },
+  {
+   "default": "Buyback Store Manager\nBuyback Manager\nBuyback Admin",
+   "fieldname": "payment_operation_roles",
+   "fieldtype": "Small Text",
+   "label": "Payment Operation Roles"
+  },
+  {
+   "default": "Buyback Agent\nBuyback Store Manager\nBuyback Manager\nBuyback Admin",
+   "description": "Roles allowed to create exchange orders from a named, in-scope assessment. Administrator and System Manager always retain access.",
+   "fieldname": "exchange_creation_roles",
+   "fieldtype": "Small Text",
+   "label": "Exchange Order Creation Roles"
+  },
+  {
+   "default": "Buyback Store Manager\nBuyback Manager\nBuyback Admin",
+   "fieldname": "otp_bypass_roles",
+   "fieldtype": "Small Text",
+   "label": "In-Store OTP Bypass Roles"
+  },
+  {
+   "default": "Buyback Agent\nBuyback Store Manager\nBuyback Manager\nBuyback Admin",
+   "fieldname": "imei_validation_roles",
+   "fieldtype": "Small Text",
+   "label": "IMEI Validation Roles"
+  },
+  {
+   "default": "Buyback Store Manager\nBuyback Manager\nBuyback Admin",
+   "fieldname": "pickup_request_roles",
+   "fieldtype": "Small Text",
+   "label": "Pickup Request Roles"
+  },
+  {
+   "default": "Buyback Agent\nBuyback Store Manager\nBuyback Manager\nBuyback Admin",
+   "fieldname": "assessment_operation_roles",
+   "fieldtype": "Small Text",
+   "label": "Assessment Operation Roles"
+  },
+  {
+   "default": "Buyback Agent\nBuyback Store Manager\nBuyback Manager\nBuyback Admin",
+   "fieldname": "inspection_operation_roles",
+   "fieldtype": "Small Text",
+   "label": "Inspection Operation Roles"
+  },
+  {
+   "default": "100",
+   "fieldname": "max_diagnostic_rows",
+   "fieldtype": "Int",
+   "label": "Maximum Diagnostic Rows"
+  },
+  {
+   "default": "10",
+   "description": "Maximum time to wait for exclusive question-code allocation.",
+   "fieldname": "question_code_lock_timeout_seconds",
+   "fieldtype": "Int",
+   "label": "Question Code Lock Timeout (Seconds)",
+   "non_negative": 1,
+   "reqd": 1
+  },
+  {
+   "default": "100",
+   "description": "Maximum numeric suffix candidates checked before using a high-entropy fallback.",
+   "fieldname": "question_code_suffix_retry_limit",
+   "fieldtype": "Int",
+   "label": "Question Code Suffix Retry Limit",
+   "non_negative": 1,
+   "reqd": 1
+  },
+  {
+   "default": "System Manager",
+   "fieldname": "portal_preview_roles",
+   "fieldtype": "Small Text",
+   "label": "Portal Preview Roles"
+  },
+  {
+   "default": "Buyback Manager\nBuyback Auditor\nBuyback Admin",
+   "description": "Roles allowed to open Buyback dashboards. Administrator and System Manager always retain access.",
+   "fieldname": "dashboard_roles",
+   "fieldtype": "Small Text",
+   "label": "Dashboard Roles"
+  },
+  {
+   "default": "3",
+   "fieldname": "dashboard_suspicious_override_threshold",
+   "fieldtype": "Int",
+   "label": "Suspicious Override Threshold"
+  },
+  {
+   "default": "5",
+   "fieldname": "hub_stuck_otp_alert_threshold",
+   "fieldtype": "Int",
+   "label": "Hub Stuck OTP Alert Threshold",
+   "reqd": 1
+  },
+  {
+   "default": "20",
+   "fieldname": "hub_active_backlog_alert_threshold",
+   "fieldtype": "Int",
+   "label": "Hub Active Backlog Alert Threshold",
+   "reqd": 1
+  },
+  {
+   "default": "30",
+   "fieldname": "hub_rejection_rate_alert_pct",
+   "fieldtype": "Percent",
+   "label": "Hub Rejection Rate Alert",
+   "reqd": 1
+  },
+  {
+   "default": "5",
+   "fieldname": "hub_rejection_min_decisions",
+   "fieldtype": "Int",
+   "label": "Hub Rejection Minimum Decisions",
+   "reqd": 1
+  },
+  {
+   "default": "500",
+   "description": "Maximum buyback orders evaluated by one SLA branch summary request.",
+   "fieldname": "sla_summary_order_limit",
+   "fieldtype": "Int",
+   "label": "SLA Summary Order Limit",
+   "non_negative": 1,
+   "reqd": 1
+  },
+  {
+   "default": "Buyback Manager\nBuyback Auditor\nBuyback Admin",
+   "description": "Roles allowed to view store, inspector and executive scorecards.",
+   "fieldname": "scorecard_roles",
+   "fieldtype": "Small Text",
+   "label": "Scorecard Roles"
+  },
+  {
+   "default": "366",
+   "description": "Maximum inclusive date range accepted by scorecard APIs.",
+   "fieldname": "scorecard_max_range_days",
+   "fieldtype": "Int",
+   "label": "Scorecard Maximum Range (Days)",
+   "non_negative": 1
+  },
+  {
+   "default": "{\"conversion_target_pct\":80,\"rejection_zero_pct\":33.333,\"conversion_weight\":30,\"sla_weight\":30,\"average_value_weight\":20,\"rejection_weight\":20}",
+   "description": "JSON targets and percentage weights for store scorecards.",
+   "fieldname": "store_scorecard_configuration",
+   "fieldtype": "Code",
+   "label": "Store Scorecard Configuration",
+   "options": "JSON"
+  },
+  {
+   "default": "{\"daily_target\":10,\"duration_target_minutes\":30,\"grade_a_target_pct\":40,\"conversion_target_pct\":70,\"throughput_weight\":25,\"speed_weight\":25,\"grade_a_weight\":25,\"conversion_weight\":25}",
+   "description": "JSON targets and percentage weights for inspector scorecards.",
+   "fieldname": "inspector_scorecard_configuration",
+   "fieldtype": "Code",
+   "label": "Inspector Scorecard Configuration",
+   "options": "JSON"
+  },
+  {
+   "default": "{\"order_target\":50,\"conversion_target_pct\":70,\"rejection_zero_pct\":33.333,\"orders_weight\":30,\"conversion_weight\":30,\"sla_weight\":20,\"satisfaction_weight\":20}",
+   "description": "JSON targets and percentage weights for executive scorecards.",
+   "fieldname": "executive_scorecard_configuration",
+   "fieldtype": "Code",
+   "label": "Executive Scorecard Configuration",
+   "options": "JSON"
+  },
+  {
+   "default": "{\"a_plus\":90,\"a\":80,\"b\":70,\"c\":60,\"d\":50}",
+   "description": "JSON minimum composite scores for letter grades.",
+   "fieldname": "scorecard_grade_thresholds",
+   "fieldtype": "Code",
+   "label": "Scorecard Grade Thresholds",
+   "options": "JSON"
+  },
+  {
+   "default": "Buyback Agent\nBuyback Store Manager\nBuyback Manager\nBuyback Auditor\nBuyback Admin",
+   "description": "Roles allowed to search consolidated IMEI history, subject to their assigned location scope.",
+   "fieldname": "imei_history_roles",
+   "fieldtype": "Small Text",
+   "label": "IMEI History Roles"
+  },
+  {
+   "default": "Buyback Agent\nBuyback Store Manager\nBuyback Manager\nBuyback Auditor\nBuyback Admin",
+   "description": "Roles allowed to look up buyback records by phone, subject to assigned location scope.",
+   "fieldname": "customer_lookup_roles",
+   "fieldtype": "Small Text",
+   "label": "Customer Lookup Roles"
+  },
+  {
+   "default": "50",
+   "fieldname": "customer_lookup_limit",
+   "fieldtype": "Int",
+   "label": "Customer Lookup Row Limit",
+   "non_negative": 1
+  },
+  {
+   "default": "Buyback Store Manager\nBuyback Manager\nBuyback Admin",
+   "description": "Roles allowed to create Refurbishment Orders from submitted customer returns.",
+   "fieldname": "refurbishment_creation_roles",
+   "fieldtype": "Small Text",
+   "label": "Refurbishment Creation Roles"
+  },
+  {
+   "default": "Buyback Store Manager\nBuyback Manager\nBuyback Admin",
+   "description": "Roles allowed to advance non-financial Refurbishment Order states.",
+   "fieldname": "refurbishment_operation_roles",
+   "fieldtype": "Small Text",
+   "label": "Refurbishment Operation Roles"
+  },
+  {
+   "default": "Buyback Manager\nBuyback Admin",
+   "description": "Roles allowed to materialize a graded device into resale stock.",
+   "fieldname": "refurbishment_restock_roles",
+   "fieldtype": "Small Text",
+   "label": "Refurbishment Restock Roles"
+  },
+  {
+   "default": "100",
+   "description": "Maximum returned item rows processed by one Refurbishment Order creation request.",
+   "fieldname": "max_refurbishment_rows",
+   "fieldtype": "Int",
+   "label": "Maximum Refurbishment Rows",
+   "non_negative": 1
   },
   {
    "default": "25000",
@@ -179,6 +543,15 @@
    "options": "Mode of Payment"
   },
   {
+   "default": "20",
+   "description": "Maximum split-payment rows allowed on one Buyback Order.",
+   "fieldname": "max_payment_rows",
+   "fieldtype": "Int",
+   "label": "Maximum Payment Rows",
+   "non_negative": 1,
+   "reqd": 1
+  },
+  {
    "fieldname": "column_break_pay",
    "fieldtype": "Column Break"
   },
@@ -214,6 +587,63 @@
    "label": "Send SMS on Order"
   },
   {
+   "default": "Buyback Store Manager\nBuyback Manager\nBuyback Admin",
+   "description": "Roles notified for SLA breaches, filtered to the affected store.",
+   "fieldname": "sla_alert_roles",
+   "fieldtype": "Small Text",
+   "label": "SLA Alert Roles"
+  },
+  {
+   "default": "Buyback Manager\nBuyback Admin",
+   "description": "Roles notified for high-value and manager-approval events, filtered to the affected store.",
+   "fieldname": "approval_alert_roles",
+   "fieldtype": "Small Text",
+   "label": "Approval Alert Roles"
+  },
+  {
+   "default": "Buyback Auditor\nBuyback Admin",
+   "description": "Roles notified for fraud indicators such as duplicate IMEIs.",
+   "fieldname": "fraud_alert_roles",
+   "fieldtype": "Small Text",
+   "label": "Fraud Alert Roles"
+  },
+  {
+   "default": "15",
+   "description": "Maximum enabled desk users notified by one Buyback alert.",
+   "fieldname": "alert_recipient_limit",
+   "fieldtype": "Int",
+   "label": "Alert Recipient Limit"
+  },
+  {
+   "default": "50",
+   "description": "Maximum business alerts emitted by one Buyback scheduler invocation.",
+   "fieldname": "scheduler_alert_limit",
+   "fieldtype": "Int",
+   "label": "Scheduler Alert Limit"
+  },
+  {
+   "default": "80",
+   "description": "Percentage of the branch daily cash limit at which the alert is emitted.",
+   "fieldname": "cash_limit_alert_pct",
+   "fieldtype": "Percent",
+   "label": "Cash Limit Alert Percentage",
+   "reqd": 1
+  },
+  {
+   "default": "7",
+   "fieldname": "conversion_alert_lookback_days",
+   "fieldtype": "Int",
+   "label": "Conversion Alert Lookback Days",
+   "reqd": 1
+  },
+  {
+   "default": "5",
+   "fieldname": "conversion_alert_min_assessments",
+   "fieldtype": "Int",
+   "label": "Conversion Alert Minimum Assessments",
+   "reqd": 1
+  },
+  {
    "fieldname": "column_break_notif",
    "fieldtype": "Column Break"
   },
@@ -222,6 +652,20 @@
    "fieldname": "send_email_on_order",
    "fieldtype": "Check",
    "label": "Send Email on Order"
+  },
+  {
+   "default": "Buyback Manager\nBuyback Admin",
+   "description": "Roles notified when a store reaches its configured daily cash threshold.",
+   "fieldname": "cash_alert_roles",
+   "fieldtype": "Small Text",
+   "label": "Cash Alert Roles"
+  },
+  {
+   "default": "Buyback Store Manager\nBuyback Manager",
+   "description": "Roles notified for conversion and inspection-backlog alerts, filtered to the affected store.",
+   "fieldname": "performance_alert_roles",
+   "fieldtype": "Small Text",
+   "label": "Performance Alert Roles"
   },
   {
    "fieldname": "accounting_section",
@@ -311,6 +755,14 @@
    "description": "DEFAULT OFF (logistics redesign): store staff raise the pickup Material Request manually from the Buyback Order. Enable only if you want the legacy auto-creation behaviour."
   },
   {
+   "default": "3",
+   "description": "Maximum failed or scheduled pickup attempts before an exception must be raised.",
+   "fieldname": "max_pickup_attempts",
+   "fieldtype": "Int",
+   "label": "Maximum Pickup Attempts",
+   "reqd": 1
+  },
+  {
    "fieldname": "column_break_logistics",
    "fieldtype": "Column Break"
   },
@@ -347,6 +799,27 @@
    "fieldtype": "Check",
    "label": "Require Data-Wipe Certificate Before Restock",
    "description": "Refurbishment Orders derived from a Buyback Order cannot transition to Restocked without a submitted CH Data Wipe Certificate. Legal / privacy standard across Apple Trade In, Samsung Exchange, Best Buy Trade-In."
+  },
+  {
+   "default": "500",
+   "description": "Maximum documents processed by one Buyback scheduler invocation.",
+   "fieldname": "scheduler_batch_limit",
+   "fieldtype": "Int",
+   "label": "Scheduler Batch Limit"
+  },
+  {
+   "default": "20000",
+   "description": "Maximum characters accepted in a public Buyback request payload.",
+   "fieldname": "public_payload_max_chars",
+   "fieldtype": "Int",
+   "label": "Public Payload Maximum Characters"
+  },
+  {
+   "default": "100",
+   "description": "Maximum assessment response rows accepted from the public portal.",
+   "fieldname": "public_response_row_limit",
+   "fieldtype": "Int",
+   "label": "Public Response Row Limit"
   }
  ],
  "index_web_pages_for_search": 0,

@@ -300,37 +300,6 @@ frappe.ui.form.on("Buyback Assessment Diagnostic", {
 		});
 	},
 
-	// result(frm, cdt, cdn) {
-	// 	const row = locals[cdt][cdn];
-	// 	if (!row.result || !row.test) return;
-
-	// 	// Try local cache first (set by buyback_load_diagnostic_tests or test handler)
-	// 	if (row._impact_map && row._impact_map.hasOwnProperty(row.result)) {
-	// 		frappe.model.set_value(cdt, cdn, "depreciation_percent",
-	// 			row._impact_map[row.result]
-	// 		).then(() => buyback_recalculate_estimate(frm));
-	// 		return;
-	// 	}
-
-	// 	// Fallback: fetch from server
-	// 	frappe.call({
-	// 		method: "buyback.api.get_question_options",
-	// 		args: { question_name: row.test },
-	// 		callback(r) {
-	// 			if (!r.message) return;
-	// 			const opt = r.message.find(o => o.option_value === row.result);
-	// 			if (opt) {
-	// 				frappe.model.set_value(cdt, cdn, "depreciation_percent",
-	// 					Math.abs(opt.price_impact_percent || 0)
-	// 				).then(() => buyback_recalculate_estimate(frm));
-	// 			}
-	// 		},
-	// 	});
-	// },
-
-	
-	//updated code:
-
 	result(frm, cdt, cdn) {
 		const row = locals[cdt][cdn];
 		if (!row.result || !row.test) return;
@@ -465,49 +434,6 @@ function buyback_load_diagnostic_tests(frm) {
 	// Don't overwrite if tests already exist (e.g. editing a saved doc)
 	if (frm.doc.diagnostic_tests && frm.doc.diagnostic_tests.length) return;
 
-	// frappe.call({
-	// 	method: "buyback.api.get_diagnostic_tests_for_item",
-	// 	args: { item_code: frm.doc.item },
-	// 	callback(r) {
-	// 		if (!r.message || !r.message.length) return;
-
-	// 		// Clear existing empty rows
-	// 		frm.clear_table("diagnostic_tests");
-
-	// 		r.message.forEach(test => {
-	// 			const row = frm.add_child("diagnostic_tests");
-	// 			row.test = test.name;
-	// 			row.test_code = test.test_code;
-	// 			row.test_name = test.test_name;
-
-	// 			// Pre-build impact map so result change sets depreciation live
-	// 			row._impact_map = {};
-	// 			if (test.options && test.options.length) {
-	// 				test.options.forEach(o => {
-	// 					row._impact_map[o.value] = Math.abs(o.impact || 0);
-	// 				});
-	// 			}
-	// 		});
-
-	// 		frm.refresh_field("diagnostic_tests");
-
-	// 		// Update result Select options for all rows
-	// 		if (r.message.length && r.message[0].options && r.message[0].options.length) {
-	// 			const opts = r.message[0].options.map(o => o.value);
-	// 			frm.fields_dict.diagnostic_tests.grid.update_docfield_property(
-	// 				"result", "options", "\n" + opts.join("\n")
-	// 			);
-	// 		}
-
-	// 		frappe.show_alert({
-	// 			message: __("{0} diagnostic tests loaded", [r.message.length]),
-	// 			indicator: "blue",
-	// 		});
-	// 	},
-	// });
-
-
-	//updated
 	frappe.call({
 		method: "buyback.api.get_diagnostic_tests_for_item",
 		args: { item_code: frm.doc.item },

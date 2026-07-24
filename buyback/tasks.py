@@ -4,7 +4,13 @@ Registered via hooks.py scheduler_events.
 """
 
 import frappe
-from frappe.utils import nowdate, getdate
+from frappe.utils import nowdate
+
+from buyback.utils import get_int_setting
+
+
+def _scheduler_batch_limit() -> int:
+    return min(get_int_setting("scheduler_batch_limit", 500), 5000)
 
 
 def expire_assessments():
@@ -19,23 +25,27 @@ def expire_assessments():
             "expires_on": ["<", nowdate()],
         },
         pluck="name",
+        order_by="expires_on asc, name asc",
+        limit_page_length=_scheduler_batch_limit(),
     )
 
-    for name in expired:
+    processed = 0
+    for index, name in enumerate(expired):
+        savepoint = f"expire_assessment_{index}"
+        frappe.db.savepoint(savepoint)
         try:
             doc = frappe.get_doc("Buyback Assessment", name)
             doc.mark_expired()
+            processed += 1
             frappe.logger("buyback").info(f"Auto-expired assessment {name}")
         except Exception:
+            frappe.db.rollback(save_point=savepoint)
             frappe.log_error(
                 title=f"Buyback Assessment Expiry: {name}",
                 message=frappe.get_traceback(),
             )
 
-    if expired:
-        frappe.db.commit()
-
-    return f"Expired {len(expired)} assessments"
+    return f"Expired {processed} assessments"
 
 
 def expire_otps():
@@ -52,20 +62,19 @@ def expire_otps():
             "expires_at": ["<", now_datetime()],
         },
         pluck="name",
+        order_by="expires_at asc, name asc",
+        limit_page_length=_scheduler_batch_limit(),
     )
 
-    for name in expired:
-        try:
-            doc = frappe.get_doc("CH OTP Log", name)
-            doc.status = "Expired"
-            doc.save(ignore_permissions=True)
-        except Exception:
-            frappe.log_error(
-                title=f"Failed to expire OTP {name}",
-            )
-
     if expired:
-        frappe.db.commit()
+        frappe.db.set_value(
+            "CH OTP Log",
+            {"name": ("in", expired), "status": "Pending"},
+            "status",
+            "Expired",
+            update_modified=False,
+        )
+    return len(expired)
 
 
 def daily_buyback_summary():

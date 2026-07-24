@@ -8,12 +8,21 @@ inspection-variance approval — this is the ad-hoc store-initiated path.
 """
 import frappe
 from frappe import _
-from frappe.utils import flt
+from frappe.utils import flt, now_datetime
 
 OVERRIDE_TYPE = "Buyback Price Override"
 APPROVED_STATUSES = ("Approved", "Auto-Approved")
 # Never rewrite the price once money has moved or the order is closed.
-LOCKED_ORDER_STATUSES = ("Paid", "Closed", "Cancelled", "Rejected")
+LOCKED_ORDER_STATUSES = (
+    "Customer Approved",
+    "Awaiting OTP",
+    "OTP Verified",
+    "Ready to Pay",
+    "Paid",
+    "Closed",
+    "Cancelled",
+    "Rejected",
+)
 
 
 def apply_approved_buyback_price_override(doc, method=None):
@@ -52,6 +61,7 @@ def apply_approved_buyback_price_override(doc, method=None):
         "final_price": price,
         "approved_price": price,
         "approved_by": doc.get("approver") or frappe.session.user,
+        "approval_date": now_datetime(),
     }
     # If the order was waiting on price approval, this approval clears that gate.
     if order_status == "Awaiting Approval":
@@ -60,6 +70,15 @@ def apply_approved_buyback_price_override(doc, method=None):
             updates["workflow_state"] = "Approved"
 
     frappe.db.set_value("Buyback Order", order, updates, update_modified=True)
+    order_doc = frappe.get_doc("Buyback Order", order)
+    if hasattr(order_doc, "_refresh_lifecycle_evidence"):
+        frappe.db.set_value(
+            "Buyback Order",
+            order,
+            "lifecycle_evidence_signature",
+            order_doc._refresh_lifecycle_evidence(),
+            update_modified=False,
+        )
 
     try:
         frappe.get_doc("Buyback Order", order).add_comment(
@@ -67,4 +86,4 @@ def apply_approved_buyback_price_override(doc, method=None):
             _("Buyback price set to ₹{0} via approved exception {1} (requested by {2}).").format(
                 f"{price:,.2f}", doc.name, doc.get("requested_by") or ""))
     except Exception:
-        pass
+        frappe.log_error(frappe.get_traceback(), "Buyback exception approval comment failed")

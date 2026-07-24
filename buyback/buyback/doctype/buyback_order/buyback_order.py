@@ -1,10 +1,38 @@
+import hashlib
+import hmac
+import json
+
 import frappe
 from frappe import _
 from frappe.model.document import Document
 from frappe.utils import now_datetime, flt, nowdate, add_days, cint
+from frappe.utils.password import get_encryption_key
 
 from buyback.exceptions import BuybackStatusError
-from buyback.utils import log_audit, validate_indian_phone
+from buyback.utils import (
+    assert_buyback_scope,
+    has_configured_role,
+    get_buyback_setting_value,
+    is_privileged_user,
+    log_audit,
+    next_numeric_external_id,
+    require_configured_role,
+    sync_customer_identity,
+    update_customer_mobile_if_missing,
+    validate_indian_phone,
+)
+
+
+def _require_order_action(doc, role_field: str, action: str) -> None:
+    """Require configured action authority, named write permission and location scope."""
+    require_configured_role(role_field, action=action)
+    doc.check_permission("write")
+    assert_buyback_scope(store=doc.get("store"), company=doc.get("company"))
+    frappe.db.sql(
+        "SELECT name FROM `tabBuyback Order` WHERE name = %s FOR UPDATE",
+        (doc.name,),
+    )
+    doc.reload()
 
 
 def _normalize_customer_approval_method(method: str | None) -> str:
@@ -26,60 +54,63 @@ def _normalize_customer_approval_method(method: str | None) -> str:
     return method
 
 
-MANAGER_APPROVAL_ROLES = {"Buyback Manager", "Buyback Admin", "System Manager"}
-
-
-def _require_manager_approval_role():
-    """Server-side guard for manager approval actions.
-
-    DocPerm write access is broader than the approval workflow. Keep the
-    controller method aligned with the workflow role gate so API/Desk calls
-    cannot approve just because the user can edit the document.
-    """
-    user = frappe.session.user
-    if user == "Administrator":
-        return
-    roles = set(frappe.get_roles(user))
-    if roles.intersection(MANAGER_APPROVAL_ROLES):
-        return
-    frappe.throw(
-        _("Only a Buyback Manager can approve or reject a buyback order."),
-        exc=frappe.PermissionError,
+class BuybackOrder(Document):
+    _PROTECTED_EVIDENCE_FIELDS = (
+        "approved_by",
+        "approved_price",
+        "approval_date",
+        "customer_approved",
+        "customer_approved_at",
+        "customer_approval_method",
+        "otp_verified",
+        "otp_verified_at",
+        "indemnity_signed",
+        "indemnity_signed_at",
+        "indemnity_signature_type",
+        "indemnity_signed_by_name",
+        "indemnity_captured_by",
     )
 
+    @frappe.whitelist()
+    def get_ui_capabilities(self) -> dict:
+        """Return manager actions from the configured server approval policy."""
+        self.check_permission("read")
+        assert_buyback_scope(store=self.get("store"), company=self.get("company"))
+        return {
+            "can_manager_approve": bool(
+                self.status == "Awaiting Approval"
+                and frappe.has_permission(self.doctype, "write", doc=self, throw=False)
+                and has_configured_role("manager_approval_roles")
+            )
+        }
 
-class BuybackOrder(Document):
     def before_insert(self):
         """Validate uniqueness, assign sequential order_id, generate approval token."""
         self._check_duplicate_active_order()
         self._assign_order_id()
         self._set_status("Draft")
-        if not self.approval_token:
-            self.approval_token = frappe.generate_hash(length=32)
+        self.approval_token = frappe.generate_hash(length=32)
+        self.approval_token_digest = hashlib.sha256(self.approval_token.encode()).hexdigest()
+        self.approval_token_issued_at = now_datetime()
+        # Evidence is server-issued.  UI read_only/hidden flags are not a trust
+        # boundary because standard REST clients can still send these values.
+        if not is_privileged_user():
+            for fieldname in self._PROTECTED_EVIDENCE_FIELDS:
+                self.set(fieldname, None)
+            self.set("payments", [])
+            self.lifecycle_evidence_signature = None
 
     def validate_workflow(self):
-        """Skip Frappe's workflow transition re-validation on save.
-
-        The buyback status machine is server-managed: every transition is
-        enforced by explicit status gates in this controller and the API
-        layer, and `workflow_state` is only a mirror of `status` for desk
-        visibility (see _sync_workflow_state). Frappe would otherwise
-        re-validate the mirror write as a user-driven transition and crash
-        on legitimate server moves the desk workflow doesn't model — e.g.
-        POS advances status to 'Awaiting Customer Approval' via db_set,
-        then the customer's guest payout save syncs the mirror and dies
-        with WorkflowPermissionError ('transition not allowed from
-        Approved to Awaiting Customer Approval').
-
-        Desk workflow buttons stay safe: apply_workflow() validates the
-        transition (roles + condition) itself before saving.
-        """
-        return
+        """Validate user-driven workflow changes; trust only controller moves."""
+        if self.flags.get("ch_server_transition"):
+            return
+        return super().validate_workflow()
 
     def _has_workflow_state_field(self):
         return bool(self.meta.has_field("workflow_state"))
 
     def _set_status(self, status):
+        self.flags.ch_server_transition = True
         self.status = status
         if self._has_workflow_state_field():
             self.workflow_state = status
@@ -95,6 +126,95 @@ class BuybackOrder(Document):
         """Keep workflow_state aligned when server code changes status directly."""
         if self.status and self._has_workflow_state_field() and self.workflow_state != self.status:
             self.workflow_state = self.status
+
+    def _payment_evidence(self):
+        return [
+            {
+                "payment_method": (row.payment_method or "").strip(),
+                "amount": f"{flt(row.amount):.6f}",
+                "transaction_reference": (row.transaction_reference or "").strip(),
+                "payment_date": str(row.payment_date or ""),
+            }
+            for row in (self.payments or [])
+        ]
+
+    def _lifecycle_evidence_payload(self):
+        payload = {
+            "name": self.name or "",
+            "company": self.company or "",
+            "store": self.store or "",
+            "customer": self.customer or "",
+            "item": self.item or "",
+            "imei_serial": self.imei_serial or "",
+            "final_price": f"{flt(self.final_price):.6f}",
+            "requires_approval": cint(self.requires_approval),
+            "payments": self._payment_evidence(),
+        }
+        for fieldname in self._PROTECTED_EVIDENCE_FIELDS:
+            value = self.get(fieldname)
+            payload[fieldname] = str(value or "")
+        return json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str)
+
+    def _expected_lifecycle_evidence_signature(self):
+        return hmac.new(
+            get_encryption_key().encode(),
+            self._lifecycle_evidence_payload().encode(),
+            hashlib.sha256,
+        ).hexdigest()
+
+    def _refresh_lifecycle_evidence(self):
+        self.lifecycle_evidence_signature = self._expected_lifecycle_evidence_signature()
+        return self.lifecycle_evidence_signature
+
+    def _has_valid_lifecycle_evidence(self):
+        actual = str(self.get("lifecycle_evidence_signature") or "")
+        return bool(actual) and hmac.compare_digest(
+            actual,
+            self._expected_lifecycle_evidence_signature(),
+        )
+
+    def _evidence_changed(self, previous):
+        if not previous:
+            return bool(self.payments) or any(self.get(field) for field in self._PROTECTED_EVIDENCE_FIELDS)
+        if self._payment_evidence() != previous._payment_evidence():
+            return True
+        if (
+            flt(self.final_price) != flt(previous.final_price)
+            and (previous.status or "")
+            in ("Customer Approved", "Awaiting OTP", "OTP Verified", "Ready to Pay", "Paid", "Closed")
+        ):
+            return True
+        return any(
+            str(self.get(field) or "") != str(previous.get(field) or "")
+            for field in self._PROTECTED_EVIDENCE_FIELDS
+        )
+
+    def _validate_server_evidence_changes(self):
+        if is_privileged_user() or self.flags.get("ch_evidence_update_authorized"):
+            return
+        if self._evidence_changed(self.get_doc_before_save()):
+            frappe.throw(
+                _("Approval, customer verification, indemnity and payment evidence must be recorded through their authorised actions."),
+                frappe.PermissionError,
+            )
+
+    def _validate_paid_transition_evidence(self, *, force=False):
+        if not force and self.status not in ("Paid", "Closed"):
+            return
+        if not self._has_valid_lifecycle_evidence():
+            frappe.throw(
+                _("Cannot mark this order Paid because its approval/payment evidence is missing or has been altered."),
+                frappe.PermissionError,
+            )
+        if cint(self.requires_approval) and (
+            not self.approved_by
+            or not self.approval_date
+            or flt(self.approved_price) != flt(self.final_price)
+        ):
+            frappe.throw(_("A valid manager approval for the final price is required before payment."))
+        if not cint(self.customer_approved) or not cint(self.otp_verified):
+            frappe.throw(_("Customer approval and OTP verification are required before payment."))
+        self._require_indemnity_before_paid()
 
     def _sync_approval_status_after_price_change(self):
         """Repair pending approval state when final_price crosses the threshold."""
@@ -113,6 +233,7 @@ class BuybackOrder(Document):
             self.approved_price = 0
             self.approval_date = None
             self._set_status("Awaiting Approval")
+            self._refresh_lifecycle_evidence()
 
     def _notify_manager_approval_required(self):
         try:
@@ -151,14 +272,7 @@ class BuybackOrder(Document):
             )
 
     def _assign_order_id(self):
-        """Assign a unique sequential order_id using a row-level lock to prevent races."""
-        # FOR UPDATE on the same statement that reads the value — keeps the lock
-        # until the INSERT commits, preventing two concurrent inserts from reading
-        # the same MAX and colliding on order_id.
-        last = frappe.db.sql(
-            "SELECT MAX(order_id) FROM `tabBuyback Order` FOR UPDATE"
-        )[0][0] or 0
-        self.order_id = last + 1
+        self.order_id = next_numeric_external_id("Buyback Order", "order_id")
 
     def _sync_serial_no_aliases(self):
         """Keep `serial_no` (new canonical) and `imei_serial` (legacy) in lock-step.
@@ -190,12 +304,13 @@ class BuybackOrder(Document):
             self.serial_no = old_val
 
     def validate(self):
+        self._validate_approval_token_fields()
         self._sync_serial_no_aliases()
         self._ensure_mobile_no()
         if self.mobile_no:
             self.mobile_no = validate_indian_phone(self.mobile_no, "Mobile No")
-        self._update_customer_mobile()
-        self._sync_customer_id()
+        update_customer_mobile_if_missing(self.customer, self.mobile_no)
+        sync_customer_identity(self)
         self._check_imei_blacklist()
         self._populate_item_hierarchy()
         self._link_assessment()
@@ -203,6 +318,7 @@ class BuybackOrder(Document):
         self._calculate_exchange_totals()
         self._calculate_payment_totals()
         self._validate_payment_rows()
+        self._validate_server_evidence_changes()
         self._validate_paid_status_consistency()
         self._check_approval_requirement()
         self._validate_imei_check_before_kyc()
@@ -211,28 +327,37 @@ class BuybackOrder(Document):
         self._validate_kyc_for_otp_stage()
         self._check_exchange_value_override()
         self._sync_workflow_state()
+        self._validate_paid_transition_evidence()
 
-    def _sync_customer_id(self):
-        """Populate ch_customer_id / ch_membership_id from Customer master."""
-        if not self.customer or (self.ch_customer_id and self.ch_membership_id):
-            return
-        cust = frappe.db.get_value(
-            "Customer", self.customer,
-            ["ch_customer_id", "ch_membership_id"],
-            as_dict=True,
-        )
-        if cust:
-            if not self.ch_customer_id:
-                self.ch_customer_id = cust.ch_customer_id
-            if not self.ch_membership_id:
-                self.ch_membership_id = cust.ch_membership_id
+    def _validate_approval_token_fields(self):
+        if not self.approval_token:
+            frappe.throw(_("Buyback approval token is missing."))
+        previous = self.get_doc_before_save()
+        if (
+            previous
+            and previous.approval_token != self.approval_token
+            and not self.flags.get("ch_token_rotation_authorized")
+            and not is_privileged_user()
+        ):
+            frappe.throw(_("Approval tokens can only be rotated by the resend action."), frappe.PermissionError)
+        expected = hashlib.sha256(self.approval_token.encode()).hexdigest()
+        if self.approval_token_digest and not hmac.compare_digest(
+            str(self.approval_token_digest), expected
+        ):
+            if previous and previous.approval_token == self.approval_token:
+                frappe.throw(_("Buyback approval token digest is invalid."), frappe.PermissionError)
+        self.approval_token_digest = expected
 
     def before_update_after_submit(self):
+        self._validate_approval_token_fields()
         self._check_approval_requirement()
-        self._sync_approval_status_after_price_change()
-        self._sync_workflow_state()
         self._calculate_payment_totals()
         self._validate_payment_rows()
+        self._validate_server_evidence_changes()
+        self._sync_approval_status_after_price_change()
+        self._sync_workflow_state()
+        self._validate_paid_status_consistency()
+        self._validate_paid_transition_evidence()
         # Field updates on an already-submitted doc go through update_after_submit,
         # NOT validate() — Frappe's _validate() only calls run_method("validate")
         # when self._action == "save". By the time status reaches "Awaiting OTP"
@@ -267,14 +392,6 @@ class BuybackOrder(Document):
             )
             if cust:
                 self.mobile_no = cust.mobile_no or cust.ch_alternate_phone or cust.ch_whatsapp_number
-
-    def _update_customer_mobile(self):
-        """Write mobile_no back to Customer if Customer has none."""
-        if not self.mobile_no or not self.customer:
-            return
-        cust_mobile = frappe.db.get_value("Customer", self.customer, "mobile_no")
-        if not cust_mobile:
-            frappe.db.set_value("Customer", self.customer, "mobile_no", self.mobile_no)
 
     def _populate_item_hierarchy(self):
         """Auto-fill brand, item_name from Item if not set."""
@@ -425,6 +542,7 @@ class BuybackOrder(Document):
         from buyback.serial_no_utils import update_serial_buyback_status
         if self.status == "Paid":
             # Workflow brought us directly to Paid — create accounting entries
+            self._validate_paid_transition_evidence()
             self._create_accounting_entries()
             self._ensure_exchange_order_exists()
             update_serial_buyback_status(
@@ -541,16 +659,41 @@ class BuybackOrder(Document):
         appends or interrupted prior runs and would otherwise block
         every subsequent save with a misleading "amount must be > 0".
         """
-        kept = []
-        for row in (self.payments or []):
+        kept = [
+            row
+            for row in (self.payments or [])
+            if flt(row.amount)
+            or (row.payment_method or "").strip()
+            or (row.transaction_reference or "").strip()
+        ]
+        row_limit = max(
+            1,
+            min(cint(get_buyback_setting_value("max_payment_rows", 20)) or 20, 100),
+        )
+        if len(kept) > row_limit:
+            frappe.throw(
+                _("Buyback Order allows at most {0} payment rows.").format(row_limit),
+                title=_("Buyback Order Error"),
+            )
+        methods = sorted(
+            {(row.payment_method or "").strip() for row in kept if row.payment_method}
+        )
+        mode_types = {}
+        if methods:
+            mode_types = {
+                row.name: (row.type or "").strip()
+                for row in frappe.get_all(
+                    "Mode of Payment",
+                    filters={"name": ("in", methods)},
+                    fields=["name", "type"],
+                    limit_page_length=row_limit + 1,
+                )
+            }
+
+        for row in kept:
             amount = flt(row.amount)
             method = (row.payment_method or "").strip()
             ref = (row.transaction_reference or "").strip()
-            # Truly blank row → drop on the fly. mutating doc.payments
-            # is safe before save persists the child table.
-            if amount == 0 and not method and not ref:
-                continue
-            kept.append(row)
 
             if amount <= 0:
                 frappe.throw(_("Payment row #{0}: amount must be greater than zero.").format(row.idx), title=_("Buyback Order Error"))
@@ -559,7 +702,7 @@ class BuybackOrder(Document):
             if not row.payment_date:
                 frappe.throw(_("Payment row #{0}: payment date is required.").format(row.idx), title=_("Buyback Order Error"))
 
-            mode_type = (frappe.db.get_value("Mode of Payment", method, "type") or "").strip()
+            mode_type = mode_types.get(method, "")
             requires_reference = mode_type != "Cash"
             if requires_reference and not ref:
                 frappe.throw(
@@ -640,7 +783,9 @@ class BuybackOrder(Document):
 
     def approve(self, remarks=None):
         """Manager approves the order."""
-        _require_manager_approval_role()
+        _require_order_action(
+            self, "manager_approval_roles", _("approve a buyback order")
+        )
         if self.status != "Awaiting Approval":
             frappe.throw(
                 _("Can only approve orders in 'Awaiting Approval' status."),
@@ -652,13 +797,17 @@ class BuybackOrder(Document):
         self.approval_date = now_datetime()
         if remarks:
             self.approval_remarks = remarks
+        self.flags.ch_evidence_update_authorized = True
+        self._refresh_lifecycle_evidence()
         self.save()
         log_audit("Order Approved", "Buyback Order", self.name,
                   new_value={"approved_by": self.approved_by, "approved_price": self.approved_price})
 
     def reject(self, remarks=None):
         """Manager rejects the order."""
-        _require_manager_approval_role()
+        _require_order_action(
+            self, "manager_approval_roles", _("reject a buyback order")
+        )
         if self.status != "Awaiting Approval":
             frappe.throw(
                 _("Can only reject orders in 'Awaiting Approval' status."),
@@ -669,11 +818,13 @@ class BuybackOrder(Document):
         self.approval_date = now_datetime()
         if remarks:
             self.approval_remarks = remarks
+        self.flags.ch_evidence_update_authorized = True
+        self._refresh_lifecycle_evidence()
         self.save()
         log_audit("Order Rejected", "Buyback Order", self.name,
                   new_value={"rejected_by": frappe.session.user, "reason": remarks})
 
-    def customer_approve(self, method="In-Store Signature"):
+    def customer_approve(self, method="In-Store Signature", *, token_authorized=False):
         """Customer approves the revised/final price.
 
         This is required when the inspection price differs from the
@@ -689,11 +840,22 @@ class BuybackOrder(Document):
                 exc=BuybackStatusError,
             )
         method = _normalize_customer_approval_method(method)
-        self.customer_approved = 1
-        self.customer_approved_at = now_datetime()
-        self.customer_approval_method = method
-        self._set_status("Customer Approved")
-        self.save()
+        approved_at = now_datetime()
+        updates = {
+            "customer_approved": 1,
+            "customer_approved_at": approved_at,
+            "customer_approval_method": method,
+            **self._status_update("Customer Approved"),
+        }
+        self.update(updates)
+        self.flags.ch_server_transition = True
+        self.flags.ch_evidence_update_authorized = True
+        updates["lifecycle_evidence_signature"] = self._refresh_lifecycle_evidence()
+        if token_authorized:
+            self.db_set(updates, update_modified=True)
+            self.reload()
+        else:
+            self.save()
         log_audit("Customer Approved", "Buyback Order", self.name,
                   new_value={"method": method, "final_price": self.final_price})
 
@@ -728,7 +890,7 @@ class BuybackOrder(Document):
         log_audit("Settlement Type Changed", "Buyback Order", self.name,
                   new_value={"settlement_type": settlement_type, "new_item": new_item})
 
-    def send_otp(self):
+    def send_otp(self, *, token_authorized=False):
         """Send OTP for customer verification.
 
         Allowed states:
@@ -764,8 +926,12 @@ class BuybackOrder(Document):
 
         otp_code = self._dispatch_otp()
         self.flags.otp_just_dispatched = True
-        self._set_status("Awaiting OTP")
-        self.save()
+        if token_authorized:
+            self.db_set(self._status_update("Awaiting OTP"), update_modified=True)
+            self.reload()
+        else:
+            self._set_status("Awaiting OTP")
+            self.save()
         return otp_code
 
     def _dispatch_otp(self):
@@ -845,6 +1011,10 @@ class BuybackOrder(Document):
                 "customer_approval_method": approval_method,
                 **self._status_update("OTP Verified"),
             }
+            self.update(updates)
+            self.flags.ch_server_transition = True
+            self.flags.ch_evidence_update_authorized = True
+            updates["lifecycle_evidence_signature"] = self._refresh_lifecycle_evidence()
 
             # OTP verification is often done after submit from customer flows.
             # Use db_set for submitted docs to avoid update-after-submit errors.
@@ -852,19 +1022,13 @@ class BuybackOrder(Document):
                 self.db_set(updates, update_modified=True)
                 self.reload()
             else:
-                self.otp_verified = 1
-                self.otp_verified_at = verified_at
-                self.customer_approved = 1
-                self.customer_approved_at = verified_at
-                self.customer_approval_method = approval_method
-                self._set_status("OTP Verified")
                 self.save()
 
             log_audit("OTP Verified", "Buyback Order", self.name)
 
         return result
 
-    @frappe.whitelist()
+    @frappe.whitelist(methods=["POST"])
     def bypass_otp_instore(self, remarks=None):
         """Skip OTP verification for in-store approvals.
 
@@ -872,6 +1036,12 @@ class BuybackOrder(Document):
         approval is sufficient, or when no mobile number is available.
         Logs an audit trail with the staff member's remarks.
         """
+        _require_order_action(self, "otp_bypass_roles", _("bypass customer OTP"))
+        remarks = (remarks or "").strip()
+        if not remarks:
+            frappe.throw(_("Remarks are required for an in-store OTP bypass."))
+        if len(remarks) > 500:
+            frappe.throw(_("Remarks cannot exceed 500 characters."))
         if self.status not in ("Awaiting OTP", "Approved"):
             frappe.throw(
                 _("OTP bypass is only applicable when status is 'Awaiting OTP' or 'Approved'."),
@@ -887,19 +1057,18 @@ class BuybackOrder(Document):
             "customer_approved_at": verified_at,
             **self._status_update("OTP Verified"),
         }
+        self.update(updates)
+        self.flags.ch_server_transition = True
+        self.flags.ch_evidence_update_authorized = True
+        updates["lifecycle_evidence_signature"] = self._refresh_lifecycle_evidence()
 
         if self.docstatus == 1:
             self.db_set(updates, update_modified=True)
             self.reload()
         else:
-            self.otp_verified = 1
-            self.otp_verified_at = verified_at
-            self.customer_approved = 1
-            self.customer_approved_at = verified_at
-            self._set_status("OTP Verified")
             self.save()
 
-        audit_note = f"In-Store OTP Bypass — {remarks}" if remarks else "In-Store OTP Bypass (no OTP)"
+        audit_note = f"In-Store OTP Bypass — {remarks}"
         log_audit(audit_note, "Buyback Order", self.name)
         return {"success": True}
 
@@ -915,11 +1084,18 @@ class BuybackOrder(Document):
 
     def mark_paid(self):
         """Mark as fully paid."""
+        _require_order_action(self, "payment_operation_roles", _("mark a Buyback order Paid"))
+        if self.status != "Ready to Pay":
+            frappe.throw(
+                _("Only an order in Ready to Pay can be marked Paid."),
+                exc=BuybackStatusError,
+            )
         if self.payment_status != "Paid":
             frappe.throw(
                 _("Total paid must equal final price."),
                 exc=BuybackStatusError,
             )
+        self._validate_paid_transition_evidence(force=True)
         self._set_status("Paid")
         self.save()
         log_audit("Payment Made", "Buyback Order", self.name,
@@ -1229,7 +1405,7 @@ class BuybackOrder(Document):
                     exc=BuybackStatusError,
                 )
 
-    @frappe.whitelist()
+    @frappe.whitelist(methods=["POST"])
     def submit_imei_validation(self, status: str, screenshot: str | None = None, remarks: str | None = None) -> dict:
         """Record the manual Sanchar Saathi (CEIR) IMEI check result.
 
@@ -1246,6 +1422,9 @@ class BuybackOrder(Document):
         Verify" leaves the order blocked at its current stage for retry
         (e.g. portal was down) without rejecting it.
         """
+        _require_order_action(
+            self, "imei_validation_roles", _("record an IMEI validation result")
+        )
         allowed = {"Verified Clean", "Blacklisted", "Duplicate IMEI", "Already In Use", "Could Not Verify"}
         status = (status or "").strip()
         if status not in allowed:
@@ -1493,51 +1672,9 @@ class BuybackOrder(Document):
                 title=f"Customer Activity Update Error: {self.name}",
             )
 
-    # def _create_accounting_entries(self):
-    #     """Create JE + SE atomically — called when status transitions to Paid."""
-    #     _prev_user = (frappe.session.user or "").strip()
-    #     restore_user = (
-    #         _prev_user
-    #         if _prev_user and _prev_user != "None" and frappe.db.exists("User", _prev_user)
-    #         else "Guest"
-    #     )
-    #     try:
-    #         frappe.set_user("Administrator")
-    #         self._create_journal_entry()
-    #         self._create_stock_entry()
-    #         # Persist the JE/SE links via db.set_value (avoid recursive save)
-    #         frappe.db.set_value("Buyback Order", self.name, {
-    #             "journal_entry": self.journal_entry,
-    #             "stock_entry": self.stock_entry,
-    #         }, update_modified=False)
-    #         # Auto-create Material Transfer Material Request from store →
-    #         # central Buyback Bin so delivery staff pick the device up.
-    #         # Failures must NOT roll back JE/SE (logistics is downstream).
-    #         try:
-    #             self._create_pickup_request()
-    #         except Exception:
-    #             frappe.log_error(
-    #                 title=_("Buyback Order {0}: pickup MR creation failed").format(self.name),
-    #             )
-    #     except Exception:
-    #         frappe.log_error(
-    #             title=_("Buyback Order {0}: JE/SE creation failed").format(self.name),
-    #         )
-    #         raise
-    #     finally:
-    #         frappe.set_user(restore_user)
-
-
-    # update _create_accounting_entries
-
     def _create_accounting_entries(self):
         """Create JE + SE atomically — called when status transitions to Paid."""
-        prev_user = frappe.session.user
         try:
-            # In-memory only - do NOT use frappe.set_user (it writes cookies)
-            frappe.session.user = "Administrator"
-            frappe.local.session_obj = None
-            
             self._create_journal_entry()
             self._create_stock_entry()
             # Persist the JE/SE links via db.set_value (avoid recursive save)
@@ -1559,9 +1696,6 @@ class BuybackOrder(Document):
                 title=_("Buyback Order {0}: JE/SE creation failed").format(self.name),
             )
             raise
-        finally:
-            frappe.session.user = prev_user
-            frappe.local.session_obj = None
 
     def _update_serial_no_bought_back(self):
         """Mark Serial No as 'Bought Back' and add timeline comment on close."""
@@ -1654,6 +1788,7 @@ class BuybackOrder(Document):
                     frappe.get_traceback(),
                     f"Buyback accrual JE failed for {self.name}",
                 )
+                raise
             try:
                 # NOTE: canonical path is ch_payments.api (there is no
                 # ``ch_payments.bank_payments.api`` module — mirrors how
@@ -1682,20 +1817,20 @@ class BuybackOrder(Document):
 
         settings = frappe.get_single("Buyback Settings")
         if not settings.buyback_expense_account:
-            frappe.logger("buyback").warning(
-                f"No buyback_expense_account configured — skipping JE for {self.name}"
+            frappe.throw(
+                _("Configure Buyback Expense Account in Buyback Settings before marking an order Paid."),
+                title=_("Buyback Accounting Not Configured"),
             )
-            return
 
         if flt(self.final_price) <= 0:
-            frappe.logger("buyback").warning(
-                f"Buyback Order {self.name} has non-positive final_price — skipping JE"
+            frappe.throw(
+                _("Final price must be greater than zero before marking an order Paid."),
+                title=_("Invalid Buyback Amount"),
             )
-            return
 
         company = self.company or settings.default_company
         if not company:
-            return
+            frappe.throw(_("Company is required for buyback accounting."))
 
         expense_account = self._resolve_expense_account_for_company(
             settings.buyback_expense_account, company
@@ -1710,10 +1845,10 @@ class BuybackOrder(Document):
             or frappe.db.get_value("Company", company, "default_payable_account")
         )
         if not credit_account:
-            frappe.logger("buyback").warning(
-                f"No cash/bank/payable account for company {company} — skipping JE"
+            frappe.throw(
+                _("Configure a default cash, bank, or payable account for company {0}.").format(company),
+                title=_("Buyback Accounting Not Configured"),
             )
-            return
 
         je = frappe.get_doc({
             "doctype": "Journal Entry",
@@ -1771,12 +1906,12 @@ class BuybackOrder(Document):
         if mapped:
             return mapped
 
-        frappe.logger("buyback").warning(
-            f"buyback_expense_account {expense_account} belongs to {acc.company} "
-            f"and company {company} has no '{acc.account_name}' ledger — "
-            f"skipping JE for {self.name}"
+        frappe.throw(
+            _("Company {0} needs a non-group account named {1} for buyback accounting.").format(
+                company, acc.account_name
+            ),
+            title=_("Buyback Accounting Not Configured"),
         )
-        return None
 
     def _post_bank_payout_accrual_je(self):
         """Accrual JE for bank-mode buyback payouts (SAP FI-AR one-time-customer).
@@ -1806,20 +1941,20 @@ class BuybackOrder(Document):
         """
         settings = frappe.get_single("Buyback Settings")
         if not settings.buyback_expense_account:
-            frappe.logger("buyback").warning(
-                f"No buyback_expense_account configured — skipping accrual JE for {self.name}"
+            frappe.throw(
+                _("Configure Buyback Expense Account in Buyback Settings before marking an order Paid."),
+                title=_("Buyback Accounting Not Configured"),
             )
-            return
 
         if flt(self.final_price) <= 0:
-            frappe.logger("buyback").warning(
-                f"Buyback Order {self.name} has non-positive final_price — skipping accrual JE"
+            frappe.throw(
+                _("Final price must be greater than zero before marking an order Paid."),
+                title=_("Invalid Buyback Amount"),
             )
-            return
 
         company = self.company or settings.default_company
         if not company:
-            return
+            frappe.throw(_("Company is required for buyback accounting."))
 
         expense_account = self._resolve_expense_account_for_company(
             settings.buyback_expense_account, company
@@ -1837,10 +1972,12 @@ class BuybackOrder(Document):
         if not party_account:
             party_account = frappe.db.get_value("Company", company, "default_receivable_account")
         if not party_account:
-            frappe.logger("buyback").warning(
-                f"No party/receivable account for {self.customer} @ {company} — skipping accrual JE for {self.name}"
+            frappe.throw(
+                _("Configure a receivable account for customer {0} in company {1}.").format(
+                    self.customer, company
+                ),
+                title=_("Buyback Accounting Not Configured"),
             )
-            return
 
         cost_center = frappe.db.get_value("Company", company, "cost_center")
 
@@ -1917,10 +2054,12 @@ class BuybackOrder(Document):
                 "Company", self.company or settings.default_company, "default_warehouse"
             )
         if not target_warehouse:
-            frappe.logger("buyback").warning(
-                f"No warehouse resolved for {self.name} — skipping Stock Entry"
+            frappe.throw(
+                _("Configure a buyback or default warehouse for company {0}.").format(
+                    self.company or settings.default_company
+                ),
+                title=_("Buyback Warehouse Not Configured"),
             )
-            return
 
         # Determine valuation rate (use final_price as the cost of acquisition)
         valuation_rate = flt(self.final_price)
@@ -1953,8 +2092,8 @@ class BuybackOrder(Document):
         # to other walk-ins) for an exchange.
         if self.imei_serial:
             try:
-                from ch_erp15.ch_erp15.stock_bin_api import move_to_bin
-                move_to_bin(
+                from ch_erp15.ch_erp15.stock_bin_api import _move_to_bin
+                _move_to_bin(
                     self.imei_serial,
                     tag_bin_type,
                     reason=f"Received via Buyback Order {self.name} ({self.settlement_type or 'Buyback'})",
@@ -2010,6 +2149,31 @@ class BuybackOrder(Document):
             # Already at the buyback bin — nothing to transfer
             return
 
+        assert_buyback_scope(
+            store=self.store,
+            warehouse=source_wh,
+            company=self.company,
+        )
+        frappe.has_permission("Material Request", ptype="create", throw=True)
+        frappe.has_permission("Item", ptype="read", doc=self.item, throw=True)
+        for warehouse in (source_wh, target_wh):
+            warehouse_row = frappe.db.get_value(
+                "Warehouse", warehouse, ["company", "disabled"], as_dict=True
+            )
+            if (
+                not warehouse_row
+                or warehouse_row.disabled
+                or warehouse_row.company != self.company
+            ):
+                frappe.throw(
+                    _("Warehouse {0} is not active for company {1}.").format(
+                        warehouse, self.company
+                    )
+                )
+            frappe.has_permission(
+                "Warehouse", ptype="read", doc=warehouse, throw=True
+            )
+
         # Idempotency: did we already create a pickup MR for this order?
         existing = frappe.db.get_value(
             "Material Request",
@@ -2057,14 +2221,13 @@ class BuybackOrder(Document):
                 },
             ],
         })
-        mr.insert(ignore_permissions=True)
-        mr.flags.ignore_permissions = True
+        mr.insert()
         mr.submit()
 
         self._notify_pickup_role(mr.name, source_wh, target_wh, settings)
         return mr.name
 
-    @frappe.whitelist()
+    @frappe.whitelist(methods=["POST"])
     def create_pickup_request_now(self):
         """User-initiated pickup MR creation (Logistics redesign Phase 1).
 
@@ -2076,6 +2239,10 @@ class BuybackOrder(Document):
         Returns the Material Request name, or None when nothing was created
         (e.g. order not yet Paid, item not stock, MR already exists).
         """
+        _require_order_action(
+            self, "pickup_request_roles", _("create a Buyback pickup request")
+        )
+        frappe.has_permission("Material Request", ptype="create", throw=True)
         if self.status != "Paid":
             frappe.throw(
                 _("Pickup Transfer Request can only be raised after the Buyback Order is Paid."),
@@ -2107,7 +2274,9 @@ class BuybackOrder(Document):
 
     def _notify_pickup_role(self, mr_name, source_wh, target_wh, settings):
         """Create ToDo + Notification Log for users with the pickup role."""
-        role = getattr(settings, "pickup_notify_role", None) or "Stock Manager"
+        role = getattr(settings, "pickup_notify_role", None)
+        if not role:
+            return
         users = []
         # Prefer role × store scope intersection so branch alerts don't
         # notify unrelated users from other stores.
@@ -2115,17 +2284,17 @@ class BuybackOrder(Document):
             from ch_erp15.ch_erp15.notification_router import get_scoped_users
             users = get_scoped_users([role], store=self.store)
         except Exception:
-            users = frappe.get_all(
-                "Has Role",
-                filters={"role": role, "parenttype": "User"},
-                pluck="parent",
+            frappe.log_error(
+                frappe.get_traceback(),
+                title=f"Scoped pickup notification lookup failed: {self.name}",
             )
-        # Filter to enabled, non-system users
-        users = [
-            u for u in set(users)
-            if u not in ("Administrator", "Guest")
-            and frappe.db.get_value("User", u, "enabled")
-        ]
+            return
+        from buyback.utils import filter_enabled_system_users, get_int_setting
+
+        users = filter_enabled_system_users(
+            users,
+            limit=get_int_setting("alert_recipient_limit", 15),
+        )
         if not users:
             return
 

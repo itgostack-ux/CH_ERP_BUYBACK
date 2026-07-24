@@ -264,82 +264,6 @@ def validate_price_override(original_price, override_price, user=None):
 
 # ── Internal Helpers ──────────────────────────────────────────────
 
-# def _get_base_price(item_code, grade, warranty_status=None, device_age_months=None):
-#     """Look up price from Buyback Price Master grade×warranty matrix."""
-#     bpm = frappe.db.get_value(
-#         "Buyback Price Master",
-#         {"item_code": item_code},
-#         ["name", "current_market_price",
-#          "a_grade_iw_0_3", "b_grade_iw_0_3", "c_grade_iw_0_3",
-#          "a_grade_iw_0_6", "b_grade_iw_0_6", "c_grade_iw_0_6", "d_grade_iw_0_6",
-#          "a_grade_iw_6_11", "b_grade_iw_6_11", "c_grade_iw_6_11", "d_grade_iw_6_11",
-#          "a_grade_oow_11", "b_grade_oow_11", "c_grade_oow_11", "d_grade_oow_11"],
-#         as_dict=True,
-#     )
-
-#     if not bpm:
-#         return 0
-
-#     # Resolve grade letter
-#     grade_letter = _resolve_grade_letter(grade)
-#     if not grade_letter:
-#         return flt(bpm.get("current_market_price"))
-
-#     # Determine warranty/age bucket
-#     age = _resolve_age_months(device_age_months)
-#     is_iw = warranty_status == "In Warranty"
-
-#     if is_iw and age <= 3:
-#         field = f"{grade_letter}_grade_iw_0_3"
-#     elif is_iw and age <= 6:
-#         field = f"{grade_letter}_grade_iw_0_6"
-#     elif is_iw and age <= 11:
-#         field = f"{grade_letter}_grade_iw_6_11"
-#     else:
-#         field = f"{grade_letter}_grade_oow_11"
-
-#     return flt(bpm.get(field)) or flt(bpm.get("current_market_price"))
-
-
-# def _get_floor_price(item_code, warranty_status=None, device_age_months=None):
-#     """Return the lowest grade (D) price for this item/warranty/age bucket.
-
-#     This is the absolute minimum the price can drop to — ensures the
-#     estimated price never goes to zero.
-#     """
-#     bpm = frappe.db.get_value(
-#         "Buyback Price Master",
-#         {"item_code": item_code},
-#         ["d_grade_iw_0_6", "d_grade_iw_6_11", "d_grade_oow_11",
-#          "c_grade_iw_0_3", "c_grade_oow_11"],
-#         as_dict=True,
-#     )
-#     if not bpm:
-#         return 0
-
-#     age = _resolve_age_months(device_age_months)
-#     is_iw = warranty_status == "In Warranty"
-
-#     # Grade D doesn't have 0-3 bucket, so fall back through D fields
-#     if is_iw and age <= 6:
-#         floor = flt(bpm.get("d_grade_iw_0_6"))
-#     elif is_iw and age <= 11:
-#         floor = flt(bpm.get("d_grade_iw_6_11"))
-#     else:
-#         floor = flt(bpm.get("d_grade_oow_11"))
-
-#     # If D grade price is 0, try C grade OOW as absolute minimum
-#     if not floor:
-#         floor = flt(bpm.get("c_grade_oow_11"))
-
-#     return floor
-
-
-
-
-# updated code :
-
-
 def _get_base_price(item_code, grade, warranty_status=None, device_age_months=None):
     """Look up base price from Ready Reckoner.
     
@@ -386,56 +310,6 @@ def _get_base_price(item_code, grade, warranty_status=None, device_age_months=No
 
     return price
 
-def _get_floor_price(item_code, warranty_status=None, device_age_months=None):
-    """Return the absolute minimum price (safety floor).
-    
-    For 0-3 months: No D grade exists, so use 50% of C as safety floor
-                    (allows deductions to reduce price properly).
-    For 4-6 months and beyond: D grade is the natural floor.
-    """
-    bpm = frappe.db.get_value(
-        "Buyback Price Master",
-        {"item_code": item_code},
-        ["c_grade_iw_0_3",
-         "d_grade_iw_0_6", "d_grade_iw_6_11", "d_grade_oow_11",
-         "c_grade_iw_0_6", "c_grade_iw_6_11", "c_grade_oow_11"],
-        as_dict=True,
-    )
-    if not bpm:
-        return 0
-
-    age = _resolve_age_months(device_age_months)
-    is_iw = warranty_status == "In Warranty"
-
-    if is_iw and age <= 3:
-        c_price = flt(bpm.get("c_grade_iw_0_3"))
-        floor = c_price * 0.5 if c_price else 0
-    elif is_iw and age <= 6:
-        floor = flt(bpm.get("d_grade_iw_0_6"))
-    elif is_iw and age <= 11:
-        floor = flt(bpm.get("d_grade_iw_6_11"))
-    else:
-        floor = flt(bpm.get("d_grade_oow_11"))
-
-    return floor
-
-
-def _resolve_grade_letter(grade):
-    """Convert grade name/ID to letter (a, b, c, d)."""
-    if not grade:
-        return None
-
-    # Might be passed as GRD-00001 or as grade name like "A"
-    grade_name = grade
-    if grade.startswith("GRD-"):
-        grade_name = frappe.db.get_value("Grade Master", grade, "grade_name") or grade
-
-    letter = grade_name.strip().lower()
-    if letter in ("a", "b", "c", "d"):
-        return letter
-    return None
-
-
 def _resolve_age_months(device_age_months):
     """Convert age bracket label to a representative numeric value.
 
@@ -464,85 +338,6 @@ def _resolve_age_months(device_age_months):
         return 0
 
 
-# def _get_diagnostic_deduction(diagnostic_test, base_price):
-#     """Calculate deduction from an automated diagnostic test result.
-
-#     Looks up the Question Bank entry by test_code, then finds the
-#     matching option for the result (Pass / Fail / Partial).
-#     """
-#     test_code = diagnostic_test.get("test_code")
-#     result = diagnostic_test.get("result")
-
-#     if not test_code or not result:
-#         return None
-
-#     question = frappe.db.get_value(
-#         "Buyback Question Bank",
-#         {"question_code": test_code, "disabled": 0},
-#         "name",
-#     )
-#     if not question:
-#         return None
-
-#     option = frappe.db.get_value(
-#         "Buyback Question Option",
-#         {"parent": question, "option_value": result},
-#         ["option_label", "price_impact_percent"],
-#         as_dict=True,
-#     )
-
-#     if not option or not option.price_impact_percent:
-#         return None
-
-#     deduction_amount = abs(base_price * flt(option.price_impact_percent) / 100)
-
-#     return {
-#         "label": f"{test_code}: {option.option_label or result}",
-#         "amount": deduction_amount,
-#         "type": "diagnostic_test",
-#         "percent": abs(option.price_impact_percent),
-#     }
-
-
-# def _get_question_deduction(response, base_price):
-#     """Calculate deduction from a single question response."""
-#     question_code = response.get("question_code")
-#     answer_value = response.get("answer_value")
-
-#     if not question_code or not answer_value:
-#         return None
-
-#     # Find the question and its option
-#     question = frappe.db.get_value(
-#         "Buyback Question Bank",
-#         {"question_code": question_code, "disabled": 0},
-#         "name",
-#     )
-#     if not question:
-#         return None
-
-#     # Find matching option
-#     option = frappe.db.get_value(
-#         "Buyback Question Option",
-#         {"parent": question, "option_value": answer_value},
-#         ["option_label", "price_impact_percent"],
-#         as_dict=True,
-#     )
-
-#     if not option or not option.price_impact_percent:
-#         return None
-
-#     deduction_amount = abs(base_price * flt(option.price_impact_percent) / 100)
-
-#     return {
-#         "label": f"{question_code}: {option.option_label}",
-#         "amount": deduction_amount,
-#         "type": "question",
-#         "percent": abs(option.price_impact_percent),
-#     }
-
-
-# updated for
 # POS condition-check keys → Buyback Question Bank question_code.
 # The POS quick-grading UI sends short keys (screen/camera/…); the question
 # bank is seeded with diag-*/q-* codes. Without this mapping every failed
@@ -692,24 +487,7 @@ def _apply_pricing_rules(base_price, brand=None, item_group=None,
     return deductions
 
 
-# def _round_price(price):
-#     """Round price per Buyback Settings."""
-#     try:
-#         rounding = frappe.db.get_single_value("Buyback Settings", "price_rounding")
-#     except frappe.DoesNotExistError:
-#         rounding = "Round to nearest 10"
-
-#     if rounding == "Round to nearest 10":
-#         return round(price / 10) * 10
-#     elif rounding == "Round to nearest 50":
-#         return round(price / 50) * 50
-#     elif rounding == "Round to nearest 100":
-#         return round(price / 100) * 100
-#     return price
-
-# updated
 def _round_price(price):
-    #return exact price... no rounding to nearest 10/50/100
     return round(float(price or 0), 2)
 
 def _determine_grade_from_price(item_code, final_price, warranty_status=None, device_age_months=None):

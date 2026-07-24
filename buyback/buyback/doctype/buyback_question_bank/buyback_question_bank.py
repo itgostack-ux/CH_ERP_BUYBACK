@@ -1,18 +1,17 @@
+import secrets
+
 import frappe
+from frappe.utils import cint
 from frappe.model.document import Document
+
+from buyback.utils import get_buyback_setting_value, next_numeric_external_id
 
 
 class BuybackQuestionBank(Document):
     def before_insert(self):
-        """Auto-assign sequential integer ID using advisory lock."""
-        frappe.db.sql("SELECT GET_LOCK('buyback_question_bank_id', 10)")
-        try:
-            last = frappe.db.sql(
-                "SELECT MAX(question_id) FROM `tabBuyback Question Bank`"
-            )[0][0] or 0
-            self.question_id = last + 1
-        finally:
-            frappe.db.sql("SELECT RELEASE_LOCK('buyback_question_bank_id')")
+        self.question_id = next_numeric_external_id(
+            "Buyback Question Bank", "question_id"
+        )
 
     def validate(self):
         # Auto-generate question_code from question_text if not provided
@@ -68,7 +67,22 @@ class BuybackQuestionBank(Document):
         if not self.question_code:
             return
 
-        frappe.db.sql("SELECT GET_LOCK('buyback_question_code', 10)")
+        lock_timeout = max(
+            1,
+            min(
+                cint(get_buyback_setting_value("question_code_lock_timeout_seconds", 10))
+                or 10,
+                60,
+            ),
+        )
+        lock_result = frappe.db.sql(
+            "SELECT GET_LOCK('buyback_question_code', %s)", (lock_timeout,)
+        )
+        if not lock_result or cint(lock_result[0][0]) != 1:
+            frappe.throw(
+                frappe._("Unable to reserve a question code. Please retry."),
+                frappe.ValidationError,
+            )
         try:
             base_code = self.question_code
             existing = frappe.db.get_value(
@@ -77,12 +91,44 @@ class BuybackQuestionBank(Document):
                 "name",
             )
             if existing:
-                suffix = 2
-                while frappe.db.exists(
-                    "Buyback Question Bank",
-                    {"question_code": f"{base_code}_{suffix}", "name": ["!=", self.name]},
-                ):
-                    suffix += 1
-                self.question_code = f"{base_code}_{suffix}"
+                retry_limit = max(
+                    1,
+                    min(
+                        cint(get_buyback_setting_value("question_code_suffix_retry_limit", 100))
+                        or 100,
+                        1000,
+                    ),
+                )
+                candidates = []
+                for suffix in range(2, retry_limit + 2):
+                    suffix_text = str(suffix)
+                    candidates.append(f"{base_code[:139 - len(suffix_text)]}_{suffix_text}")
+                occupied = set(
+                    frappe.get_all(
+                        "Buyback Question Bank",
+                        filters={
+                            "question_code": ("in", candidates),
+                            "name": ("!=", self.name),
+                        },
+                        pluck="question_code",
+                        limit_page_length=retry_limit + 1,
+                    )
+                )
+                self.question_code = next(
+                    (candidate for candidate in candidates if candidate not in occupied),
+                    "",
+                )
+                if not self.question_code:
+                    entropy = secrets.token_hex(8)
+                    fallback = f"{base_code[:139 - len(entropy)]}_{entropy}"
+                    if frappe.db.exists(
+                        "Buyback Question Bank",
+                        {"question_code": fallback, "name": ("!=", self.name)},
+                    ):
+                        frappe.throw(
+                            frappe._("Unable to allocate a unique question code. Please retry."),
+                            frappe.ValidationError,
+                        )
+                    self.question_code = fallback
         finally:
             frappe.db.sql("SELECT RELEASE_LOCK('buyback_question_code')")

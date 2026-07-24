@@ -3,7 +3,11 @@ from frappe import _
 from frappe.model.document import Document
 from frappe.utils import now_datetime, flt
 
-from buyback.utils import validate_indian_phone
+from buyback.utils import (
+    next_numeric_external_id,
+    sync_customer_identity,
+    validate_indian_phone,
+)
 
 from buyback.exceptions import BuybackStatusError
 from buyback.utils import log_audit
@@ -11,17 +15,15 @@ from buyback.utils import log_audit
 
 class BuybackExchangeOrder(Document):
     def before_insert(self):
-        """Auto-assign sequential exchange_id using atomic SQL increment."""
-        result = frappe.db.sql(
-            "SELECT IFNULL(MAX(exchange_id), 0) + 1 FROM `tabBuyback Exchange Order` FOR UPDATE"
+        self.exchange_id = next_numeric_external_id(
+            "Buyback Exchange Order", "exchange_id"
         )
-        self.exchange_id = result[0][0] if result else 1
         self.status = "Draft"
 
     def validate(self):
         if self.mobile_no:
             self.mobile_no = validate_indian_phone(self.mobile_no, "Mobile No")
-        self._sync_customer_id()
+        sync_customer_identity(self)
         self._calculate_amount_to_pay()
         self._sync_workflow_state()
 
@@ -37,21 +39,6 @@ class BuybackExchangeOrder(Document):
             return
         if self.status and self.workflow_state != self.status:
             self.workflow_state = self.status
-
-    def _sync_customer_id(self):
-        """Populate ch_customer_id / ch_membership_id from Customer master."""
-        if not self.customer or (self.ch_customer_id and self.ch_membership_id):
-            return
-        cust = frappe.db.get_value(
-            "Customer", self.customer,
-            ["ch_customer_id", "ch_membership_id"],
-            as_dict=True,
-        )
-        if cust:
-            if not self.ch_customer_id:
-                self.ch_customer_id = cust.ch_customer_id
-            if not self.ch_membership_id:
-                self.ch_membership_id = cust.ch_membership_id
 
     def on_submit(self):
         if self.status == "Draft":
@@ -204,8 +191,8 @@ class BuybackExchangeOrder(Document):
                 # logistics guard (procurement_guardrails).
                 se.flags.ignore_procurement_guardrails = True
                 se.submit()
-            from ch_erp15.ch_erp15.stock_bin_api import move_to_bin
-            move_to_bin(
+            from ch_erp15.ch_erp15.stock_bin_api import _move_to_bin
+            _move_to_bin(
                 serial, tag_bin_type,
                 reason=reason,
                 reference_doctype="Buyback Exchange Order",

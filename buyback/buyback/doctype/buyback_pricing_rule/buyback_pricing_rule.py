@@ -3,18 +3,14 @@ from frappe import _
 from frappe.model.document import Document
 from frappe.utils import getdate, nowdate
 
+from buyback.utils import next_numeric_external_id
+
 
 class BuybackPricingRule(Document):
     def before_insert(self):
-        """Auto-assign sequential integer ID using advisory lock."""
-        frappe.db.sql("SELECT GET_LOCK('buyback_pricing_rule_id', 10)")
-        try:
-            last = frappe.db.sql(
-                "SELECT MAX(pricing_rule_id) FROM `tabBuyback Pricing Rule`"
-            )[0][0] or 0
-            self.pricing_rule_id = last + 1
-        finally:
-            frappe.db.sql("SELECT RELEASE_LOCK('buyback_pricing_rule_id')")
+        self.pricing_rule_id = next_numeric_external_id(
+            "Buyback Pricing Rule", "pricing_rule_id"
+        )
 
     def validate(self):
         self._validate_deduction_values()

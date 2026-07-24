@@ -2,18 +2,12 @@ import frappe
 from frappe.model.document import Document
 from frappe.utils import now_datetime
 
+from buyback.utils import next_numeric_external_id
+
 
 class BuybackAuditLog(Document):
     def before_insert(self):
-        """Auto-assign sequential integer ID using advisory lock."""
-        frappe.db.sql("SELECT GET_LOCK('buyback_audit_log_id', 10)")
-        try:
-            last = frappe.db.sql(
-                "SELECT MAX(audit_id) FROM `tabBuyback Audit Log`"
-            )[0][0] or 0
-            self.audit_id = last + 1
-        finally:
-            frappe.db.sql("SELECT RELEASE_LOCK('buyback_audit_log_id')")
+        self.audit_id = next_numeric_external_id("Buyback Audit Log", "audit_id")
 
         if not self.timestamp:
             self.timestamp = now_datetime()

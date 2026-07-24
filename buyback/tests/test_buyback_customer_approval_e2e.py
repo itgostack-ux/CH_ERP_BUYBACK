@@ -6,22 +6,22 @@ Covers:
 2) Buyback audit log entry should be created without select-validation errors.
 3) POS buyback detail API should auto-fetch customer payout fields.
 
-Run:
-  cd /home/palla/erpnext-bench
-  ./env/bin/python3 apps/buyback/test_buyback_customer_approval_e2e.py
+Run with bench execute against an isolated test site.
 """
+
+import os
 
 import frappe
 from frappe.utils import flt
 
 
-SITE = "erpnext.local"
-SITES_PATH = "/home/palla/erpnext-bench/sites"
-
-
-def _init():
-    frappe.init(site=SITE, sites_path=SITES_PATH)
-    frappe.connect()
+def _init(site=None, sites_path=None):
+    if not getattr(frappe.local, "site", None):
+        site = site or os.environ.get("FRAPPE_SITE")
+        if not site:
+            raise RuntimeError("FRAPPE_SITE is required when running outside bench execute")
+        frappe.init(site=site, sites_path=sites_path)
+        frappe.connect()
     frappe.set_user("Administrator")
 
 

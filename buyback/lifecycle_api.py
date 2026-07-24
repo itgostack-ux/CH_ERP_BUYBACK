@@ -16,13 +16,22 @@ import frappe
 from frappe import _
 from frappe.utils import cint, now_datetime
 
-MAX_PICKUP_ATTEMPTS = 3
+from buyback.utils import (
+    assert_buyback_scope,
+    is_privileged_user,
+    require_configured_role,
+    require_scoped_document_action,
+)
+
+
+def _max_pickup_attempts() -> int:
+    return max(cint(frappe.db.get_single_value("Buyback Settings", "max_pickup_attempts") or 3), 1)
 
 
 # ── Indemnity / NOC ──────────────────────────────────────────────────────
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def record_indemnity(
     order_name: str,
     signed_by_name: str,
@@ -36,9 +45,10 @@ def record_indemnity(
     a device cannot progress to Paid without a signed indemnity confirming
     the seller is the legal owner and consents to transfer.
     """
-    frappe.has_permission("Buyback Order", ptype="write", throw=True)
-
     order = frappe.get_doc("Buyback Order", order_name)
+    require_scoped_document_action(
+        order, "order_operation_roles", _("capture a Buyback indemnity")
+    )
     signed_by_name = (signed_by_name or "").strip()
     signature_type = (signature_type or "").strip()
     if not signed_by_name:
@@ -63,6 +73,10 @@ def record_indemnity(
     }
     if attachment:
         payload["indemnity_attachment"] = attachment
+
+    order.update(payload)
+    order.flags.ch_evidence_update_authorized = True
+    payload["lifecycle_evidence_signature"] = order._refresh_lifecycle_evidence()
 
     frappe.db.set_value(
         "Buyback Order", order_name, payload, update_modified=False
@@ -97,7 +111,7 @@ def _get_attempt_count(order_name: str) -> int:
     )
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def schedule_pickup(
     order_name: str,
     appointment_date: str,
@@ -114,20 +128,25 @@ def schedule_pickup(
     """Create a new Buyback Pickup Appointment for an order.
 
     Auto-increments the attempt number; refuses to schedule beyond
-    MAX_PICKUP_ATTEMPTS (raises an exception request instead).
+    the configured attempt cap (raises an exception request instead).
     """
+    require_configured_role("pickup_request_roles", action=_("schedule a Buyback pickup"))
     frappe.has_permission("CH Buyback Pickup Appointment", ptype="create", throw=True)
-
     order = frappe.get_doc("Buyback Order", order_name)
+    order.check_permission("write")
+    assert_buyback_scope(store=order.store, company=order.company)
+    frappe.db.get_value("Buyback Order", order.name, "name", for_update=True)
+    order.reload()
 
     prior = _get_attempt_count(order_name)
-    if prior >= MAX_PICKUP_ATTEMPTS:
+    max_attempts = _max_pickup_attempts()
+    if prior >= max_attempts:
         frappe.throw(
             _(
                 "Buyback Order {0} has already reached the {1}-attempt cap. "
                 "Escalate via CH Exception Request rather than scheduling "
                 "another attempt."
-            ).format(order_name, MAX_PICKUP_ATTEMPTS),
+            ).format(order_name, max_attempts),
             title=_("Pickup Attempt Cap"),
         )
 
@@ -183,10 +202,16 @@ def schedule_pickup(
     return {"name": doc.name, "attempt_number": doc.attempt_number}
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def complete_pickup(appointment: str, remarks: str | None = None) -> dict:
-    frappe.has_permission("CH Buyback Pickup Appointment", ptype="write", throw=True)
     doc = frappe.get_doc("CH Buyback Pickup Appointment", appointment)
+    require_configured_role("pickup_request_roles", action=_("complete a Buyback pickup"))
+    doc.check_permission("write")
+    order = frappe.get_doc("Buyback Order", doc.buyback_order)
+    order.check_permission("read")
+    assert_buyback_scope(store=order.store, company=order.company)
+    frappe.db.get_value(doc.doctype, doc.name, "name", for_update=True)
+    doc.reload()
     if doc.docstatus != 1:
         frappe.throw(_("Pickup Appointment must be Submitted before it can be completed."))
     if doc.status == "Completed":
@@ -203,20 +228,34 @@ def complete_pickup(appointment: str, remarks: str | None = None) -> dict:
     return {"name": doc.name, "status": doc.status}
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def fail_pickup(
     appointment: str,
     failure_reason: str,
     next_action: str,
     remarks: str | None = None,
 ) -> dict:
-    frappe.has_permission("CH Buyback Pickup Appointment", ptype="write", throw=True)
-    if not failure_reason:
-        frappe.throw(_("Failure Reason is required."))
-    if not next_action:
-        frappe.throw(_("Next Action is required."))
+    require_configured_role("pickup_request_roles", action=_("record a failed Buyback pickup"))
+    allowed_reasons = {
+        "Customer Unavailable", "Wrong Address", "Device Not Ready",
+        "Customer Refused Pickup", "Device Condition Mismatch",
+        "Account Locked / Data Not Wiped", "Other",
+    }
+    allowed_actions = {
+        "Retry Same Slot", "Retry Different Slot", "Escalate to Manager", "Cancel Order"
+    }
+    if failure_reason not in allowed_reasons:
+        frappe.throw(_("Choose a valid Failure Reason."))
+    if next_action not in allowed_actions:
+        frappe.throw(_("Choose a valid Next Action."))
 
     doc = frappe.get_doc("CH Buyback Pickup Appointment", appointment)
+    doc.check_permission("write")
+    order = frappe.get_doc("Buyback Order", doc.buyback_order)
+    order.check_permission("read")
+    assert_buyback_scope(store=order.store, company=order.company)
+    frappe.db.get_value(doc.doctype, doc.name, "name", for_update=True)
+    doc.reload()
     if doc.docstatus != 1:
         frappe.throw(_("Pickup Appointment must be Submitted before failure can be recorded."))
     if doc.status in ("Completed", "Cancelled"):
@@ -230,22 +269,28 @@ def fail_pickup(
         doc.db_set("remarks", combined)
 
     # Auto-escalate when the third attempt has failed.
-    if doc.attempt_number >= MAX_PICKUP_ATTEMPTS or next_action == "Cancel Order":
+    if doc.attempt_number >= _max_pickup_attempts() or next_action == "Cancel Order":
         _raise_pickup_exhaustion_exception(doc)
 
     return {"name": doc.name, "status": doc.status, "attempt_number": doc.attempt_number}
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def reschedule_pickup(
     appointment: str,
     appointment_date: str,
     appointment_slot: str | None = None,
 ) -> dict:
     """Create a follow-up appointment linked to the failed prior attempt."""
+    require_configured_role("pickup_request_roles", action=_("reschedule a Buyback pickup"))
     frappe.has_permission("CH Buyback Pickup Appointment", ptype="create", throw=True)
-
     prior = frappe.get_doc("CH Buyback Pickup Appointment", appointment)
+    prior.check_permission("write")
+    order = frappe.get_doc("Buyback Order", prior.buyback_order)
+    order.check_permission("read")
+    assert_buyback_scope(store=order.store, company=order.company)
+    frappe.db.get_value(prior.doctype, prior.name, "name", for_update=True)
+    prior.reload()
     if prior.status != "Attempted (Failed)":
         frappe.throw(_("Only failed attempts can be rescheduled."))
     if prior.reschedule_to:
@@ -257,11 +302,12 @@ def reschedule_pickup(
 
     order_name = prior.buyback_order
     prior_count = _get_attempt_count(order_name)
-    if prior_count >= MAX_PICKUP_ATTEMPTS:
+    max_attempts = _max_pickup_attempts()
+    if prior_count >= max_attempts:
         frappe.throw(
             _(
                 "Buyback Order {0} has already reached the {1}-attempt cap."
-            ).format(order_name, MAX_PICKUP_ATTEMPTS),
+            ).format(order_name, max_attempts),
             title=_("Pickup Attempt Cap"),
         )
 
@@ -314,7 +360,7 @@ def _raise_pickup_exhaustion_exception(doc):
 # ── Data-Wipe Certificate ────────────────────────────────────────────────
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def record_data_wipe(
     order_name: str,
     wipe_method: str,
@@ -327,9 +373,11 @@ def record_data_wipe(
     submit: bool = True,
 ) -> dict:
     """Create a Data Wipe Certificate for a Buyback Order and (by default) submit it."""
+    require_configured_role("inspection_operation_roles", action=_("record a Buyback data wipe"))
     frappe.has_permission("CH Data Wipe Certificate", ptype="create", throw=True)
-
     order = frappe.get_doc("Buyback Order", order_name)
+    order.check_permission("read")
+    assert_buyback_scope(store=order.store, company=order.company)
 
     if not wipe_method:
         frappe.throw(_("Wipe Method is required."))
@@ -374,22 +422,34 @@ def record_data_wipe(
     }
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def verify_data_wipe(certificate: str, verification_method: str | None = None) -> dict:
     """Second-person verification of a submitted wipe certificate.
 
     Enforces the maker-checker rule (verifier != wiper) at validate time
     via CHDataWipeCertificate.validate.
     """
-    frappe.has_permission("CH Data Wipe Certificate", ptype="write", throw=True)
+    require_configured_role("inspection_operation_roles", action=_("verify a Buyback data wipe"))
     doc = frappe.get_doc("CH Data Wipe Certificate", certificate)
+    doc.check_permission("write")
+    order = frappe.get_doc("Buyback Order", doc.buyback_order)
+    order.check_permission("read")
+    assert_buyback_scope(store=order.store, company=order.company)
+    frappe.db.get_value(doc.doctype, doc.name, "name", for_update=True)
+    doc.reload()
     if doc.docstatus != 1:
         frappe.throw(_("Certificate must be Submitted before it can be verified."))
-    if doc.wiped_by == frappe.session.user:
+    if doc.wiped_by == frappe.session.user and not is_privileged_user():
         frappe.throw(
             _("You cannot verify a wipe you performed (maker-checker rule)."),
             title=_("Maker-Checker Required"),
         )
+    allowed_methods = {
+        "Visual — Fresh Boot Screen", "Tool Report", "Hash Comparison",
+        "Cryptographic Key Destruction",
+    }
+    if verification_method and verification_method not in allowed_methods:
+        frappe.throw(_("Choose a valid verification method."))
 
     doc.db_set("wipe_verified", 1)
     doc.db_set("verified_by", frappe.session.user)

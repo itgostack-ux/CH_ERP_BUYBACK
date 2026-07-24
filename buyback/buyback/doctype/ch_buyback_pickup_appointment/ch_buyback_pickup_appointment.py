@@ -16,15 +16,14 @@ from __future__ import annotations
 import frappe
 from frappe import _
 from frappe.model.document import Document
-from frappe.utils import now_datetime
+from frappe.utils import cint, now_datetime
 
-MAX_ATTEMPTS = 3
+
+def _max_attempts():
+    return max(cint(frappe.db.get_single_value("Buyback Settings", "max_pickup_attempts") or 3), 1)
 
 
 class CHBuybackPickupAppointment(Document):
-    def autoname(self):
-        pass
-
     def validate(self):
         self._auto_set_attempt_number()
         self._auto_set_appointment_id()
@@ -43,13 +42,14 @@ class CHBuybackPickupAppointment(Document):
             },
         )
         self.attempt_number = count + 1
-        if self.attempt_number > MAX_ATTEMPTS:
+        max_attempts = _max_attempts()
+        if self.attempt_number > max_attempts:
             frappe.msgprint(
                 _(
                     "This is attempt #{0} for Buyback Order {1} — the market-"
                     "standard cap is {2}. Consider cancelling the order or "
                     "raising an exception instead of scheduling another attempt."
-                ).format(self.attempt_number, self.buyback_order, MAX_ATTEMPTS),
+                ).format(self.attempt_number, self.buyback_order, max_attempts),
                 title=_("Attempt Cap Exceeded"),
                 indicator="orange",
             )

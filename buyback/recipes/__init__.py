@@ -7,6 +7,5 @@ flow. Consumed by:
 * ``bench execute`` for dev-loop / UAT smoke testing
 * CI Step 5 workflows
 
-For heavy-scenario recipes see ``buyback/qa/runner.py`` and
-``buyback/qa/scenarios.py`` (the pre-existing 27-scenario QA harness).
+Heavy scenarios are exercised by the discovered Buyback QA test suite.
 """

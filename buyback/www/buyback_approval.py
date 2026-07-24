@@ -38,50 +38,12 @@ def get_context(context):
         context.error = "No approval token provided."
         return
 
-    order_name = frappe.db.get_value(
-        "Buyback Order", {"approval_token": token, "docstatus": ["!=", 2]}, "name"
-    )
-    if not order_name:
+    try:
+        from buyback.api import get_buyback_approval_details
+
+        details = get_buyback_approval_details(token)
+    except Exception:
         context.error = "Invalid or expired approval link."
         return
-
-    order = frappe.get_doc("Buyback Order", order_name)
-    context.order = {
-        "name": order.name,
-        "order_id": order.order_id,
-        "customer_name": order.customer_name,
-        "item_name": frappe.db.get_value("Item", order.item, "item_name") or order.item,
-        "brand": order.brand,
-        "imei_serial": order.imei_serial,
-        "condition_grade": (
-            frappe.db.get_value("Grade Master", order.condition_grade, "grade_name")
-            if order.condition_grade else ""
-        ),
-        "final_price": order.final_price,
-        "store_name": (
-            frappe.db.get_value("Warehouse", order.store, "warehouse_name")
-            if order.store else ""
-        ),
-        "status": order.status,
-        "device_photo_front": order.device_photo_front,
-        "device_photo_back": order.device_photo_back,
-        "otp_verified": order.otp_verified,
-        "warranty_status": order.warranty_status,
-        "mobile_no": order.mobile_no,
-        "customer_payout_mode": order.customer_payout_mode,
-        "customer_cash_receiver_name": order.customer_cash_receiver_name,
-        "customer_upi_id": order.customer_upi_id,
-        "customer_bank_account_holder": order.customer_bank_account_holder,
-        "customer_bank_account_number": order.customer_bank_account_number,
-        "customer_bank_ifsc": order.customer_bank_ifsc,
-        "customer_bank_name": order.customer_bank_name,
-        "customer_payout_notes": order.customer_payout_notes,
-        "customer_photo": order.customer_photo,
-        "customer_id_type": order.customer_id_type,
-        "customer_id_number": order.customer_id_number,
-        "customer_id_front": order.customer_id_front,
-        "customer_id_back": order.customer_id_back,
-        "kyc_verified": order.kyc_verified,
-        "kyc_verified_at": order.kyc_verified_at,
-    }
+    context.order = frappe._dict(details)
     context.no_cache = 1
