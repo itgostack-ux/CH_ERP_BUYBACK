@@ -156,7 +156,7 @@ class TestFinalResidualBlockers(TestCase):
 		for controller, fieldname in controller_fields.items():
 			source = (doctype_root / controller / f"{controller}.py").read_text()
 			self.assertIn("next_numeric_external_id", source, controller)
-			self.assertNotIn(f"MAX({fieldname})", source, controller)
+			self.assertNotIn({"MAX": fieldname})", source, controller)
 
 	def test_buyback_hub_requires_configured_role_and_named_reads(self):
 		source = inspect.getsource(buyback_hub_api._check_hub_access)
