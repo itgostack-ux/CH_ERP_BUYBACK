@@ -118,7 +118,7 @@ def next_numeric_external_id(doctype: str, fieldname: str) -> int:
         frappe.throw(_("Unsupported numeric identifier series."))
 
     existing_max = cint(
-        frappe.db.get_value(doctype, {}, {"MAX": fieldname}, order_by=None) or 0
+        frappe.db.get_value(doctype, {}, [{"MAX": fieldname}], order_by=None) or 0
     )
     frappe.db.sql(
         """
