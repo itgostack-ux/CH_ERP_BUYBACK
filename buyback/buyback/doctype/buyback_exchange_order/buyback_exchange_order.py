@@ -30,8 +30,14 @@ class BuybackExchangeOrder(Document):
     def validate_workflow(self):
         """Skip Frappe's workflow re-validation — status machine is
         server-managed and workflow_state is a desk-visibility mirror
-        (same rationale as Buyback Order.validate_workflow)."""
-        return
+        (same rationale as Buyback Order.validate_workflow).
+
+        Mirror explicitly on the way out: returning early leaves workflow_state
+        untouched only for saves that already ran validate(); an
+        update_after_submit save that changed status elsewhere would otherwise
+        keep a stale mirror.
+        """
+        self._sync_workflow_state()
 
     def _sync_workflow_state(self):
         """Keep workflow_state aligned when status is changed via server actions."""

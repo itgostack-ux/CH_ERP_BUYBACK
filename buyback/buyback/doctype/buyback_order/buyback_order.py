@@ -101,10 +101,31 @@ class BuybackOrder(Document):
             self.lifecycle_evidence_signature = None
 
     def validate_workflow(self):
-        """Validate user-driven workflow changes; trust only controller moves."""
-        if self.flags.get("ch_server_transition"):
-            return
-        return super().validate_workflow()
+        """`status` is the state machine; `workflow_state` is only its mirror.
+
+        Frappe's Document.validate_workflow() must never run for this doctype:
+
+        1. It calls set_workflow_state_on_action() for every action other than
+           "save" — including "update_after_submit". That helper stamps
+           workflow_state with the FIRST workflow state whose doc_status matches
+           the document, which for a submitted Buyback Order is "Paid" (the
+           workflow marks Approved…Ready to Pay as doc_status 0 while POS
+           submits orders at creation). A plain field save — capturing KYC,
+           payout preference or a payment row — therefore silently wrote
+           workflow_state = "Paid" onto an unpaid order.
+        2. On the next save _sync_workflow_state() pulls the mirror back to the
+           real status, which Frappe then rejects as an illegal transition
+           ("Workflow State transition not allowed from Paid to OTP Verified"),
+           bricking the order: every later save failed the same way, and
+           payment_api._validate_payout_eligibility() — which reads
+           `workflow_state or status` — refused to open a payout for it.
+
+        Transitions are validated by the controller methods themselves
+        (customer_approve / verify_otp / mark_ready_to_pay / mark_paid / close),
+        so mirroring is all that is required here. Same rationale as
+        BuybackExchangeOrder.validate_workflow().
+        """
+        self._sync_workflow_state()
 
     def _has_workflow_state_field(self):
         return bool(self.meta.has_field("workflow_state"))
@@ -1073,10 +1094,25 @@ class BuybackOrder(Document):
         return {"success": True}
 
     def mark_ready_to_pay(self):
-        """Move to payment stage."""
-        if self.status != "OTP Verified":
+        """Move to payment stage.
+
+        Recorded customer consent is the gate, not the channel it arrived on:
+        an OTP the customer typed back and a portal/token approval are both
+        valid evidence, so "Customer Approved" with the flag set is accepted
+        alongside "OTP Verified". Idempotent — re-entering from Ready to Pay
+        is a no-op so retried settlement calls do not fail.
+        """
+        if self.status == "Ready to Pay":
+            return
+        consented = self.status == "OTP Verified" or (
+            self.status == "Customer Approved" and cint(self.customer_approved)
+        )
+        if not consented:
             frappe.throw(
-                _("Must verify OTP before proceeding to payment."),
+                _("Customer approval (OTP or in-store/portal confirmation) is required "
+                  "before proceeding to payment. Current status: {0}.").format(
+                    frappe.bold(self.status)
+                ),
                 exc=BuybackStatusError,
             )
         self._set_status("Ready to Pay")
@@ -1142,7 +1178,7 @@ class BuybackOrder(Document):
                         bpr_row.get("payment_status") in ("Processed", "Reconciled")
                         and bpr_row.get("docstatus") == 1
                     )
-            if not has_pe:
+            if not has_pe and not self._has_counter_payout_evidence():
                 frappe.throw(
                     _(
                         "Cannot close Buyback Order {0}: bank payout has not "
@@ -1156,6 +1192,32 @@ class BuybackOrder(Document):
         self._set_status("Closed")
         self.save()
         log_audit("Order Closed", "Buyback Order", self.name)
+
+    def _has_counter_payout_evidence(self):
+        """True when a non-bank-rail payout was settled at the counter with proof.
+
+        A UPI payout pushed from the store's own handle never produces a Bank
+        Payment Request, so the BPR gate above could never be satisfied and the
+        order could never close. The control the gate exists for is evidence
+        that money actually left — for a counter UPI payout that evidence is the
+        UTR / RRN captured against every payment row (POS refuses to settle UPI
+        without one). Bank Transfer is deliberately excluded: it always runs on
+        the banking rail, so only a settled BPR clears it.
+        """
+        mode = (self.get("customer_payout_mode") or "").strip().lower()
+        if mode != "upi":
+            return False
+        if self.payment_status != "Paid":
+            return False
+        rows = self.get("payments") or []
+        if not rows:
+            return False
+        placeholder = f"pos-cashback-{(self.name or '').lower()}"
+        for row in rows:
+            reference = (row.transaction_reference or "").strip()
+            if not reference or reference.lower() == placeholder:
+                return False
+        return True
 
     def _block_close_without_finance(self):
         """Hard block: cannot close/dispatch without finance posted (#13).

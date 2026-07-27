@@ -62,11 +62,14 @@ from buyback.utils import assert_buyback_scope, log_audit, require_configured_ro
 # Internal constants
 # ---------------------------------------------------------------------------
 
-# Statuses where a payout may be initiated.  Anything outside this set is
-# either not yet ready (no customer approval) or already in a terminal state.
+# Statuses where a payout may be initiated.  This MUST match the contract the
+# BPR factory enforces on the other side — ``ch_payments.api`` and
+# ``BankPaymentRequest.validate`` both reject a Buyback Order that is not
+# submitted and "Ready to Pay".  Allowing "Approved"/"OTP Verified" here made
+# the two validators mutually exclusive, so no payout could ever be created:
+# this gate passed only in states the factory refused, and vice versa.
 _PAYOUT_INITIABLE_STATUSES = {
-    "Approved",
-    "OTP Verified",
+    "Ready to Pay",
 }
 
 # BPR statuses that count as "open" — used for idempotency checks.
