@@ -48,18 +48,13 @@ class BuybackHub {
 	}
 
 	refresh() {
-		this.$root.html(`<div class="hub-loading"><i class="fa fa-spinner fa-spin"></i> ${__("Loading Buyback Hub...")}</div>`);
-		frappe.xcall("buyback.buyback.page.buyback_hub.buyback_hub_api.get_buyback_hub_data",
-			this.filters.values())
-			.then((data) => this._render(data))
-			.catch(() => {
-				this.$root.html(`<div class="hub-loading text-danger">${__("Failed to load data. Please try again.")}</div>`);
-			});
+		return ch_erp15.hub_refresh.run(this,
+			() => frappe.xcall("buyback.buyback.page.buyback_hub.buyback_hub_api.get_buyback_hub_data", this.filters.values()),
+			(data) => this._render(data), { label: "Buyback Hub" });
 	}
 
 	_start_auto_refresh() {
-		this._timer = setInterval(() => this.refresh(), 60000);
-		$(this.page.parent).on("remove", () => clearInterval(this._timer));
+		ch_erp15.hub_refresh.start(this, 60000);
 	}
 
 	_render(data) {
