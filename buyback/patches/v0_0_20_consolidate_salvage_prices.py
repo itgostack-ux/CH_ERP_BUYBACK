@@ -36,16 +36,18 @@ def execute():
 
 	frappe.reload_doc("buyback", "doctype", "buyback_price_master")
 
+	# has_column() takes the DOCTYPE name; only the raw SQL below wants "tab...".
+	doctype = "Buyback Price Master"
 	table = "tabBuyback Price Master"
-	present_scrap = [f for f in _LEGACY_SCRAP if frappe.db.has_column(table, f)]
-	present_dead = [f for f in _LEGACY_DEAD if frappe.db.has_column(table, f)]
+	present_scrap = [f for f in _LEGACY_SCRAP if frappe.db.has_column(doctype, f)]
+	present_dead = [f for f in _LEGACY_DEAD if frappe.db.has_column(doctype, f)]
 	if not present_scrap and not present_dead:
 		return
 
 	# Migrate before dropping: take the max across the old bands so a populated
 	# site keeps a sensible salvage figure instead of losing it.
 	for target, sources in (("scrap_price", present_scrap), ("phone_dead_price", present_dead)):
-		if not sources or not frappe.db.has_column(table, target):
+		if not sources or not frappe.db.has_column(doctype, target):
 			continue
 		greatest = ", ".join(f"IFNULL(`{c}`, 0)" for c in sources)
 		frappe.db.sql(
