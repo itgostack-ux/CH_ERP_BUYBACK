@@ -498,52 +498,75 @@ function _buyback_option_is_selected(stored_value, option) {
 		.some(value => String(value || "").trim().toLowerCase() === stored);
 }
 
+function _buyback_diagnostic_radio_html(row, value, frm) {
+	const options = (row && row._diagnostic_radio_options) || [];
+	if (!options.length) return frappe.utils.escape_html(value == null ? "" : String(value));
+
+	const disabled = frm && frm.doc.docstatus ? "disabled" : "";
+	const choices = options.map(option => {
+		const val = frappe.utils.escape_html(option.value || "");
+		const label = frappe.utils.escape_html(option.label || option.value || "");
+		const checked = _buyback_option_is_selected(value, option) ? "checked" : "";
+		return `<label style="display:inline-flex;align-items:center;gap:5px;margin:2px 12px 2px 0;white-space:nowrap;cursor:pointer">
+			<input class="buyback-diagnostic-radio" type="radio" name="buyback-diagnostic-${frappe.utils.escape_html(row.name)}" value="${val}" ${checked} ${disabled} style="margin:0;accent-color:var(--primary)" />
+			<span>${label}</span>
+		</label>`;
+	}).join("");
+	return `<div class="buyback-diagnostic-radios" style="display:flex;flex-wrap:wrap;align-items:center">${choices}</div>`;
+}
+
+// Render Result as a radio group instead of Frappe's Select editor.
+//
+// The previous approach appended radios to the cell and hid .field-area once.
+// That could not hold: GridRow.toggle_editable_row() runs make_control() and
+// then explicitly calls column.field_area.toggle(true) every time ANY cell in
+// the row is clicked, which re-showed the Select on top of the radios — the
+// "click a radio, get a dropdown" symptom. Re-hiding from JS is a race, and
+// the per-cell mousedown guard died with the DOM node on the next re-render.
+//
+// So this drives both halves from things a re-render cannot undo:
+//   • a docfield FORMATTER, which frappe.format() feeds into .static-area on
+//     every single row render (grid_row.js:1127), so the radios always come
+//     back by themselves;
+//   • a stylesheet rule with !important, which outranks the inline display
+//     that toggle_editable_row() sets, so the Select can never become visible.
+// Selection is handled by one delegated listener on grid.wrapper, which also
+// survives re-renders.
 function _buyback_render_diagnostic_radios(frm) {
 	const grid = frm.fields_dict.diagnostic_tests && frm.fields_dict.diagnostic_tests.grid;
 	if (!grid || frm.doc.is_phone_dead) return;
 
+	if (!document.getElementById("buyback-diagnostic-radio-styles")) {
+		const style = document.createElement("style");
+		style.id = "buyback-diagnostic-radio-styles";
+		// !important is load-bearing: toggle_editable_row sets display inline.
+		style.textContent = `
+			.buyback-diagnostic-grid .grid-row [data-fieldname="result"] .field-area { display: none !important; }
+			.buyback-diagnostic-grid .grid-row [data-fieldname="result"] .static-area { display: block !important; }
+			.buyback-diagnostic-grid .grid-row [data-fieldname="result"] .static-area.ellipsis { overflow: visible; text-overflow: clip; }
+		`;
+		document.head.appendChild(style);
+	}
+	grid.wrapper.addClass("buyback-diagnostic-grid");
+
+	const df = grid.get_field && grid.get_field("result") && grid.get_field("result").df;
+	if (df) df.formatter = (value, _df, _options, doc) => _buyback_diagnostic_radio_html(doc, value, frm);
+
+	// Delegated: bound to the grid wrapper, so it outlives every row re-render.
 	grid.wrapper.off("change.buyback_diagnostic_radio");
 	grid.wrapper.on("change.buyback_diagnostic_radio", ".buyback-diagnostic-radio", function (event) {
 		event.stopPropagation();
 		const row_name = $(this).closest(".grid-row").attr("data-name");
 		const row = (frm.doc.diagnostic_tests || []).find(item => item.name === row_name);
 		if (!row) return;
-		frappe.model.set_value(row.doctype, row.name, "result", $(this).val())
-			.then(() => setTimeout(() => _buyback_render_diagnostic_radios(frm), 0));
+		frappe.model.set_value(row.doctype, row.name, "result", $(this).val());
 	});
 
 	(grid.grid_rows || []).forEach(grid_row => {
-		const row = grid_row.doc;
-		const options = row && row._diagnostic_radio_options;
-		if (!row || !options || !options.length) return;
-
-		const $column = grid_row.wrapper.find('[data-fieldname="result"]').first();
-		if (!$column.length) return;
-		$column.find(".field-area, .static-area").hide();
-		$column.find(".buyback-diagnostic-radios").remove();
-
-		const disabled = frm.doc.docstatus ? "disabled" : "";
-		const choices = options.map(option => {
-			const value = frappe.utils.escape_html(option.value || "");
-			const label = frappe.utils.escape_html(option.label || option.value || "");
-			const checked = _buyback_option_is_selected(row.result, option) ? "checked" : "";
-			return `<label style="display:inline-flex;align-items:center;gap:5px;margin:2px 12px 2px 0;white-space:nowrap;cursor:pointer">
-				<input class="buyback-diagnostic-radio" type="radio" name="buyback-diagnostic-${frappe.utils.escape_html(row.name)}" value="${value}" ${checked} ${disabled} style="margin:0;accent-color:var(--primary)" />
-				<span>${label}</span>
-			</label>`;
-		}).join("");
-		$column.append(`<div class="buyback-diagnostic-radios" style="display:flex;flex-wrap:wrap;align-items:center;min-height:38px;padding:4px 8px">${choices}</div>`);
-		// This column is rendered as a radio group, not as Frappe's Select
-		// editor. Stop pointer events at the cell before they reach the grid-row
-		// click handler, otherwise clicking Yes/No first opens the dropdown on
-		// top of the radios. Do not preventDefault: the browser must still check
-		// the selected radio and emit change for frappe.model.set_value above.
-		$column.off("mousedown.buyback_radio click.buyback_radio");
-		$column.on("mousedown.buyback_radio click.buyback_radio", function (event) {
-			event.stopPropagation();
-		});
+		if (grid_row.doc) grid_row.refresh_field("result");
 	});
 }
+
 
 // ── Auto-load Customer Questions when Item is selected ──────────
 function buyback_load_customer_questions(frm) {
@@ -620,9 +643,45 @@ function _buyback_set_response_option_maps(row, options) {
 	});
 }
 
+function _buyback_answer_radio_html(row, value, frm) {
+	const options = (row && row._answer_radio_options) || [];
+	if (!options.length) return frappe.utils.escape_html(value == null ? "" : String(value));
+
+	const disabled = frm && frm.doc.docstatus ? "disabled" : "";
+	const choices = options.map(option => {
+		const val = frappe.utils.escape_html(option.value || "");
+		const label = frappe.utils.escape_html(option.label || option.value || "");
+		const checked = _buyback_option_is_selected(value, option) ? "checked" : "";
+		return `<label style="display:inline-flex;align-items:center;gap:5px;margin:2px 12px 2px 0;white-space:nowrap;cursor:pointer">
+			<input class="buyback-answer-radio" type="radio" name="buyback-answer-${frappe.utils.escape_html(row.name)}" value="${val}" ${checked} ${disabled} style="margin:0;accent-color:var(--primary)" />
+			<span>${label}</span>
+		</label>`;
+	}).join("");
+	return `<div class="buyback-answer-radios" style="display:flex;flex-wrap:wrap;align-items:center">${choices}</div>`;
+}
+
+// Same contract as the diagnostics grid above — formatter for the markup,
+// stylesheet for visibility, delegated listener for the change. See the long
+// comment on _buyback_render_diagnostic_radios for why appending to the cell
+// and hiding .field-area once cannot work.
 function _buyback_render_response_radios(frm) {
 	const grid = frm.fields_dict.responses && frm.fields_dict.responses.grid;
 	if (!grid || frm.doc.is_phone_dead) return;
+
+	if (!document.getElementById("buyback-answer-radio-styles")) {
+		const style = document.createElement("style");
+		style.id = "buyback-answer-radio-styles";
+		style.textContent = `
+			.buyback-answer-grid .grid-row [data-fieldname="answer_value"] .field-area { display: none !important; }
+			.buyback-answer-grid .grid-row [data-fieldname="answer_value"] .static-area { display: block !important; }
+			.buyback-answer-grid .grid-row [data-fieldname="answer_value"] .static-area.ellipsis { overflow: visible; text-overflow: clip; }
+		`;
+		document.head.appendChild(style);
+	}
+	grid.wrapper.addClass("buyback-answer-grid");
+
+	const df = grid.get_field && grid.get_field("answer_value") && grid.get_field("answer_value").df;
+	if (df) df.formatter = (value, _df, _options, doc) => _buyback_answer_radio_html(doc, value, frm);
 
 	grid.wrapper.off("change.buyback_answer_radio");
 	grid.wrapper.on("change.buyback_answer_radio", ".buyback-answer-radio", function (event) {
@@ -630,35 +689,11 @@ function _buyback_render_response_radios(frm) {
 		const row_name = $(this).closest(".grid-row").attr("data-name");
 		const row = (frm.doc.responses || []).find(item => item.name === row_name);
 		if (!row) return;
-		frappe.model.set_value(row.doctype, row.name, "answer_value", $(this).val())
-			.then(() => setTimeout(() => _buyback_render_response_radios(frm), 0));
+		frappe.model.set_value(row.doctype, row.name, "answer_value", $(this).val());
 	});
 
 	(grid.grid_rows || []).forEach(grid_row => {
-		const row = grid_row.doc;
-		const options = row && row._answer_radio_options;
-		if (!row || !options || !options.length) return;
-
-		const $column = grid_row.wrapper.find('[data-fieldname="answer_value"]').first();
-		if (!$column.length) return;
-		$column.find(".field-area, .static-area").hide();
-		$column.find(".buyback-answer-radios").remove();
-
-		const disabled = frm.doc.docstatus ? "disabled" : "";
-		const choices = options.map(option => {
-			const value = frappe.utils.escape_html(option.value || "");
-			const label = frappe.utils.escape_html(option.label || option.value || "");
-			const checked = _buyback_option_is_selected(row.answer_value, option) ? "checked" : "";
-			return `<label style="display:inline-flex;align-items:center;gap:5px;margin:2px 12px 2px 0;white-space:nowrap;cursor:pointer">
-				<input class="buyback-answer-radio" type="radio" name="buyback-answer-${frappe.utils.escape_html(row.name)}" value="${value}" ${checked} ${disabled} style="margin:0;accent-color:var(--primary)" />
-				<span>${label}</span>
-			</label>`;
-		}).join("");
-		$column.append(`<div class="buyback-answer-radios" style="display:flex;flex-wrap:wrap;align-items:center;min-height:38px;padding:4px 8px">${choices}</div>`);
-		$column.off("mousedown.buyback_radio click.buyback_radio");
-		$column.on("mousedown.buyback_radio click.buyback_radio", function (event) {
-			event.stopPropagation();
-		});
+		if (grid_row.doc) grid_row.refresh_field("answer_value");
 	});
 }
 
