@@ -26,32 +26,28 @@
   "b_grade_iw_0_3",
   "iw_0_3_col2",
   "c_grade_iw_0_3",
-  "scrap_iw_0_3",
-  "phone_dead_iw_0_3",
   "iw_0_6_section",
   "a_grade_iw_0_6",
   "b_grade_iw_0_6",
   "iw_0_6_col2",
   "c_grade_iw_0_6",
   "d_grade_iw_0_6",
-  "scrap_iw_0_6",
-  "phone_dead_iw_0_6",
   "iw_6_11_section",
   "a_grade_iw_6_11",
   "b_grade_iw_6_11",
   "iw_6_11_col2",
   "c_grade_iw_6_11",
   "d_grade_iw_6_11",
-  "scrap_iw_6_11",
-  "phone_dead_iw_6_11",
   "oow_11_section",
   "a_grade_oow_11",
   "b_grade_oow_11",
   "oow_11_col2",
   "c_grade_oow_11",
   "d_grade_oow_11",
-  "scrap_oow_11",
-  "phone_dead_oow_11"
+  "salvage_section",
+  "scrap_price",
+  "salvage_col_break",
+  "phone_dead_price"
  ],
  "fields": [
   {
@@ -280,42 +276,22 @@
    "read_only": 1
   },
   {
-   "fieldname": "scrap_iw_0_3",
+   "fieldname": "salvage_section",
+   "fieldtype": "Section Break",
+   "label": "Salvage Prices",
+   "description": "Applied whenever the device is graded Scrap or flagged Phone Dead, regardless of device age or warranty status."
+  },
+  {
+   "fieldname": "scrap_price",
    "fieldtype": "Currency",
    "label": "Scrap Price"
   },
   {
-   "fieldname": "phone_dead_iw_0_3",
-   "fieldtype": "Currency",
-   "label": "Phone Dead"
+   "fieldname": "salvage_col_break",
+   "fieldtype": "Column Break"
   },
   {
-   "fieldname": "scrap_iw_0_6",
-   "fieldtype": "Currency",
-   "label": "Scrap Price"
-  },
-  {
-   "fieldname": "phone_dead_iw_0_6",
-   "fieldtype": "Currency",
-   "label": "Phone Dead"
-  },
-  {
-   "fieldname": "scrap_iw_6_11",
-   "fieldtype": "Currency",
-   "label": "Scrap Price"
-  },
-  {
-   "fieldname": "phone_dead_iw_6_11",
-   "fieldtype": "Currency",
-   "label": "Phone Dead"
-  },
-  {
-   "fieldname": "scrap_oow_11",
-   "fieldtype": "Currency",
-   "label": "Scrap Price"
-  },
-  {
-   "fieldname": "phone_dead_oow_11",
+   "fieldname": "phone_dead_price",
    "fieldtype": "Currency",
    "label": "Phone Dead"
   }

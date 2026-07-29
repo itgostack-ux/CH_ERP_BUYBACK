@@ -547,58 +547,33 @@ def _determine_grade_from_price(item_code, final_price, warranty_status=None, de
 
     return grade_prices[-1][0]
 
-def _get_phone_dead_price(item_code, warranty_status, device_age_months):
-    """Return Phone Dead price from Ready Reckoner for the current bucket."""
-    bpm = frappe.db.get_value(
-        "Buyback Price Master",
-        {"item_code": item_code},
-        [
-            "phone_dead_iw_0_3", "phone_dead_iw_0_6",
-            "phone_dead_iw_6_11", "phone_dead_oow_11",
-        ],
-        as_dict=True,
+def _get_phone_dead_price(item_code, warranty_status=None, device_age_months=None):
+    """Return the Phone Dead price — one value, whatever the age or warranty.
+
+    A handset that does not power on is worth its salvage value; that does not
+    change because it is 2 months old rather than 20, or because warranty has
+    not lapsed. The warranty/age arguments are accepted and ignored so callers
+    (and the grade-price helpers beside this one) keep a uniform signature.
+    """
+    return flt(
+        frappe.db.get_value(
+            "Buyback Price Master", {"item_code": item_code}, "phone_dead_price"
+        )
     )
-    if not bpm:
-        return 0
-
-    age = _resolve_age_months(device_age_months)
-    is_iw = warranty_status == "In Warranty"
-
-    if is_iw and age <= 3:
-        return flt(bpm.get("phone_dead_iw_0_3"))
-    elif is_iw and age <= 6:
-        return flt(bpm.get("phone_dead_iw_0_6"))
-    elif is_iw and age <= 11:
-        return flt(bpm.get("phone_dead_iw_6_11"))
-    else:
-        return flt(bpm.get("phone_dead_oow_11"))
 
 
-def _get_scrap_price(item_code, warranty_status, device_age_months):
-    """Return Scrap Price from Ready Reckoner for the current bucket."""
-    bpm = frappe.db.get_value(
-        "Buyback Price Master",
-        {"item_code": item_code},
-        [
-            "scrap_iw_0_3", "scrap_iw_0_6",
-            "scrap_iw_6_11", "scrap_oow_11",
-        ],
-        as_dict=True,
+def _get_scrap_price(item_code, warranty_status=None, device_age_months=None):
+    """Return the Scrap price — one value, whatever the age or warranty.
+
+    Scrap is the floor applied when deductions drop the quote below the
+    bucket's minimum grade price. The THRESHOLD stays band-specific (see
+    _get_min_grade_price); only the salvage value itself is flat.
+    """
+    return flt(
+        frappe.db.get_value(
+            "Buyback Price Master", {"item_code": item_code}, "scrap_price"
+        )
     )
-    if not bpm:
-        return 0
-
-    age = _resolve_age_months(device_age_months)
-    is_iw = warranty_status == "In Warranty"
-
-    if is_iw and age <= 3:
-        return flt(bpm.get("scrap_iw_0_3"))
-    elif is_iw and age <= 6:
-        return flt(bpm.get("scrap_iw_0_6"))
-    elif is_iw and age <= 11:
-        return flt(bpm.get("scrap_iw_6_11"))
-    else:
-        return flt(bpm.get("scrap_oow_11"))
 
 
 def _get_min_grade_price(item_code, warranty_status, device_age_months):

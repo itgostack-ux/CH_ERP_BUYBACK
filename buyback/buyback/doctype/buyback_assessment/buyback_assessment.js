@@ -162,15 +162,12 @@ frappe.ui.form.on("Buyback Assessment", {
 		buyback_render_price_cards(frm);
 
 		// Auto-load tests/questions on refresh if item is set but tables are empty
-		if (frm.doc.item && frm.doc.status === "Draft") {
+		if (frm.doc.item && frm.doc.status === "Draft" && !frm.doc.is_phone_dead) {
 			buyback_load_diagnostic_tests(frm);
 			buyback_load_customer_questions(frm);
 		}
 
-		if (frm.doc.is_phone_dead) {
-			frm.set_df_property("diagnostic_tests", "hidden", 1);
-			frm.set_df_property("responses", "hidden", 1);
-		}
+		_buyback_set_phone_dead_state(frm, false);
 	},
 
 	item(frm) {
@@ -270,6 +267,7 @@ frappe.ui.form.on("Buyback Assessment Response", {
 				});
 			}
 		}
+		setTimeout(() => _buyback_render_response_radios(frm), 0);
 	},
 });
 
@@ -285,17 +283,18 @@ frappe.ui.form.on("Buyback Assessment Diagnostic", {
 			callback(r) {
 				if (!r.message || !r.message.length) return;
 
-				// Store impact map on row for result change handler
-				row._impact_map = {};
-				r.message.forEach(o => {
-					row._impact_map[o.option_value] = Math.abs(o.price_impact_percent || 0);
-				});
+				_buyback_set_diagnostic_option_maps(row, r.message.map(option => ({
+					value: option.option_value,
+					label: option.option_label || option.option_value,
+					impact: option.price_impact_percent || 0,
+				})));
 
 				const opts = r.message.map(o => o.option_value);
 				frm.fields_dict.diagnostic_tests.grid.update_docfield_property(
 					"result", "options", "\n" + opts.join("\n")
 				);
 				frm.fields_dict.diagnostic_tests.grid.refresh();
+				_buyback_render_diagnostic_radios(frm);
 			},
 		});
 	},
@@ -337,6 +336,7 @@ frappe.ui.form.on("Buyback Assessment Diagnostic", {
 				}
 			},
 		});
+		setTimeout(() => _buyback_render_diagnostic_radios(frm), 0);
 	},
 });
 
@@ -429,16 +429,27 @@ function buyback_render_price_cards(frm) {
 
 // ── Auto-load Diagnostic Tests when Item is selected ────────────
 function buyback_load_diagnostic_tests(frm) {
-	if (!frm.doc.item) return;
-
-	// Don't overwrite if tests already exist (e.g. editing a saved doc)
-	if (frm.doc.diagnostic_tests && frm.doc.diagnostic_tests.length) return;
+	if (!frm.doc.item || frm.doc.is_phone_dead) return;
 
 	frappe.call({
 		method: "buyback.api.get_diagnostic_tests_for_item",
 		args: { item_code: frm.doc.item },
 		callback(r) {
+			if (frm.doc.is_phone_dead) return;
 			if (!r.message || !r.message.length) return;
+			const existing_rows = frm.doc.diagnostic_tests || [];
+			const tests_by_name = Object.fromEntries(r.message.map(test => [test.name, test]));
+
+			// API-created and previously saved assessments already contain rows.
+			// Rehydrate option metadata so their stored value/label is preselected.
+			if (existing_rows.length) {
+				existing_rows.forEach(row => {
+					const test = tests_by_name[row.test];
+					if (test) _buyback_set_diagnostic_option_maps(row, test.options);
+				});
+				_buyback_render_diagnostic_radios(frm);
+				return;
+			}
 
 			// Clear existing empty rows
 			frm.clear_table("diagnostic_tests");
@@ -449,15 +460,7 @@ function buyback_load_diagnostic_tests(frm) {
 				row.test_code = test.test_code;
 				row.test_name = test.test_name;
 
-				// Pre-build impact map so result change sets depreciation live
-                row._impact_map = {};
-                row._label_to_value = {};
-                if (test.options && test.options.length) {
-                    test.options.forEach(o => {
-                        row._impact_map[o.value] = Math.abs(o.impact || 0);
-                        row._label_to_value[o.label || o.value] = o.value;
-                    });
-                }
+				_buyback_set_diagnostic_option_maps(row, test.options);
             });
 
 			frm.refresh_field("diagnostic_tests");
@@ -465,10 +468,11 @@ function buyback_load_diagnostic_tests(frm) {
 			// Update result Select options for all rows
             if (r.message.length && r.message[0].options && r.message[0].options.length) {
                 const opts = r.message[0].options.map(o => o.label || o.value);
-                frm.fields_dict.diagnostic_tests.grid.update_docfield_property(
-                    "result", "options", "\n" + opts.join("\n")
-                );
-            }
+				frm.fields_dict.diagnostic_tests.grid.update_docfield_property(
+					"result", "options", "\n" + opts.join("\n")
+				);
+			}
+			_buyback_render_diagnostic_radios(frm);
 
 			frappe.show_alert({
 				message: __("{0} diagnostic tests loaded", [r.message.length]),
@@ -478,18 +482,85 @@ function buyback_load_diagnostic_tests(frm) {
 	});
 }
 
+function _buyback_set_diagnostic_option_maps(row, options) {
+	row._impact_map = {};
+	row._label_to_value = {};
+	row._diagnostic_radio_options = options || [];
+	row._diagnostic_radio_options.forEach(option => {
+		row._impact_map[option.value] = Math.abs(option.impact || 0);
+		row._label_to_value[option.label || option.value] = option.value;
+	});
+}
+
+function _buyback_option_is_selected(stored_value, option) {
+	const stored = String(stored_value || "").trim().toLowerCase();
+	return Boolean(stored) && [option.value, option.label]
+		.some(value => String(value || "").trim().toLowerCase() === stored);
+}
+
+function _buyback_render_diagnostic_radios(frm) {
+	const grid = frm.fields_dict.diagnostic_tests && frm.fields_dict.diagnostic_tests.grid;
+	if (!grid || frm.doc.is_phone_dead) return;
+
+	grid.wrapper.off("change.buyback_diagnostic_radio");
+	grid.wrapper.on("change.buyback_diagnostic_radio", ".buyback-diagnostic-radio", function (event) {
+		event.stopPropagation();
+		const row_name = $(this).closest(".grid-row").attr("data-name");
+		const row = (frm.doc.diagnostic_tests || []).find(item => item.name === row_name);
+		if (!row) return;
+		frappe.model.set_value(row.doctype, row.name, "result", $(this).val())
+			.then(() => setTimeout(() => _buyback_render_diagnostic_radios(frm), 0));
+	});
+
+	(grid.grid_rows || []).forEach(grid_row => {
+		const row = grid_row.doc;
+		const options = row && row._diagnostic_radio_options;
+		if (!row || !options || !options.length) return;
+
+		const $column = grid_row.wrapper.find('[data-fieldname="result"]').first();
+		if (!$column.length) return;
+		$column.find(".field-area, .static-area").hide();
+		$column.find(".buyback-diagnostic-radios").remove();
+
+		const disabled = frm.doc.docstatus ? "disabled" : "";
+		const choices = options.map(option => {
+			const value = frappe.utils.escape_html(option.value || "");
+			const label = frappe.utils.escape_html(option.label || option.value || "");
+			const checked = _buyback_option_is_selected(row.result, option) ? "checked" : "";
+			return `<label style="display:inline-flex;align-items:center;gap:5px;margin:2px 12px 2px 0;white-space:nowrap;cursor:pointer">
+				<input class="buyback-diagnostic-radio" type="radio" name="buyback-diagnostic-${frappe.utils.escape_html(row.name)}" value="${value}" ${checked} ${disabled} style="margin:0;accent-color:var(--primary)" />
+				<span>${label}</span>
+			</label>`;
+		}).join("");
+		$column.append(`<div class="buyback-diagnostic-radios" style="display:flex;flex-wrap:wrap;align-items:center;min-height:38px;padding:4px 8px">${choices}</div>`);
+	});
+}
+
 // ── Auto-load Customer Questions when Item is selected ──────────
 function buyback_load_customer_questions(frm) {
-	if (!frm.doc.item) return;
-
-	// Don't overwrite if questions already exist (e.g. editing a saved doc)
-	if (frm.doc.responses && frm.doc.responses.length) return;
+	if (!frm.doc.item || frm.doc.is_phone_dead) return;
 
 	frappe.call({
 		method: "buyback.api.get_customer_questions_for_item",
 		args: { item_code: frm.doc.item },
 		callback(r) {
+			if (frm.doc.is_phone_dead) return;
 			if (!r.message || !r.message.length) return;
+			const existing_rows = frm.doc.responses || [];
+			const questions_by_name = Object.fromEntries(
+				r.message.map(question => [question.name, question])
+			);
+
+			// Saved assessments already have rows. Rehydrate their configured
+			// options so the inline radios can be rendered after every refresh.
+			if (existing_rows.length) {
+				existing_rows.forEach(row => {
+					const question = questions_by_name[row.question];
+					if (question) _buyback_set_response_option_maps(row, question.options);
+				});
+				_buyback_render_response_radios(frm);
+				return;
+			}
 
 			// Clear existing empty rows
 			frm.clear_table("responses");
@@ -500,17 +571,7 @@ function buyback_load_customer_questions(frm) {
 				row.question_code = q.question_code;
 				row.question_text = q.question_text;
 
-				// Pre-build maps for live answer handling
-				row._options_map = {};
-				row._impact_map = {};
-				row._answer_options = [];
-				if (q.options && q.options.length) {
-					q.options.forEach(o => {
-						row._options_map[o.value] = o.label || o.value;
-						row._impact_map[o.value] = o.impact || 0;
-						row._answer_options.push(o.value);
-					});
-				}
+				_buyback_set_response_option_maps(row, q.options);
 			});
 
 			frm.refresh_field("responses");
@@ -528,12 +589,63 @@ function buyback_load_customer_questions(frm) {
 					);
 				}
 			});
+			_buyback_render_response_radios(frm);
 
 			frappe.show_alert({
 				message: __("{0} customer questions loaded", [r.message.length]),
 				indicator: "blue",
 			});
 		},
+	});
+}
+
+function _buyback_set_response_option_maps(row, options) {
+	row._options_map = {};
+	row._impact_map = {};
+	row._answer_options = [];
+	row._answer_radio_options = options || [];
+	row._answer_radio_options.forEach(option => {
+		row._options_map[option.value] = option.label || option.value;
+		row._impact_map[option.value] = option.impact || 0;
+		row._answer_options.push(option.value);
+	});
+}
+
+function _buyback_render_response_radios(frm) {
+	const grid = frm.fields_dict.responses && frm.fields_dict.responses.grid;
+	if (!grid || frm.doc.is_phone_dead) return;
+
+	grid.wrapper.off("change.buyback_answer_radio");
+	grid.wrapper.on("change.buyback_answer_radio", ".buyback-answer-radio", function (event) {
+		event.stopPropagation();
+		const row_name = $(this).closest(".grid-row").attr("data-name");
+		const row = (frm.doc.responses || []).find(item => item.name === row_name);
+		if (!row) return;
+		frappe.model.set_value(row.doctype, row.name, "answer_value", $(this).val())
+			.then(() => setTimeout(() => _buyback_render_response_radios(frm), 0));
+	});
+
+	(grid.grid_rows || []).forEach(grid_row => {
+		const row = grid_row.doc;
+		const options = row && row._answer_radio_options;
+		if (!row || !options || !options.length) return;
+
+		const $column = grid_row.wrapper.find('[data-fieldname="answer_value"]').first();
+		if (!$column.length) return;
+		$column.find(".field-area, .static-area").hide();
+		$column.find(".buyback-answer-radios").remove();
+
+		const disabled = frm.doc.docstatus ? "disabled" : "";
+		const choices = options.map(option => {
+			const value = frappe.utils.escape_html(option.value || "");
+			const label = frappe.utils.escape_html(option.label || option.value || "");
+			const checked = _buyback_option_is_selected(row.answer_value, option) ? "checked" : "";
+			return `<label style="display:inline-flex;align-items:center;gap:5px;margin:2px 12px 2px 0;white-space:nowrap;cursor:pointer">
+				<input class="buyback-answer-radio" type="radio" name="buyback-answer-${frappe.utils.escape_html(row.name)}" value="${value}" ${checked} ${disabled} style="margin:0;accent-color:var(--primary)" />
+				<span>${label}</span>
+			</label>`;
+		}).join("");
+		$column.append(`<div class="buyback-answer-radios" style="display:flex;flex-wrap:wrap;align-items:center;min-height:38px;padding:4px 8px">${choices}</div>`);
 	});
 }
 
@@ -567,10 +679,24 @@ function buyback_open_new_customer_dialog(frm) {
 
 // ── Handle Phone Dead checkbox toggle ────────────────────────────
 function _buyback_handle_phone_dead_toggle(frm) {
-    const is_dead = frm.doc.is_phone_dead;
+	_buyback_set_phone_dead_state(frm, true);
+	buyback_recalculate_estimate(frm);
+}
 
-    frm.set_df_property("diagnostic_tests", "hidden", is_dead ? 1 : 0);
-    frm.set_df_property("responses", "hidden", is_dead ? 1 : 0);
+function _buyback_set_phone_dead_state(frm, reload_when_alive) {
+	const is_dead = Boolean(frm.doc.is_phone_dead);
+	frm.set_df_property("diagnostic_tests_section", "hidden", is_dead ? 1 : 0);
+	frm.set_df_property("diagnostic_tests", "hidden", is_dead ? 1 : 0);
+	frm.set_df_property("responses_section", "hidden", is_dead ? 1 : 0);
+	frm.set_df_property("responses", "hidden", is_dead ? 1 : 0);
 
-    buyback_recalculate_estimate(frm);
+	if (is_dead) {
+		frm.clear_table("diagnostic_tests");
+		frm.clear_table("responses");
+		frm.refresh_field("diagnostic_tests");
+		frm.refresh_field("responses");
+	} else if (reload_when_alive && frm.doc.item && frm.doc.status === "Draft") {
+		buyback_load_diagnostic_tests(frm);
+		buyback_load_customer_questions(frm);
+	}
 }

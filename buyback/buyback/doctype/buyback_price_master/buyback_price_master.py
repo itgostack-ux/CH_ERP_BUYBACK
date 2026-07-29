@@ -11,16 +11,16 @@ _PRICE_FIELDS = [
     "current_market_price", "vendor_price",
     # IW 0-3
     "a_grade_iw_0_3", "b_grade_iw_0_3", "c_grade_iw_0_3",
-    "scrap_iw_0_3", "phone_dead_iw_0_3",
     # IW 4-6
     "a_grade_iw_0_6", "b_grade_iw_0_6", "c_grade_iw_0_6", "d_grade_iw_0_6",
-    "scrap_iw_0_6", "phone_dead_iw_0_6",
     # IW 6-11
     "a_grade_iw_6_11", "b_grade_iw_6_11", "c_grade_iw_6_11", "d_grade_iw_6_11",
-    "scrap_iw_6_11", "phone_dead_iw_6_11",
     # OOW 11+
     "a_grade_oow_11", "b_grade_oow_11", "c_grade_oow_11", "d_grade_oow_11",
-    "scrap_oow_11", "phone_dead_oow_11",
+    # Salvage — one price each, independent of age and warranty status. A dead
+    # or scrap handset is worth its salvage value whatever its age, so these
+    # deliberately have no per-band variants.
+    "scrap_price", "phone_dead_price",
 ]
 
 
