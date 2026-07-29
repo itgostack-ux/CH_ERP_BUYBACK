@@ -128,23 +128,23 @@ frappe.ui.form.on("Buyback Assessment", {
 		//     "Delete row / Edit row / Duplicate row" toolbar never appears.
 		//     Users answer inline (Result / Answer dropdowns) but cannot
 		//     remove, duplicate, or bulk-edit rows.
-		//   • Inline dropdowns stay editable in Draft; Frappe locks them
-		//     automatically once the assessment is Submitted (docstatus=1).
-		const _is_draft = !frm.doc.docstatus;
+		//   • Result/Answer are rendered as inline radio groups below. Keep the
+		//     underlying Select fields read-only even in Draft so a grid click can
+		//     never replace a radio group with Frappe's native dropdown editor.
 		frm.fields_dict.diagnostic_tests.grid.cannot_add_rows = true;
 		frm.fields_dict.diagnostic_tests.grid.cannot_delete_rows = true;
 		frm.fields_dict.diagnostic_tests.grid.update_docfield_property(
 			"depreciation_percent", "hidden", 1
 		);
 		frm.fields_dict.diagnostic_tests.grid.update_docfield_property(
-			"result", "read_only", _is_draft ? 0 : 1
+			"result", "read_only", 1
 		);
 		frm.fields_dict.diagnostic_tests.grid.refresh();
 
 		frm.fields_dict.responses.grid.cannot_add_rows = true;
 		frm.fields_dict.responses.grid.cannot_delete_rows = true;
 		frm.fields_dict.responses.grid.update_docfield_property(
-			"answer_value", "read_only", _is_draft ? 0 : 1
+			"answer_value", "read_only", 1
 		);
 		frm.fields_dict.responses.grid.refresh();
 
@@ -533,6 +533,15 @@ function _buyback_render_diagnostic_radios(frm) {
 			</label>`;
 		}).join("");
 		$column.append(`<div class="buyback-diagnostic-radios" style="display:flex;flex-wrap:wrap;align-items:center;min-height:38px;padding:4px 8px">${choices}</div>`);
+		// This column is rendered as a radio group, not as Frappe's Select
+		// editor. Stop pointer events at the cell before they reach the grid-row
+		// click handler, otherwise clicking Yes/No first opens the dropdown on
+		// top of the radios. Do not preventDefault: the browser must still check
+		// the selected radio and emit change for frappe.model.set_value above.
+		$column.off("mousedown.buyback_radio click.buyback_radio");
+		$column.on("mousedown.buyback_radio click.buyback_radio", function (event) {
+			event.stopPropagation();
+		});
 	});
 }
 
@@ -646,6 +655,10 @@ function _buyback_render_response_radios(frm) {
 			</label>`;
 		}).join("");
 		$column.append(`<div class="buyback-answer-radios" style="display:flex;flex-wrap:wrap;align-items:center;min-height:38px;padding:4px 8px">${choices}</div>`);
+		$column.off("mousedown.buyback_radio click.buyback_radio");
+		$column.on("mousedown.buyback_radio click.buyback_radio", function (event) {
+			event.stopPropagation();
+		});
 	});
 }
 
