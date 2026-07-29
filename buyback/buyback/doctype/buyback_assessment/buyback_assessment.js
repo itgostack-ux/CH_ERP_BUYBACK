@@ -498,8 +498,25 @@ function _buyback_option_is_selected(stored_value, option) {
 		.some(value => String(value || "").trim().toLowerCase() === stored);
 }
 
-function _buyback_diagnostic_radio_html(row, value, frm) {
-	const options = (row && row._diagnostic_radio_options) || [];
+// Radio choices for a cell. Prefers the per-row option metadata (carries the
+// grading impact + distinct value/label), and falls back to the Select's own
+// options so a row still renders radios before that metadata has loaded — and
+// on GridRow.refresh_field's second pass, which re-formats with the PARENT doc
+// whenever the first pass returned an empty string (grid_row.js:1599).
+function _buyback_radio_options(row, df) {
+	const from_row = row && row._diagnostic_radio_options;
+	if (from_row && from_row.length) return from_row;
+	const from_answer = row && row._answer_radio_options;
+	if (from_answer && from_answer.length) return from_answer;
+	return String((df && df.options) || "")
+		.split("\n")
+		.map(o => o.trim())
+		.filter(Boolean)
+		.map(o => ({ value: o, label: o }));
+}
+
+function _buyback_diagnostic_radio_html(row, value, frm, df) {
+	const options = _buyback_radio_options(row, df);
 	if (!options.length) return frappe.utils.escape_html(value == null ? "" : String(value));
 
 	const disabled = frm && frm.doc.docstatus ? "disabled" : "";
@@ -508,7 +525,7 @@ function _buyback_diagnostic_radio_html(row, value, frm) {
 		const label = frappe.utils.escape_html(option.label || option.value || "");
 		const checked = _buyback_option_is_selected(value, option) ? "checked" : "";
 		return `<label style="display:inline-flex;align-items:center;gap:5px;margin:2px 12px 2px 0;white-space:nowrap;cursor:pointer">
-			<input class="buyback-diagnostic-radio" type="radio" name="buyback-diagnostic-${frappe.utils.escape_html(row.name)}" value="${val}" ${checked} ${disabled} style="margin:0;accent-color:var(--primary)" />
+			<input class="buyback-diagnostic-radio" type="radio" name="buyback-diagnostic-${frappe.utils.escape_html((row && row.name) || "")}" value="${val}" ${checked} ${disabled} style="margin:0;accent-color:var(--primary)" />
 			<span>${label}</span>
 		</label>`;
 	}).join("");
@@ -549,8 +566,26 @@ function _buyback_render_diagnostic_radios(frm) {
 	}
 	grid.wrapper.addClass("buyback-diagnostic-grid");
 
-	const df = grid.get_field && grid.get_field("result") && grid.get_field("result").df;
-	if (df) df.formatter = (value, _df, _options, doc) => _buyback_diagnostic_radio_html(doc, value, frm);
+	// MUST go through update_docfield_property: grid.get_field() returns the
+	// fieldinfo/get_query workaround object, NOT the docfield, so assigning
+	// .formatter there silently did nothing and the cell rendered empty.
+	// update_docfield_property writes to every row's `docfields` plus the
+	// parent's — which is exactly what GridRow.refresh_field() looks up.
+	// Set once per grid: update_docfield_property fires debounced_refresh, and
+	// this function runs on every form refresh. It also throws if any row is
+	// missing the field, which must never break the rest of the form.
+	if (!grid._buyback_radio_formatter) {
+		try {
+			grid.update_docfield_property(
+				"result",
+				"formatter",
+				(value, df, _options, doc) => _buyback_diagnostic_radio_html(doc, value, frm, df)
+			);
+			grid._buyback_radio_formatter = true;
+		} catch (e) {
+			console.warn("Buyback: could not attach diagnostic radio formatter", e);
+		}
+	}
 
 	// Delegated: bound to the grid wrapper, so it outlives every row re-render.
 	grid.wrapper.off("change.buyback_diagnostic_radio");
@@ -643,8 +678,8 @@ function _buyback_set_response_option_maps(row, options) {
 	});
 }
 
-function _buyback_answer_radio_html(row, value, frm) {
-	const options = (row && row._answer_radio_options) || [];
+function _buyback_answer_radio_html(row, value, frm, df) {
+	const options = _buyback_radio_options(row, df);
 	if (!options.length) return frappe.utils.escape_html(value == null ? "" : String(value));
 
 	const disabled = frm && frm.doc.docstatus ? "disabled" : "";
@@ -653,7 +688,7 @@ function _buyback_answer_radio_html(row, value, frm) {
 		const label = frappe.utils.escape_html(option.label || option.value || "");
 		const checked = _buyback_option_is_selected(value, option) ? "checked" : "";
 		return `<label style="display:inline-flex;align-items:center;gap:5px;margin:2px 12px 2px 0;white-space:nowrap;cursor:pointer">
-			<input class="buyback-answer-radio" type="radio" name="buyback-answer-${frappe.utils.escape_html(row.name)}" value="${val}" ${checked} ${disabled} style="margin:0;accent-color:var(--primary)" />
+			<input class="buyback-answer-radio" type="radio" name="buyback-answer-${frappe.utils.escape_html((row && row.name) || "")}" value="${val}" ${checked} ${disabled} style="margin:0;accent-color:var(--primary)" />
 			<span>${label}</span>
 		</label>`;
 	}).join("");
@@ -680,8 +715,18 @@ function _buyback_render_response_radios(frm) {
 	}
 	grid.wrapper.addClass("buyback-answer-grid");
 
-	const df = grid.get_field && grid.get_field("answer_value") && grid.get_field("answer_value").df;
-	if (df) df.formatter = (value, _df, _options, doc) => _buyback_answer_radio_html(doc, value, frm);
+	if (!grid._buyback_radio_formatter) {
+		try {
+			grid.update_docfield_property(
+				"answer_value",
+				"formatter",
+				(value, df, _options, doc) => _buyback_answer_radio_html(doc, value, frm, df)
+			);
+			grid._buyback_radio_formatter = true;
+		} catch (e) {
+			console.warn("Buyback: could not attach answer radio formatter", e);
+		}
+	}
 
 	grid.wrapper.off("change.buyback_answer_radio");
 	grid.wrapper.on("change.buyback_answer_radio", ".buyback-answer-radio", function (event) {
