@@ -287,13 +287,14 @@ def _fire_sla_alert(doctype, name, sla_type, minutes_taken, target_minutes=None,
     whichever Cashier/Sales Exec first created the order — see Audit
     Finding 2026-06-19 "SLA toast pile-up"):
 
-      → User-facing notification (in-app bell + realtime toast + optional
-        WhatsApp) is delegated to `alerts.alert_sla_breach()`, which resolves
+      → User-facing notification (in-app bell + email + optional WhatsApp,
+        without a blocking realtime dialog) is delegated to
+        `alerts.alert_sla_breach()`, which resolves
         recipients through `notification_router.get_scoped_users()` and
         filters by:
             - Roles: the configured Buyback Settings SLA alert role set.
             - Store: only users whose CH User Scope covers the order's
-              store get the toast. Bypass users (National Head, COO, etc.)
+              store get the alert. Bypass users (National Head, COO, etc.)
               see all stores. Mirrors SAP S/4HANA plant-based notification
               scoping and Oracle NetSuite role+subsidiary targeting.
             - Doc owner is added as a follower (Odoo followers-model

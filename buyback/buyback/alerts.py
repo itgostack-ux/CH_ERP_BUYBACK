@@ -30,7 +30,8 @@ from buyback.outbound_security import post_whatsapp_webhook
 # ─── Alert Dispatcher ────────────────────────────────────────────────
 
 def send_alert(subject, message, recipients=None, doctype=None, docname=None,
-               alert_type="Warning", send_whatsapp=False, send_email=False):
+               alert_type="Warning", send_whatsapp=False, send_email=False,
+               send_realtime=True):
     """Central alert dispatcher — sends via available channels."""
     recipients = list(dict.fromkeys(recipients or []))
 
@@ -49,16 +50,19 @@ def send_alert(subject, message, recipients=None, doctype=None, docname=None,
     except Exception:
         frappe.log_error(frappe.get_traceback(), "Buyback notification log delivery failed")
 
-    # 2. Realtime push
-    for user in recipients:
-        try:
-            frappe.publish_realtime(
-                "msgprint",
-                {"message": message, "title": subject, "indicator": _indicator(alert_type)},
-                user=user,
-            )
-        except Exception:
-            frappe.log_error(frappe.get_traceback(), "Buyback realtime alert delivery failed")
+    # 2. Realtime push. Operational SLA alerts deliberately disable this
+    # channel: Frappe renders the `msgprint` event as a blocking modal on the
+    # recipient's current screen (including approval and payment workflows).
+    if send_realtime:
+        for user in recipients:
+            try:
+                frappe.publish_realtime(
+                    "msgprint",
+                    {"message": message, "title": subject, "indicator": _indicator(alert_type)},
+                    user=user,
+                )
+            except Exception:
+                frappe.log_error(frappe.get_traceback(), "Buyback realtime alert delivery failed")
 
     # 3. Email (if explicitly enabled)
     if send_email and recipients:
@@ -120,7 +124,18 @@ def alert_sla_breach(doctype, docname, sla_type, minutes_taken, target_minutes):
         _configured_alert_roles("sla_alert_roles"),
         store=store,
     )
-    send_alert(subject, message, recipients, doctype, docname, "Critical", send_whatsapp=True)
+    # SLA remains visible in Buyback dashboards and the notification bell;
+    # send email for escalation, but never interrupt the user's active screen.
+    send_alert(
+        subject,
+        message,
+        recipients,
+        doctype,
+        docname,
+        "Critical",
+        send_email=True,
+        send_realtime=False,
+    )
 
 
 def alert_high_value_order(docname, final_price, threshold):
