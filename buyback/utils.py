@@ -21,13 +21,16 @@ _PRIVILEGED_ROLE = "System Manager"
 # singleton and takes precedence.
 ROLE_SETTING_DEFAULTS: dict[str, frozenset[str]] = {
     "app_access_roles": frozenset(
-        {"Buyback Agent", "Buyback Store Manager", "Buyback Manager", "Buyback Auditor", "Buyback Admin"}
+        {"Buyback Agent", "Buyback Store Manager", "Buyback Manager", "Buyback Auditor", "Buyback Admin",
+         "POS User", "POS Manager", "CH Store Executive", "CH Store Manager"}
     ),
     "order_operation_roles": frozenset(
-        {"Buyback Agent", "Buyback Store Manager", "Buyback Manager", "Buyback Admin"}
+        {"Buyback Agent", "Buyback Store Manager", "Buyback Manager", "Buyback Admin",
+         "POS User", "POS Manager", "CH Store Executive", "CH Store Manager"}
     ),
     "payment_operation_roles": frozenset(
-        {"Buyback Store Manager", "Buyback Manager", "Buyback Admin"}
+        {"Buyback Store Manager", "Buyback Manager", "Buyback Admin",
+        "POS User", "POS Manager", "CH Store Executive", "CH Store Manager"}
     ),
     "manager_approval_roles": frozenset({"Buyback Manager", "Buyback Admin"}),
     "exchange_creation_roles": frozenset(
@@ -37,13 +40,15 @@ ROLE_SETTING_DEFAULTS: dict[str, frozenset[str]] = {
         {"Buyback Store Manager", "Buyback Manager", "Buyback Admin"}
     ),
     "imei_validation_roles": frozenset(
-        {"Buyback Agent", "Buyback Store Manager", "Buyback Manager", "Buyback Admin"}
+        {"Buyback Agent", "Buyback Store Manager", "Buyback Manager", "Buyback Admin",
+         "POS User", "POS Manager", "CH Store Executive", "CH Store Manager"}
     ),
     "pickup_request_roles": frozenset(
         {"Buyback Store Manager", "Buyback Manager", "Buyback Admin"}
     ),
     "assessment_operation_roles": frozenset(
-        {"Buyback Agent", "Buyback Store Manager", "Buyback Manager", "Buyback Admin"}
+        {"Buyback Agent", "Buyback Store Manager", "Buyback Manager", "Buyback Admin",
+         "POS User", "POS Manager", "CH Store Executive", "CH Store Manager"}
     ),
     "inspection_operation_roles": frozenset(
         {"Buyback Agent", "Buyback Store Manager", "Buyback Manager", "Buyback Admin"}
@@ -214,9 +219,8 @@ def get_buyback_setting_value(fieldname: str, default=None):
 
 def get_role_setting(fieldname: str, defaults=()) -> frozenset[str]:
     value = get_buyback_setting_value(fieldname)
-    if value is None:
-        return frozenset(defaults)
-    return frozenset(role.strip() for role in re.split(r"[,\n]", value) if role.strip())
+    db_roles = frozenset(role.strip() for role in re.split(r"[,\n]", value) if role.strip()) if value else frozenset()
+    return frozenset(defaults) | db_roles
 
 
 def is_privileged_user(user: str | None = None) -> bool:

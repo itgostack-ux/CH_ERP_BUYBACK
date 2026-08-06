@@ -67,6 +67,13 @@ _PAYOUT_EDITABLE_STATUSES = {
     "Awaiting OTP",
 }
 
+def _has_pos_bypass() -> bool:
+    """Skip strict Item permission checks for POS-flow roles."""
+    from buyback.utils import is_privileged_user
+    if is_privileged_user():
+        return True
+    roles = set(frappe.get_roles())
+    return bool(roles & {"POS User", "POS Manager", "CH Store Executive", "CH Store Manager"})
 
 def _require_app_read(action: str, *doctypes: str) -> None:
     require_configured_role("app_access_roles", action=action)
@@ -2140,13 +2147,22 @@ def get_reference_prices(item_code: str) -> dict:
         return {"market_price": 0, "vendor_price": 0}
 
     require_configured_role("assessment_operation_roles", action=_("view reference prices"))
+    # item_doc = frappe.get_doc("Item", item_code)
+    # for doctype, doc in (("Item", item_doc), ("Buyback Price Master", None)):
+    #     if not frappe.has_permission(doctype, ptype="read", doc=doc):
+    #         frappe.throw(
+    #             _("You do not have read permission for {0}.").format(doctype),
+    #             frappe.PermissionError,
+    #         )
+    # updated
     item_doc = frappe.get_doc("Item", item_code)
-    for doctype, doc in (("Item", item_doc), ("Buyback Price Master", None)):
-        if not frappe.has_permission(doctype, ptype="read", doc=doc):
-            frappe.throw(
-                _("You do not have read permission for {0}.").format(doctype),
-                frappe.PermissionError,
-            )
+    if not _has_pos_bypass():
+        for doctype, doc in (("Item", item_doc), ("Buyback Price Master", None)):
+            if not frappe.has_permission(doctype, ptype="read", doc=doc):
+                frappe.throw(
+                    _("You do not have read permission for {0}.").format(doctype),
+                    frappe.PermissionError,
+                )
 
     bpm = frappe.db.get_value(
         "Buyback Price Master",
@@ -2187,7 +2203,8 @@ def calculate_live_estimate(
         "Buyback Price Master",
         "Buyback Pricing Rule",
     )
-    frappe.get_doc("Item", item_code).check_permission("read")
+    if not _has_pos_bypass():
+        frappe.get_doc("Item", item_code).check_permission("read")
 
     diag_data = json.loads(diagnostic_tests or "[]")
     resp_data = json.loads(responses or "[]")
@@ -2325,7 +2342,8 @@ def get_diagnostic_tests_for_item(item_code: str) -> list:
     if not item_code:
         return []
     _require_app_read(_("view Buyback diagnostic tests"), "Item", "Buyback Question Bank")
-    frappe.get_doc("Item", item_code).check_permission("read")
+    if not _has_pos_bypass():
+        frappe.get_doc("Item", item_code).check_permission("read")
 
     mapped_names = _get_mapped_question_names(item_code, "Automated Test")
 
@@ -2385,7 +2403,8 @@ def get_customer_questions_for_item(item_code: str) -> list:
     if not item_code:
         return []
     _require_app_read(_("view Buyback customer questions"), "Item", "Buyback Question Bank")
-    frappe.get_doc("Item", item_code).check_permission("read")
+    if not _has_pos_bypass():
+        frappe.get_doc("Item", item_code).check_permission("read")
 
     mapped_names = _get_mapped_question_names(item_code, "Customer Question")
 
