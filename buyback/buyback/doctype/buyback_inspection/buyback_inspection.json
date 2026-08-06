@@ -185,7 +185,7 @@
   {
    "fieldname": "store",
    "fieldtype": "Link",
-   "label": "Store",
+   "label": "Store Warehouse",
    "options": "Warehouse",
    "fetch_from": "buyback_assessment.store",
    "read_only": 1,

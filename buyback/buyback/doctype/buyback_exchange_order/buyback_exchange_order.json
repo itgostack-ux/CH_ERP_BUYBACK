@@ -131,7 +131,7 @@
   {
    "fieldname": "store",
    "fieldtype": "Link",
-   "label": "Store",
+   "label": "Store Warehouse",
    "options": "Warehouse",
    "reqd": 1,
    "in_standard_filter": 1,

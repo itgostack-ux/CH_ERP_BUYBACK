@@ -134,14 +134,35 @@ class RefurbishmentOrder(Document):
 			source = frappe.get_doc("Service Request", self.service_request)
 			if not is_privileged_user():
 				source.check_permission("read")
-			if source.docstatus == 2 or source.get("status") == "Cancelled":
-				frappe.throw(_("Cancelled Service Requests cannot create refurbishment stock."))
+			if source.docstatus != 1 or source.get("decision") not in (
+				"Rejected", "Completed", "Invoiced", "Delivered"
+			):
+				frappe.throw(_("Refurbishment requires a submitted, completed or non-repairable Service Request."))
 			for fieldname in ("company", "customer"):
 				expected = source.get(fieldname)
 				if self.get(fieldname) and expected and self.get(fieldname) != expected:
 					frappe.throw(_("{0} must match the Service Request.").format(fieldname.title()), frappe.PermissionError)
 				if expected:
 					self.set(fieldname, expected)
+			if source.device_item and self.item_code != source.device_item:
+				frappe.throw(_("Item Code must match the Service Request device."), frappe.PermissionError)
+			source_serials = {value for value in (source.get("actual_imei"), source.get("serial_no")) if value}
+			if self.serial_no and source_serials and self.serial_no not in source_serials:
+				frappe.throw(_("IMEI / Serial No must match the Service Request device."), frappe.PermissionError)
+			if not self.serial_no and len(source_serials) == 1:
+				self.serial_no = next(iter(source_serials))
+			duplicate = frappe.db.get_value(
+				"Refurbishment Order",
+				{
+					"service_request": self.service_request,
+					"name": ("!=", self.name or ""),
+					"docstatus": ("<", 2),
+					"status": ("!=", "Cancelled"),
+				},
+				"name",
+			)
+			if duplicate:
+				frappe.throw(_("Service Request already has active Refurbishment Order {0}.").format(duplicate))
 
 	def _validate_warehouse_context(self):
 		for fieldname in ("source_warehouse", "target_warehouse"):
