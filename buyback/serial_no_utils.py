@@ -100,7 +100,7 @@ def sync_buyback_to_lifecycle(
 
     _ensure_buyback_lifecycle_exists(imei)
 
-    if not frappe.db.exists("CH Serial Lifecycle", imei):
+    if not frappe.db.exists("CH Serial Lifecycle", {"serial_no": imei}):
         return  # still no lifecycle row (e.g. no Serial No either)
 
     try:
@@ -175,7 +175,7 @@ def sync_exchange_to_lifecycle(
 
     _ensure_buyback_lifecycle_exists(imei)
 
-    if not frappe.db.exists("CH Serial Lifecycle", imei):
+    if not frappe.db.exists("CH Serial Lifecycle", {"serial_no": imei}):
         return
 
     try:
@@ -200,7 +200,7 @@ def sync_exchange_to_lifecycle(
 
 def _ensure_buyback_lifecycle_exists(imei: str):
     """Auto-create CH Serial Lifecycle if missing for a buyback/exchange serial."""
-    if frappe.db.exists("CH Serial Lifecycle", imei):
+    if frappe.db.exists("CH Serial Lifecycle", {"serial_no": imei}):
         return
 
     item_code = frappe.db.get_value("Serial No", imei, "item_code") if frappe.db.exists("Serial No", imei) else None
