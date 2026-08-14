@@ -386,25 +386,39 @@ def _get_diagnostic_deduction(diagnostic_test, base_price):
     if not question:
         return None
 
-    result_str = str(result).strip().lower()
-    if result_str == "yes":
-        lookup_value = "Fail"
-    elif result_str == "no":
-        lookup_value = "Pass"
-    else:
-        lookup_value = result  # already Pass/Fail/Partial
+    result_str = str(result).strip().casefold()
+    all_opts = frappe.get_all(
+        "Buyback Question Option",
+        filters={"parent": question},
+        fields=["option_label", "option_value", "price_impact_percent"],
+    )
 
-    option = frappe.db.get_value("Buyback Question Option",{"parent": question, "option_value": lookup_value},
-        ["option_label", "price_impact_percent"], as_dict=True, )
+    # Prefer the option explicitly configured for this question. This matters
+    # because Yes can mean either a healthy result ("Camera working?") or a
+    # defect ("Water damage visible?"). A global Yes -> Fail conversion loses
+    # that question-specific meaning.
+    option = next(
+        (
+            opt
+            for opt in all_opts
+            if str(opt.option_value or "").strip().casefold() == result_str
+        ),
+        None,
+    )
 
+    # Compatibility for old diagnostic masters which still use
+    # Pass/Fail/Partial. Current Yes/No masters always take the exact path.
     if not option:
-        all_opts = frappe.get_all("Buyback Question Option", filters={"parent": question}, 
-                                  fields=["option_label", "option_value", "price_impact_percent"] )
-        
-        for opt in all_opts:
-            if (opt.option_value or "").strip().lower() == lookup_value.lower():
-                option = opt
-                break
+        legacy_value = {"yes": "Fail", "no": "Pass"}.get(result_str, result)
+        legacy_key = str(legacy_value).strip().casefold()
+        option = next(
+            (
+                opt
+                for opt in all_opts
+                if str(opt.option_value or "").strip().casefold() == legacy_key
+            ),
+            None,
+        )
 
     if not option or not option.get("price_impact_percent"):
         return None

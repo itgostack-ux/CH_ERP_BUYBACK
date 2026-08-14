@@ -72,6 +72,65 @@ def _make_inspection(**kwargs):
     return doc
 
 
+# ─── TestDiagnosticResultCompatibility ──────────────────────────────────────
+
+class TestDiagnosticResultCompatibility(FrappeTestCase):
+    """Assessment and Inspection must share the canonical Yes/No vocabulary."""
+
+    def _make_yes_no_question(self):
+        return _make_question(
+            "test_yes_no_inspection_e2e",
+            "Inspection Yes/No compatibility (E2E)",
+            diagnosis_type="Automated Test",
+            options=[
+                {"value": "yes", "impact": 0},
+                {"value": "no", "impact": -18},
+            ],
+        )
+
+    def test_yes_no_assessment_result_passes_inspection_validation(self):
+        question = self._make_yes_no_question()
+        doc = frappe.new_doc("Buyback Inspection")
+        doc.append(
+            "inspection_diagnostics",
+            {
+                "test": question,
+                "test_code": "test_yes_no_inspection_e2e",
+                "assessment_result": "Yes",
+                "inspector_result": "No",
+            },
+        )
+
+        # This validation previously failed because the child
+        # DocType only allowed Pass/Fail/Partial.
+        doc._validate_selects()
+        doc._fill_inspector_diagnostic_impacts(doc._load_question_bank_cache())
+
+        row = doc.inspection_diagnostics[0]
+        self.assertEqual(row.assessment_result, "Yes")
+        self.assertEqual(row.inspector_result, "No")
+        self.assertEqual(float(row.inspector_depreciation), 18)
+
+    def test_pricing_uses_the_questions_explicit_yes_no_impact(self):
+        self._make_yes_no_question()
+        from buyback.buyback.pricing.engine import _get_diagnostic_deduction
+
+        # For this positive-worded diagnostic, Yes is healthy and No carries
+        # the configured deduction. It must not be globally remapped.
+        self.assertIsNone(
+            _get_diagnostic_deduction(
+                {"test_code": "test_yes_no_inspection_e2e", "result": "Yes"},
+                1000,
+            )
+        )
+        deduction = _get_diagnostic_deduction(
+            {"test_code": "test_yes_no_inspection_e2e", "result": "No"},
+            1000,
+        )
+        self.assertEqual(deduction["percent"], 18)
+        self.assertEqual(deduction["amount"], 180)
+
+
 # ─── TestGradeRecalculation ──────────────────────────────────────────────────
 
 class TestGradeRecalculation(FrappeTestCase):

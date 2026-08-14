@@ -284,8 +284,9 @@ class BuybackAssessment(Document):
     def _fill_diagnostic_impacts(self, cache=None):
         """Look up depreciation_percent from Question Bank options for each diagnostic test.
 
-        Automated tests store results as Pass/Fail/Partial which map to
-        option_value in the Question Bank options table.
+        New automated tests store Yes/No.  Option values in existing Question
+        Banks may use different casing, so compare normalized values while
+        retaining the configured impact for that specific question.
         """
         cache = cache or self._load_question_impact_cache()
         for d in self.diagnostic_tests:
@@ -296,7 +297,16 @@ class BuybackAssessment(Document):
             if not qname:
                 continue
 
-            impact = cache["impacts"].get((qname, d.result))
+            result_key = str(d.result).strip().casefold()
+            impact = next(
+                (
+                    value
+                    for (parent, option_value), value in cache["impacts"].items()
+                    if parent == qname
+                    and str(option_value or "").strip().casefold() == result_key
+                ),
+                None,
+            )
             if impact is not None:
                 d.depreciation_percent = abs(impact)
 

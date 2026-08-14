@@ -50,9 +50,9 @@
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Assessment Result",
-   "options": "\nPass\nFail\nPartial",
+   "options": "\nYes\nNo\nPass\nFail\nPartial",
    "read_only": 1,
-   "description": "Original result from customer assessment"
+   "description": "Original Yes/No result from customer assessment. Pass/Fail/Partial are retained for legacy records."
   },
   {
    "default": "0",
@@ -72,8 +72,8 @@
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Inspector Result",
-   "options": "\nPass\nFail\nPartial",
-   "description": "Inspector's re-test result"
+   "options": "\nYes\nNo\nPass\nFail\nPartial",
+   "description": "Inspector's Yes/No re-test result. Pass/Fail/Partial are retained for legacy records."
   },
   {
    "default": "0",

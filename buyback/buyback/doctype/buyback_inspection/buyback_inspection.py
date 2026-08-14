@@ -183,7 +183,15 @@ class BuybackInspection(Document):
         for d in (self.inspection_diagnostics or []):
             if not d.inspector_result or not d.test_code:
                 continue
-            impact = (opts.get(d.test_code) or {}).get(d.inspector_result)
+            result_key = str(d.inspector_result).strip().casefold()
+            impact = next(
+                (
+                    value
+                    for option_value, value in (opts.get(d.test_code) or {}).items()
+                    if str(option_value or "").strip().casefold() == result_key
+                ),
+                None,
+            )
             if impact is not None:
                 d.inspector_depreciation = abs(impact)
 
