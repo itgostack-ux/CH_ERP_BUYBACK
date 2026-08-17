@@ -144,6 +144,58 @@ class TestBrandFamilyRates(FrappeTestCase):
             doc.save(ignore_permissions=True)
         doc.reload()
 
+    def test_every_sheet_rate_is_reachable(self):
+        """Each row of the depreciation sheet has a question that charges it.
+
+        Twelve rows had none — wifi, bluetooth, microphone, sensor, flash,
+        charging port, ringer, silent switch, S-Pen, loudspeaker and the two
+        camera-not-working tiers. Their rates existed on paper and could never
+        be applied to a quote.
+        """
+        sheet = {
+            # (android, apple): the option that must carry it
+            "FAULT-VOLUME-BTN":     (2, 5),
+            "FAULT-POWER-BTN":      (2, 3),
+            "FAULT-RECEIVER":       (3, 5),
+            "FAULT-GPS":            (2, 4),
+            "FAULT-FINGERPRINT":    (5, 8),
+            "FAULT-CAMERA-GLASS":   (3, 5),
+            "FAULT-LOUDSPEAKER":    (5, 7),
+            "FAULT-MICROPHONE":     (5, 7),
+            "FAULT-RINGER":         (2, 4),
+            "FAULT-WIFI":           (5, 7),
+            "FAULT-BLUETOOTH":      (5, 7),
+            "FAULT-CHARGING-PORT":  (7, 8),
+            "FAULT-VIBRATOR":       (2, 4),
+            "FAULT-SENSOR":         (5, 7),
+            "FAULT-FLASH":          (7, 8),
+            "FAULT-SILENT-BTN":     (5, 5),
+            "FAULT-SPEN":           (10, 10),
+            "FAULT-HINGE":          (15, 15),
+            "FAULT-PURCHASED-ABROAD": (8, 8),
+            "FAULT-FACE-ID":        (25, 25),
+        }
+        by_fault = {q["fault_code"]: (code, q) for code, q in QUESTIONS.items()}
+
+        for fault, (android, apple) in sheet.items():
+            with self.subTest(fault):
+                self.assertIn(fault, by_fault, f"{fault} has no question")
+                _code, spec = by_fault[fault]
+                worst_android = max(o[3] for o in spec["options"])
+                worst_apple = max((o[4] if o[4] is not None else o[3])
+                                  for o in spec["options"])
+                self.assertEqual(worst_android, android)
+                self.assertEqual(worst_apple, apple)
+
+    def test_camera_tiers_cover_both_sheet_rows(self):
+        """"Camera issue" (5/8) and "camera not working" (10/12) are rungs on
+        one question, so a dead camera cannot be charged as both."""
+        for code in ("cam_front", "cam_back"):
+            with self.subTest(code):
+                rates = {o[0]: (o[3], o[4]) for o in QUESTIONS[code]["options"]}
+                self.assertEqual(rates["issue"], (5, 8))
+                self.assertEqual(rates["not_working"], (10, 12))
+
     def test_deduction_rates_match_the_depreciation_sheet(self):
         """Catalogue is the source of truth; this pins it to the sheet."""
         expected = {

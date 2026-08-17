@@ -274,6 +274,133 @@ QUESTIONS: dict[str, dict] = {
         ],
     },
 
+    # ── Audio, radio and sensors — deductions ──────────────────────
+    # Every rate below is on the depreciation sheet. They had no question, so
+    # the sheet's numbers were unreachable and the faults went uncharged.
+    "fn_loudspeaker": {
+        "text": "Loudspeaker",
+        "purpose": DEDUCTION, "category": "Functional", "fault_code": "FAULT-LOUDSPEAKER",
+        "options": [
+            ("working", "Working", None, 0, None),
+            ("not_working", "Faulty, distorted or silent", None, 5, 7),
+        ],
+    },
+    "fn_microphone": {
+        "text": "Microphone",
+        "purpose": DEDUCTION, "category": "Functional", "fault_code": "FAULT-MICROPHONE",
+        "options": [
+            ("working", "Working", None, 0, None),
+            ("not_working", "Not working", None, 5, 7),
+        ],
+    },
+    "fn_ringer": {
+        "text": "Does the phone ring on an incoming call?",
+        "purpose": DEDUCTION, "category": "Functional", "fault_code": "FAULT-RINGER",
+        "options": [
+            ("working", "Rings normally", None, 0, None),
+            ("not_working", "Does not ring", None, 2, 4),
+        ],
+    },
+    "fn_silent_button": {
+        "text": "Ring / silent switch",
+        "purpose": DEDUCTION, "category": "Functional", "fault_code": "FAULT-SILENT-BTN",
+        "options": [
+            ("working", "Working", None, 0, None),
+            ("not_working", "Not working", None, 5, None),
+        ],
+    },
+    "fn_wifi": {
+        "text": "Wi-Fi",
+        "purpose": DEDUCTION, "category": "Network", "fault_code": "FAULT-WIFI",
+        "options": [
+            ("working", "Connects normally", None, 0, None),
+            ("not_working", "Not working", None, 5, 7),
+        ],
+    },
+    "fn_bluetooth": {
+        "text": "Bluetooth",
+        "purpose": DEDUCTION, "category": "Network", "fault_code": "FAULT-BLUETOOTH",
+        "options": [
+            ("working", "Pairs normally", None, 0, None),
+            ("not_working", "Not working", None, 5, 7),
+        ],
+    },
+    "fn_charging_port": {
+        "text": "Charging port",
+        "purpose": DEDUCTION, "category": "Functional", "fault_code": "FAULT-CHARGING-PORT",
+        "options": [
+            ("working", "Charges normally", None, 0, None),
+            ("not_working", "Not charging, or loose", None, 7, 8),
+        ],
+    },
+    "fn_vibrator": {
+        "text": "Vibration motor",
+        "purpose": DEDUCTION, "category": "Functional", "fault_code": "FAULT-VIBRATOR",
+        "options": [
+            ("working", "Working", None, 0, None),
+            ("not_working", "Not working", None, 2, 4),
+        ],
+    },
+    "fn_sensor": {
+        "text": "Proximity and motion sensors (auto-rotate, screen-off on call)",
+        "purpose": DEDUCTION, "category": "Functional", "fault_code": "FAULT-SENSOR",
+        "options": [
+            ("working", "Working", None, 0, None),
+            ("not_working", "Not working", None, 5, 7),
+        ],
+    },
+    "fn_flash": {
+        "text": "Camera flash",
+        "purpose": DEDUCTION, "category": "Functional", "fault_code": "FAULT-FLASH",
+        "options": [
+            ("working", "Working", None, 0, None),
+            ("not_working", "Not working", None, 7, 8),
+        ],
+    },
+    "fn_spen": {
+        "text": "S-Pen",
+        "purpose": DEDUCTION, "category": "Accessories", "fault_code": "FAULT-SPEN",
+        "options": [
+            ("working", "Present and working", None, 0, None),
+            ("missing", "Missing or not working", None, 10, None),
+            # Most Android handsets have no stylus; this keeps one question
+            # usable across the range rather than needing a Samsung-only set.
+            ("not_applicable", "Model has no S-Pen", None, 0, None),
+        ],
+    },
+    "fn_headphone_jack": {
+        "text": "Headphone jack",
+        "purpose": DEDUCTION, "category": "Functional", "fault_code": "FAULT-HEADPHONE-JACK",
+        "options": [
+            ("working", "Working", None, 0, None),
+            ("not_working", "Not working", None, 0, None),  # rate not on the sheet
+            ("not_present", "Model has no headphone jack", None, 0, None),
+        ],
+    },
+
+    # ── History and provenance — deductions ────────────────────────
+    # Not on the depreciation sheet, but standard on Cashify and Cashkr:
+    # they change what the device can be resold as, so they are recorded and
+    # priced rather than discovered later in refurb.
+    "cond_water_damage": {
+        "text": "Any sign of water or liquid damage?",
+        "purpose": DEDUCTION, "category": "Physical", "fault_code": "FAULT-WATER-DAMAGE",
+        "options": [
+            ("none", "No sign of liquid damage", None, 0, None),
+            ("damaged", "Liquid damage indicator triggered, or corrosion visible",
+             None, 0, None),  # rate not on the sheet
+        ],
+    },
+    "hist_previously_repaired": {
+        "text": "Has the device been opened or repaired before?",
+        "purpose": DEDUCTION, "category": "Diagnosis", "fault_code": "FAULT-PRIOR-REPAIR",
+        "options": [
+            ("no", "Never opened", None, 0, None),
+            ("authorised", "Repaired at an authorised service centre", None, 0, None),
+            ("unauthorised", "Repaired outside the authorised network", None, 0, None),
+        ],
+    },
+
     # ── SIM / network — deductions ─────────────────────────────────
     "sim_1_working": {
         "text": "Is SIM slot 1 working?",
@@ -311,20 +438,25 @@ QUESTIONS: dict[str, dict] = {
     },
 
     # ── Camera — deductions ────────────────────────────────────────
+    # The sheet prices a degraded camera (5/8) and a dead one (10/12)
+    # separately. They are rungs on one question rather than two questions, so
+    # a dead camera cannot be charged as both.
     "cam_front": {
-        "text": "Is the front camera image blurred, spotted or distorted?",
+        "text": "Front camera",
         "purpose": DEDUCTION, "category": "Functional", "fault_code": "FAULT-CAMERA-FRONT",
         "options": [
-            ("no_issue", "No issues", None, 0, None),
+            ("no_issue", "Working normally", None, 0, None),
             ("issue", "Blurred, spotted or distorted", None, 5, 8),
+            ("not_working", "Not working at all", None, 10, 12),
         ],
     },
     "cam_back": {
-        "text": "Is the back camera image blurred, spotted or distorted?",
+        "text": "Back camera",
         "purpose": DEDUCTION, "category": "Functional", "fault_code": "FAULT-CAMERA-BACK",
         "options": [
-            ("no_issue", "No issues", None, 0, None),
+            ("no_issue", "Working normally", None, 0, None),
             ("issue", "Blurred, spotted or distorted", None, 5, 8),
+            ("not_working", "Not working at all", None, 10, 12),
         ],
     },
     "cam_glass": {
@@ -382,14 +514,36 @@ QUESTIONS: dict[str, dict] = {
     },
 
     # ── Commercial — deductions ────────────────────────────────────
-    "com_accessories": {
-        "text": "Which accessories are available?",
-        "purpose": DEDUCTION, "category": "Accessories", "fault_code": "FAULT-ACCESSORIES",
+    # Charger, box and bill are asked separately, as Cashify and Cashkr do.
+    # A single combined question needs one option per combination, and a
+    # customer who brings two of the three should not be scored as if they
+    # brought neither. Each is its own fault, so they never double-charge.
+    #
+    # The depreciation sheet does not price accessories; the 5% per missing
+    # item carries over from the rates already live on this site rather than
+    # being invented here.
+    "com_charger": {
+        "text": "Original charger",
+        "purpose": DEDUCTION, "category": "Accessories", "fault_code": "FAULT-NO-CHARGER",
         "options": [
-            ("charger_and_box", "Charger and box", None, 0, None),
-            ("charger_only", "Only charger", None, 5, None),
-            ("box_only", "Only box", None, 5, None),
-            ("neither", "Neither", None, 10, None),
+            ("available", "Available", None, 0, None),
+            ("missing", "Not available", None, 5, None),
+        ],
+    },
+    "com_box": {
+        "text": "Original box with matching IMEI",
+        "purpose": DEDUCTION, "category": "Accessories", "fault_code": "FAULT-NO-BOX",
+        "options": [
+            ("available", "Available", None, 0, None),
+            ("missing", "Not available", None, 5, None),
+        ],
+    },
+    "com_bill": {
+        "text": "Original bill or invoice with matching IMEI",
+        "purpose": DEDUCTION, "category": "Accessories", "fault_code": "FAULT-NO-BILL",
+        "options": [
+            ("available", "Available", None, 0, None),
+            ("missing", "Not available", None, 5, None),
         ],
     },
     "com_purchased_in_india": {
@@ -413,12 +567,20 @@ _SCREEN_CORE = [
 ]
 _BODY_CORE = ["body_scratches", "body_dents", "body_panel", "body_bent"]
 _FUNCTIONAL_CORE = [
-    "fn_volume_button", "fn_power_button", "fn_sim_tray",
-    "fn_ear_speaker", "fn_gps", "fn_finger_touch",
+    # Buttons and ports
+    "fn_volume_button", "fn_power_button", "fn_sim_tray", "fn_charging_port",
+    "fn_headphone_jack",
+    # Audio
+    "fn_ear_speaker", "fn_loudspeaker", "fn_microphone", "fn_ringer",
+    # Radios and sensors
+    "fn_wifi", "fn_bluetooth", "fn_gps", "fn_sensor", "fn_vibrator",
+    # Biometrics
+    "fn_finger_touch",
 ]
-_CAMERA_CORE = ["cam_front", "cam_back", "cam_glass"]
+_CAMERA_CORE = ["cam_front", "cam_back", "cam_glass", "fn_flash"]
 _SIM_CORE = ["sim_1_working", "sim_2_working", "sim_calls", "sim_esim_support"]
-_COMMERCIAL = ["com_accessories", "com_purchased_in_india"]
+_HISTORY = ["cond_water_damage", "hist_previously_repaired"]
+_COMMERCIAL = ["com_charger", "com_box", "com_bill", "com_purchased_in_india"]
 
 SETS = [
     {
@@ -434,10 +596,11 @@ SETS = [
             + _SIM_CORE
             + _SCREEN_CORE
             + _BODY_CORE
-            + _FUNCTIONAL_CORE + ["fn_face_id"]
+            + _FUNCTIONAL_CORE + ["fn_silent_button", "fn_face_id"]
             + _CAMERA_CORE
             + ["apl_unknown_display", "apl_unknown_camera", "apl_unknown_battery"]
             + ["bat_health_ios"]
+            + _HISTORY
             + _COMMERCIAL
         ),
     },
@@ -455,9 +618,10 @@ SETS = [
             + _SIM_CORE
             + _SCREEN_CORE
             + _BODY_CORE
-            + _FUNCTIONAL_CORE
+            + _FUNCTIONAL_CORE + ["fn_spen"]
             + _CAMERA_CORE
             + ["bat_condition_android"]
+            + _HISTORY
             + _COMMERCIAL
         ),
     },
@@ -474,13 +638,21 @@ SETS = [
             + _SIM_CORE
             + _SCREEN_CORE + ["scr_outer_display", "scr_inner_display"]
             + _BODY_CORE + ["fn_hinge"]
-            + _FUNCTIONAL_CORE
+            + _FUNCTIONAL_CORE + ["fn_spen"]
             + _CAMERA_CORE
             + ["bat_condition_android"]
+            + _HISTORY
             + _COMMERCIAL
         ),
     },
 ]
+
+
+# Codes this catalogue used to define and no longer does. The seeder disables
+# them so a question it created cannot linger, enabled but unreachable, after
+# being restructured — com_accessories became the separate charger / box / bill
+# questions Cashify and Cashkr ask for individually.
+RETIRED_CODES = ["com_accessories"]
 
 
 # Questions that only make sense on one platform. Enforced by
@@ -493,6 +665,7 @@ BRAND_FAMILY_ONLY = {
     "apl_unknown_camera": "Apple",
     "apl_unknown_battery": "Apple",
     "bat_health_ios": "Apple",
+    "fn_silent_button": "Apple",
     "elig_account_removed": "Android",
     "bat_condition_android": "Android",
 }

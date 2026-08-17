@@ -11,7 +11,8 @@ Run:  bench --site <site> execute buyback.setup.seed_question_sets.run
 import frappe
 
 from buyback.setup.question_catalogue import (
-    BRAND_FAMILY_ONLY, QUESTIONS, SETS, unrated_faults, validate_catalogue,
+    BRAND_FAMILY_ONLY, QUESTIONS, RETIRED_CODES, SETS, unrated_faults,
+    validate_catalogue,
 )
 
 
@@ -98,6 +99,17 @@ def run(retire_legacy: int = 0):
     for spec in SETS:
         set_name = _upsert_set(spec, question_names)
         print(f"✔ {set_name}: {len(spec['questions'])} questions")
+
+    # Codes this catalogue owned and dropped. Always disabled, regardless of
+    # retire_legacy: leaving one enabled but in no set means it can still be
+    # answered through the API and still deduct.
+    for code in RETIRED_CODES:
+        name = frappe.db.get_value(
+            "Buyback Question Bank", {"question_code": code, "disabled": 0}, "name")
+        if name:
+            frappe.db.set_value(
+                "Buyback Question Bank", name, "disabled", 1, update_modified=False)
+            print(f"✔ retired superseded question {code}")
 
     retired = 0
     if int(retire_legacy or 0):
