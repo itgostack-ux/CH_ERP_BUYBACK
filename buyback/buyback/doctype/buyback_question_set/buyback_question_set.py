@@ -7,7 +7,37 @@ class BuybackQuestionSet(Document):
     def validate(self):
         self._reject_repeated_questions()
         self._reject_repeated_faults()
+        self._reject_wrong_platform()
         self._renumber()
+
+    def _reject_wrong_platform(self):
+        """Keep platform-specific questions out of the other platform's set.
+
+        Face ID carries a 25% deduction and no Android handset has one; the
+        iCloud lock has no meaning off Apple, and Google account removal none
+        on it. Without this, a stray row would put a rate on a quote that
+        cannot legitimately carry it.
+        """
+        if not self.questions or self.applies_to_brand_family == "Any":
+            return
+
+        wrong = frappe.get_all(
+            "Buyback Question Bank",
+            filters={
+                "name": ["in", [row.question for row in self.questions]],
+                "applies_to_brand_family": ["not in", ["Any", "", self.applies_to_brand_family]],
+            },
+            fields=["question_text", "applies_to_brand_family"],
+        )
+        if wrong:
+            detail = "<br>".join(
+                f"{row.question_text} — {row.applies_to_brand_family} only" for row in wrong
+            )
+            frappe.throw(
+                _("This is an {0} set, so these questions do not belong in it:"
+                  "<br><br>{1}").format(self.applies_to_brand_family, detail),
+                title=_("Wrong Platform"),
+            )
 
     def _reject_repeated_questions(self):
         """One question, one row. The old bank asked the same thing twice."""

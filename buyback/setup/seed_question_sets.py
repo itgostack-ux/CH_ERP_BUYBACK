@@ -10,7 +10,9 @@ Run:  bench --site <site> execute buyback.setup.seed_question_sets.run
 
 import frappe
 
-from buyback.setup.question_catalogue import QUESTIONS, SETS, validate_catalogue
+from buyback.setup.question_catalogue import (
+    BRAND_FAMILY_ONLY, QUESTIONS, SETS, unrated_faults, validate_catalogue,
+)
 
 
 def _upsert_question(code: str, spec: dict) -> str:
@@ -33,14 +35,21 @@ def _upsert_question(code: str, spec: dict) -> str:
     if spec.get("category") and frappe.db.exists("Buyback Question Category", spec["category"]):
         doc.question_category = spec["category"]
 
+    doc.applies_to_brand_family = BRAND_FAMILY_ONLY.get(code, "Any")
+
     doc.set("options", [])
-    for value, label, forces_grade, percent in spec["options"]:
+    for value, label, forces_grade, percent, percent_apple in spec["options"]:
         doc.append("options", {
             "option_value": value,
             "option_label": label,
             "forces_grade": forces_grade or "",
             # Stored as a positive magnitude; the engine takes abs() either way.
             "price_impact_percent": percent,
+            # Always written, even when both platforms pay the same. A Percent
+            # field cannot hold NULL, so leaving it out would store 0 — which
+            # reads as "free on Apple" rather than "same as Android".
+            "price_impact_percent_apple": (
+                percent if percent_apple is None else percent_apple),
         })
 
     doc.flags.ignore_permissions = True
@@ -103,5 +112,17 @@ def run(retire_legacy: int = 0):
                 retired += 1
         print(f"✔ {retired} legacy questions disabled")
 
+    outstanding = unrated_faults()
+    if outstanding:
+        print(
+            f"  ! {len(outstanding)} faults still deduct nothing — the depreciation "
+            f"sheet does not price them: {', '.join(outstanding)}"
+        )
+
     frappe.db.commit()
-    return {"questions": len(question_names), "sets": len(SETS), "retired": retired}
+    return {
+        "questions": len(question_names),
+        "sets": len(SETS),
+        "retired": retired,
+        "unrated": outstanding,
+    }

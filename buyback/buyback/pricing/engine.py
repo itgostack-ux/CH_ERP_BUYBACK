@@ -90,16 +90,22 @@ def calculate_estimated_price(
     if not base_price:
         return result
 
+    # The depreciation sheet prices many faults differently on Apple — a broken
+    # charging port is 7% on Android and 8% on an iPhone, Face ID is 25% and has
+    # no Android equivalent at all. Resolve the family once per quote.
+    brand_family = _resolve_brand_family(item_code)
+    result["brand_family"] = brand_family
+
     # Collect deductions, keyed so the same physical fault cannot be charged
     # twice when it is covered by both an automated test and a customer
     # question (see _deduction_key).
     collected: dict = {}
 
     for dt in (diagnostic_tests or []):
-        _collect_deduction(collected, _get_diagnostic_deduction(dt, base_price))
+        _collect_deduction(collected, _get_diagnostic_deduction(dt, base_price, brand_family))
 
     for resp in (responses or []):
-        _collect_deduction(collected, _get_question_deduction(resp, base_price))
+        _collect_deduction(collected, _get_question_deduction(resp, base_price, brand_family))
 
     result["deductions"] = list(collected.values())
 
@@ -244,6 +250,42 @@ def _grade_letter(grade) -> str:
         return value.upper()
     letter = frappe.db.get_value("Grade Master", value, "grade_name")
     return (letter or "A").upper()
+
+
+def _resolve_brand_family(item_code: str) -> str:
+    """"Apple" or "Android" for an item.
+
+    Deliberately reuses the same resolver the question sets route on, rather
+    than adding a second brand-family field. One signal cannot drift out of
+    step with itself; two can.
+    """
+    from buyback.buyback.doctype.buyback_question_set.buyback_question_set import (
+        get_device_profile,
+    )
+    try:
+        return get_device_profile(item_code)[0]
+    except Exception:
+        return "Android"
+
+
+def _rate_for_family(option: dict, brand_family: str) -> float:
+    """Pick the Apple or the standard rate for this option.
+
+    An unset Apple rate means "same as the standard rate", never "free on
+    Apple". That distinction has to be made on the value rather than on NULL:
+    Frappe's Percent field coerces None to 0.0 on save, so an untouched Apple
+    column and a deliberate 0% are the same stored value.
+
+    The cost is that a fault cannot be priced at 0% on Apple while charging on
+    Android. Nothing on the depreciation sheet does that — every fault it
+    prices per-platform charges on both — and reading a blank column as free
+    would silently waive real deductions on every iPhone.
+    """
+    if brand_family == "Apple":
+        apple = flt(option.get("price_impact_percent_apple"))
+        if apple:
+            return apple
+    return flt(option.get("price_impact_percent"))
 
 
 def _deduction_key(question_name: str, fault_code: str | None) -> str:
@@ -637,7 +679,7 @@ def _resolve_diag_question(test_code):
     return None, None
 
 
-def _get_diagnostic_deduction(diagnostic_test, base_price):
+def _get_diagnostic_deduction(diagnostic_test, base_price, brand_family="Android"):
     """Calculate deduction from an automated diagnostic test result.    """
     test_code = diagnostic_test.get("test_code")
     result = diagnostic_test.get("result")
@@ -653,7 +695,8 @@ def _get_diagnostic_deduction(diagnostic_test, base_price):
     all_opts = frappe.get_all(
         "Buyback Question Option",
         filters={"parent": question},
-        fields=["option_label", "option_value", "price_impact_percent"],
+        fields=["option_label", "option_value", "price_impact_percent",
+                "price_impact_percent_apple"],
     )
 
     # Prefer the option explicitly configured for this question. This matters
@@ -683,20 +726,22 @@ def _get_diagnostic_deduction(diagnostic_test, base_price):
             None,
         )
 
-    if not option or not option.get("price_impact_percent"):
+    if not option:
         return None
 
-    deduction_amount = abs(base_price * flt(option.get("price_impact_percent")) / 100)
+    percent = _rate_for_family(option, brand_family)
+    if not percent:
+        return None
 
     return {
         "label": f"{test_code}: {option.get('option_label') or result}",
-        "amount": deduction_amount,
+        "amount": abs(base_price * percent / 100),
         "type": "diagnostic_test",
-        "percent": abs(option.get("price_impact_percent")),
+        "percent": abs(percent),
         "_key": _deduction_key(question, fault_code),
     }
 
-def _get_question_deduction(response, base_price):
+def _get_question_deduction(response, base_price, brand_family="Android"):
     """Calculate deduction from a single question response."""
     question_code = response.get("question_code")
     answer_value = response.get("answer_value")
@@ -707,36 +752,55 @@ def _get_question_deduction(response, base_price):
     qrow = frappe.db.get_value(
         "Buyback Question Bank",
         {"question_code": question_code, "disabled": 0},
-        ["name", "fault_code"],
+        ["name", "fault_code", "applies_to_brand_family"],
         as_dict=True,
     )
     if not qrow:
         return None
     question, fault_code = qrow.name, qrow.get("fault_code")
 
-    # Find matching option
-    option = frappe.db.get_value("Buyback Question Option", {"parent": question, "option_value": answer_value},
-        ["option_label", "price_impact_percent"], as_dict=True,)
-
-    if not option:
-        all_opts = frappe.get_all("Buyback Question Option",filters={"parent": question},
-                                  fields=["option_label", "option_value", "price_impact_percent"] )
-        
-        for opt in all_opts:
-            if (opt.option_value or "").strip().lower() == str(answer_value).strip().lower():
-                option = opt
-                break
-
-    if not option or not option.get("price_impact_percent"):
+    # Platform confinement is enforced here as well as by set membership.
+    # Sets control what an inspector is ASKED; this controls what can be
+    # CHARGED. An answer can still arrive from an API caller, a stale payload
+    # or a hand-built request, and Face ID at 25% must never land on an
+    # Android quote just because someone posted the code.
+    only = (qrow.get("applies_to_brand_family") or "Any").strip()
+    if only not in ("Any", "", brand_family):
         return None
 
-    deduction_amount = abs(base_price * flt(option.get("price_impact_percent")) / 100)
+    fields = ["option_label", "option_value", "price_impact_percent",
+              "price_impact_percent_apple"]
+
+    option = frappe.db.get_value(
+        "Buyback Question Option",
+        {"parent": question, "option_value": answer_value},
+        fields, as_dict=True,
+    )
+    if not option:
+        # Case-insensitive retry: answers arriving from older payloads and the
+        # POS do not always match the stored casing.
+        answer_key = str(answer_value).strip().lower()
+        option = next(
+            (
+                opt for opt in frappe.get_all(
+                    "Buyback Question Option", filters={"parent": question}, fields=fields)
+                if (opt.option_value or "").strip().lower() == answer_key
+            ),
+            None,
+        )
+
+    if not option:
+        return None
+
+    percent = _rate_for_family(option, brand_family)
+    if not percent:
+        return None
 
     return {
         "label": f"{question_code}: {option.get('option_label')}",
-        "amount": deduction_amount,
+        "amount": abs(base_price * percent / 100),
         "type": "question",
-        "percent": abs(option.get("price_impact_percent")),
+        "percent": abs(percent),
         "_key": _deduction_key(question, fault_code),
     }
 

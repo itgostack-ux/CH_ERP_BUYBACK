@@ -23,14 +23,23 @@ as `device_age_months` and selects the price band; asking it again would be
 exactly the repetition this catalogue exists to remove. Warranty status is
 derived from it for the same reason.
 
-Percentages are the Android/default rates from the depreciation sheet. Faults
-whose rate the sheet does not specify are seeded at 0 and listed by
-`unrated_faults()` so a pricing owner can fill them; the Apple column arrives
-with the brand-family split.
+Rates carry both platforms: the depreciation sheet prices roughly twenty faults
+differently on Apple. Faults the sheet does not price at all are seeded at 0 and
+listed by `unrated_faults()` so a pricing owner can see exactly what is
+outstanding, rather than a guess quietly becoming policy.
 """
 
-# Option tuple: (value, label, forces_grade, price_impact_percent)
-# forces_grade of None means the answer does not limit the grade.
+# Option tuple: (value, label, forces_grade, percent, percent_apple)
+#
+#   forces_grade   None means the answer does not limit the grade.
+#   percent        deduction on Android, and on Apple when percent_apple is None.
+#   percent_apple  Apple rate where the depreciation sheet differs. None means
+#                  "same as Android" — NOT "free on Apple".
+#
+# Rates come from the depreciation sheet. Where it gives only one figure the
+# Apple column stays None; where it prices a fault on one platform only, the
+# question is confined to that platform's set rather than zero-rated on the
+# other, so a rate here is never silently unreachable.
 
 GRADING = "Grading"
 DEDUCTION = "Deduction"
@@ -42,24 +51,24 @@ QUESTIONS: dict[str, dict] = {
         "text": "iCloud lock check",
         "purpose": ELIGIBILITY, "category": "Software", "fault_code": "FAULT-ICLOUD-LOCK",
         "options": [
-            ("not_locked", "Not locked", None, 0),
-            ("locked", "Locked", None, 0),
+            ("not_locked", "Not locked", None, 0, None),
+            ("locked", "Locked", None, 0, None),
         ],
     },
     "elig_country_lock": {
         "text": "Is the device carrier or country locked?",
         "purpose": ELIGIBILITY, "category": "Software", "fault_code": "FAULT-COUNTRY-LOCK",
         "options": [
-            ("no", "Not locked", None, 0),
-            ("yes", "Carrier / country locked", None, 0),
+            ("no", "Not locked", None, 0, None),
+            ("yes", "Carrier / country locked", None, 0, None),
         ],
     },
     "elig_account_removed": {
         "text": "Google, Xiaomi or Samsung account removed?",
         "purpose": ELIGIBILITY, "category": "Software", "fault_code": "FAULT-ACCOUNT-REMOVED",
         "options": [
-            ("yes", "Removed", None, 0),
-            ("no", "Not removed", None, 0),
+            ("yes", "Removed", None, 0, None),
+            ("no", "Not removed", None, 0, None),
         ],
     },
 
@@ -68,72 +77,72 @@ QUESTIONS: dict[str, dict] = {
         "text": "Is the touch screen and display working properly?",
         "purpose": GRADING, "category": "Cosmetic", "fault_code": "FAULT-DISPLAY-DEAD",
         "options": [
-            ("working", "Yes, working properly", None, 0),
-            ("not_working", "No, not working", "D", 0),
+            ("working", "Yes, working properly", None, 0, None),
+            ("not_working", "No, not working", "D", 0, None),
         ],
     },
     "scr_is_copy": {
         "text": "Is the screen a copy or duplicate part?",
         "purpose": GRADING, "category": "Cosmetic", "fault_code": "FAULT-DISPLAY-COPY",
         "options": [
-            ("original", "Original screen", None, 0),
-            ("copy", "Copy / duplicate screen", "D", 0),
+            ("original", "Original screen", None, 0, None),
+            ("copy", "Copy / duplicate screen", "D", 0, None),
         ],
     },
     "scr_spots": {
         "text": "Are there any visible spots on the screen?",
         "purpose": GRADING, "category": "Cosmetic", "fault_code": "FAULT-SCREEN-SPOTS",
         "options": [
-            ("none", "No spots", None, 0),
-            ("upto_3_white", "Up to 3 white spots of 2mm, or 1 white spot of 3mm", "B", 0),
-            ("over_3_white", "More than 3 white spots / white patches", "C", 0),
-            ("coloured", "Coloured spots or patches (black, yellow, blue, green, red)", "D", 0),
+            ("none", "No spots", None, 0, None),
+            ("upto_3_white", "Up to 3 white spots of 2mm, or 1 white spot of 3mm", "B", 0, None),
+            ("over_3_white", "More than 3 white spots / white patches", "C", 0, None),
+            ("coloured", "Coloured spots or patches (black, yellow, blue, green, red)", "D", 0, None),
         ],
     },
     "scr_lines": {
         "text": "Are there any visible lines on the screen?",
         "purpose": GRADING, "category": "Cosmetic", "fault_code": "FAULT-SCREEN-LINES",
         "options": [
-            ("none", "No lines on screen", None, 0),
-            ("lines", "Lines on screen", "D", 0),
+            ("none", "No lines on screen", None, 0, None),
+            ("lines", "Lines on screen", "D", 0, None),
         ],
     },
     "scr_discolouration": {
         "text": "Is the screen discoloured?",
         "purpose": GRADING, "category": "Cosmetic", "fault_code": "FAULT-SCREEN-DISCOLOUR",
         "options": [
-            ("none", "No discolouration", None, 0),
-            ("minor", "Minor — very slight shade along the edges, not clearly visible", "B", 0),
-            ("major", "Major — yellow / blue / pink / green shade along the edges", "C", 0),
-            ("fading", "Screen fading — colour or background imprint on screen", "C", 0),
+            ("none", "No discolouration", None, 0, None),
+            ("minor", "Minor — very slight shade along the edges, not clearly visible", "B", 0, None),
+            ("major", "Major — yellow / blue / pink / green shade along the edges", "C", 0, None),
+            ("fading", "Screen fading — colour or background imprint on screen", "C", 0, None),
         ],
     },
     "scr_cracks_scratches": {
         "text": "Is the screen cracked or scratched?",
         "purpose": GRADING, "category": "Cosmetic", "fault_code": "FAULT-SCREEN-SCRATCH",
         "options": [
-            ("none", "Excellent — no scratch visible", None, 0),
-            ("upto_5_under_1cm", "Up to 5 scratches under 1cm", "B", 0),
-            ("upto_10_1cm", "Up to 10 scratches of 1cm, or up to 5 of 1.1cm–2.5cm", "C", 0),
-            ("over_10_1cm", "Over 10 scratches of 1cm, over 5 of 1.1cm–2.5cm, or 1 scratch over 2.5cm", "C", 0),
-            ("chipped", "Screen chipped — minor chipping along the edges", "C", 0),
+            ("none", "Excellent — no scratch visible", None, 0, None),
+            ("upto_5_under_1cm", "Up to 5 scratches under 1cm", "B", 0, None),
+            ("upto_10_1cm", "Up to 10 scratches of 1cm, or up to 5 of 1.1cm–2.5cm", "C", 0, None),
+            ("over_10_1cm", "Over 10 scratches of 1cm, over 5 of 1.1cm–2.5cm, or 1 scratch over 2.5cm", "C", 0, None),
+            ("chipped", "Screen chipped — minor chipping along the edges", "C", 0, None),
         ],
     },
     "scr_bubble_paint": {
         "text": "Is there paint peel-off or bubbling on the screen?",
         "purpose": GRADING, "category": "Cosmetic", "fault_code": "FAULT-SCREEN-PAINT",
         "options": [
-            ("none", "No paint peel-off or bubble", None, 0),
-            ("minor", "Minor paint peel-off, or fewer than 2 bubbles", "B", 0),
-            ("major", "Major paint peel-off, or more than 2 bubbles", "C", 0),
+            ("none", "No paint peel-off or bubble", None, 0, None),
+            ("minor", "Minor paint peel-off, or fewer than 2 bubbles", "B", 0, None),
+            ("major", "Major paint peel-off, or more than 2 bubbles", "C", 0, None),
         ],
     },
     "scr_flickering": {
         "text": "Does the screen flicker?",
         "purpose": GRADING, "category": "Cosmetic", "fault_code": "FAULT-SCREEN-FLICKER",
         "options": [
-            ("none", "No flickering", None, 0),
-            ("flickering", "Flickering on screen", "D", 0),
+            ("none", "No flickering", None, 0, None),
+            ("flickering", "Flickering on screen", "D", 0, None),
         ],
     },
 
@@ -142,16 +151,16 @@ QUESTIONS: dict[str, dict] = {
         "text": "Outer screen condition",
         "purpose": GRADING, "category": "Cosmetic", "fault_code": "FAULT-OUTER-SCREEN",
         "options": [
-            ("ok", "No issue with the outer screen", None, 0),
-            ("damaged", "Outer screen damaged — line, break or spot", "D", 0),
+            ("ok", "No issue with the outer screen", None, 0, None),
+            ("damaged", "Outer screen damaged — line, break or spot", "D", 0, None),
         ],
     },
     "scr_inner_display": {
         "text": "Inner screen condition",
         "purpose": GRADING, "category": "Cosmetic", "fault_code": "FAULT-INNER-SCREEN",
         "options": [
-            ("ok", "No issue with the inner screen", None, 0),
-            ("damaged", "Inner screen damaged — line, break or spot", "D", 0),
+            ("ok", "No issue with the inner screen", None, 0, None),
+            ("damaged", "Inner screen damaged — line, break or spot", "D", 0, None),
         ],
     },
 
@@ -160,40 +169,40 @@ QUESTIONS: dict[str, dict] = {
         "text": "Are there any scratches on the phone body?",
         "purpose": GRADING, "category": "Physical", "fault_code": "FAULT-BODY-SCRATCH",
         "options": [
-            ("none", "Excellent — no scratches", None, 0),
-            ("upto_5_under_1cm", "Up to 5 scratches under 1cm", "B", 0),
-            ("upto_15_1cm", "Up to 15 scratches of 1cm, or up to 5 of 3cm", "C", 0),
-            ("over_15_1cm", "Over 15 scratches of 1cm, over 5 of 3cm, or a scratch over 3cm", "C", 0),
-            ("paint_bubble", "Minor paint peel-off or bubbling", "B", 0),
+            ("none", "Excellent — no scratches", None, 0, None),
+            ("upto_5_under_1cm", "Up to 5 scratches under 1cm", "B", 0, None),
+            ("upto_15_1cm", "Up to 15 scratches of 1cm, or up to 5 of 3cm", "C", 0, None),
+            ("over_15_1cm", "Over 15 scratches of 1cm, over 5 of 3cm, or a scratch over 3cm", "C", 0, None),
+            ("paint_bubble", "Minor paint peel-off or bubbling", "B", 0, None),
         ],
     },
     "body_dents": {
         "text": "Are there any dents on the phone body?",
         "purpose": GRADING, "category": "Physical", "fault_code": "FAULT-BODY-DENT",
         "options": [
-            ("none", "No dents", None, 0),
-            ("under_2", "Fewer than 2 dents, up to 2mm", "C", 0),
-            ("over_2_or_crack", "More than 2 dents, or a crack under 1cm on the body", "C", 0),
+            ("none", "No dents", None, 0, None),
+            ("under_2", "Fewer than 2 dents, up to 2mm", "C", 0, None),
+            ("over_2_or_crack", "More than 2 dents, or a crack under 1cm on the body", "C", 0, None),
         ],
     },
     "body_panel": {
         "text": "Panel physical condition",
         "purpose": GRADING, "category": "Physical", "fault_code": "FAULT-BODY-PANEL",
         "options": [
-            ("none", "No defect", None, 0),
-            ("loose", "Loose panel — visible gap over 0.25mm, or visible pasting", "C", 0),
-            ("missing", "Missing panel", "D", 0),
-            ("cracked", "Cracked or broken panel", "D", 0),
-            ("glass_back", "Glass back panel damaged", "D", 0),
+            ("none", "No defect", None, 0, None),
+            ("loose", "Loose panel — visible gap over 0.25mm, or visible pasting", "C", 0, None),
+            ("missing", "Missing panel", "D", 0, None),
+            ("cracked", "Cracked or broken panel", "D", 0, None),
+            ("glass_back", "Glass back panel damaged", "D", 0, None),
         ],
     },
     "body_bent": {
         "text": "Is the phone bent?",
         "purpose": GRADING, "category": "Physical", "fault_code": "FAULT-BODY-BENT",
         "options": [
-            ("none", "Phone not bent", None, 0),
-            ("loose_screen", "Loose screen — over 0.25mm gap, or visible pasting between body and screen", "C", 0),
-            ("bent", "Bent frame or panel — curve visible on the screen surface", "D", 0),
+            ("none", "Phone not bent", None, 0, None),
+            ("loose_screen", "Loose screen — over 0.25mm gap, or visible pasting between body and screen", "C", 0, None),
+            ("bent", "Bent frame or panel — curve visible on the screen surface", "D", 0, None),
         ],
     },
 
@@ -202,66 +211,66 @@ QUESTIONS: dict[str, dict] = {
         "text": "Volume button",
         "purpose": DEDUCTION, "category": "Functional", "fault_code": "FAULT-VOLUME-BTN",
         "options": [
-            ("present", "Working", None, 0),
-            ("missing", "Missing or not working", None, 2),
+            ("present", "Working", None, 0, None),
+            ("missing", "Missing or not working", None, 2, 5),
         ],
     },
     "fn_power_button": {
         "text": "Power button",
         "purpose": DEDUCTION, "category": "Functional", "fault_code": "FAULT-POWER-BTN",
         "options": [
-            ("present", "Working", None, 0),
-            ("missing", "Missing or not working", None, 2),
+            ("present", "Working", None, 0, None),
+            ("missing", "Missing or not working", None, 2, 3),
         ],
     },
     "fn_sim_tray": {
         "text": "SIM tray",
         "purpose": DEDUCTION, "category": "Physical", "fault_code": "FAULT-SIM-TRAY",
         "options": [
-            ("available", "Available and intact", None, 0),
-            ("broken", "Broken or missing", None, 0),  # rate not on the sheet
+            ("available", "Available and intact", None, 0, None),
+            ("broken", "Broken or missing", None, 0, None),  # rate not on the sheet
         ],
     },
     "fn_ear_speaker": {
         "text": "Ear speaker / receiver",
         "purpose": DEDUCTION, "category": "Functional", "fault_code": "FAULT-RECEIVER",
         "options": [
-            ("working", "Working", None, 0),
-            ("not_working", "Not working or low", None, 3),
+            ("working", "Working", None, 0, None),
+            ("not_working", "Not working or low", None, 3, 5),
         ],
     },
     "fn_gps": {
         "text": "GPS",
         "purpose": DEDUCTION, "category": "Functional", "fault_code": "FAULT-GPS",
         "options": [
-            ("working", "Working", None, 0),
-            ("not_working", "Not working", None, 2),
+            ("working", "Working", None, 0, None),
+            ("not_working", "Not working", None, 2, 4),
         ],
     },
     "fn_face_id": {
         "text": "Face ID unlock test",
         "purpose": DEDUCTION, "category": "Functional", "fault_code": "FAULT-FACE-ID",
         "options": [
-            ("working", "Face ID is working", None, 0),
-            ("not_working", "Face ID is not working", None, 25),
-            ("not_present", "Face ID not present on this model", None, 0),
+            ("working", "Face ID is working", None, 0, None),
+            ("not_working", "Face ID is not working", None, 25, None),
+            ("not_present", "Face ID not present on this model", None, 0, None),
         ],
     },
     "fn_finger_touch": {
         "text": "Fingerprint / touch unlock test",
         "purpose": DEDUCTION, "category": "Functional", "fault_code": "FAULT-FINGERPRINT",
         "options": [
-            ("working", "Working", None, 0),
-            ("not_working", "Not working", None, 5),
-            ("not_present", "Not present on this model", None, 0),
+            ("working", "Working", None, 0, None),
+            ("not_working", "Not working", None, 5, 8),
+            ("not_present", "Not present on this model", None, 0, None),
         ],
     },
     "fn_hinge": {
         "text": "Do the hinges open and fold properly?",
         "purpose": DEDUCTION, "category": "Physical", "fault_code": "FAULT-HINGE",
         "options": [
-            ("working", "Yes, opens and folds properly", None, 0),
-            ("not_working", "No, does not open or fold properly", None, 15),
+            ("working", "Yes, opens and folds properly", None, 0, None),
+            ("not_working", "No, does not open or fold properly", None, 15, None),
         ],
     },
 
@@ -270,34 +279,34 @@ QUESTIONS: dict[str, dict] = {
         "text": "Is SIM slot 1 working?",
         "purpose": DEDUCTION, "category": "Network", "fault_code": "FAULT-SIM-1",
         "options": [
-            ("yes", "Working", None, 0),
-            ("no", "Not working", None, 0),  # rate not on the sheet
+            ("yes", "Working", None, 0, None),
+            ("no", "Not working", None, 0, None),  # rate not on the sheet
         ],
     },
     "sim_2_working": {
         "text": "Is SIM slot 2 working?",
         "purpose": DEDUCTION, "category": "Network", "fault_code": "FAULT-SIM-2",
         "options": [
-            ("yes", "Working", None, 0),
-            ("no", "Not working", None, 0),  # rate not on the sheet
-            ("not_present", "Single-SIM device", None, 0),
+            ("yes", "Working", None, 0, None),
+            ("no", "Not working", None, 0, None),  # rate not on the sheet
+            ("not_present", "Single-SIM device", None, 0, None),
         ],
     },
     "sim_calls": {
         "text": "Can the device make and receive calls?",
         "purpose": GRADING, "category": "Network", "fault_code": "FAULT-CALLS",
         "options": [
-            ("yes", "Yes", None, 0),
-            ("no", "No", "D", 0),
+            ("yes", "Yes", None, 0, None),
+            ("no", "No", "D", 0, None),
         ],
     },
     "sim_esim_support": {
         "text": "How many eSIMs does the device support?",
         "purpose": DEDUCTION, "category": "Network", "fault_code": "FAULT-ESIM-COUNT",
         "options": [
-            ("single_esim", "Single eSIM", None, 0),
-            ("dual_esim", "Dual eSIM", None, 0),
-            ("both_physical", "Both physical SIM", None, 0),
+            ("single_esim", "Single eSIM", None, 0, None),
+            ("dual_esim", "Dual eSIM", None, 0, None),
+            ("both_physical", "Both physical SIM", None, 0, None),
         ],
     },
 
@@ -306,24 +315,24 @@ QUESTIONS: dict[str, dict] = {
         "text": "Is the front camera image blurred, spotted or distorted?",
         "purpose": DEDUCTION, "category": "Functional", "fault_code": "FAULT-CAMERA-FRONT",
         "options": [
-            ("no_issue", "No issues", None, 0),
-            ("issue", "Blurred, spotted or distorted", None, 5),
+            ("no_issue", "No issues", None, 0, None),
+            ("issue", "Blurred, spotted or distorted", None, 5, 8),
         ],
     },
     "cam_back": {
         "text": "Is the back camera image blurred, spotted or distorted?",
         "purpose": DEDUCTION, "category": "Functional", "fault_code": "FAULT-CAMERA-BACK",
         "options": [
-            ("no_issue", "No issues", None, 0),
-            ("issue", "Blurred, spotted or distorted", None, 5),
+            ("no_issue", "No issues", None, 0, None),
+            ("issue", "Blurred, spotted or distorted", None, 5, 8),
         ],
     },
     "cam_glass": {
         "text": "Is the camera glass broken?",
         "purpose": DEDUCTION, "category": "Physical", "fault_code": "FAULT-CAMERA-GLASS",
         "options": [
-            ("no", "Intact", None, 0),
-            ("yes", "Broken", None, 3),
+            ("no", "Intact", None, 0, None),
+            ("yes", "Broken", None, 3, 5),
         ],
     },
 
@@ -332,24 +341,24 @@ QUESTIONS: dict[str, dict] = {
         "text": "Is the display part reported as unknown?",
         "purpose": DEDUCTION, "category": "Diagnosis", "fault_code": "FAULT-UNKNOWN-DISPLAY",
         "options": [
-            ("known", "No, the display part is genuine", None, 0),
-            ("unknown", "Yes, the display part is unknown", None, 0),  # rate not on the sheet
+            ("known", "No, the display part is genuine", None, 0, None),
+            ("unknown", "Yes, the display part is unknown", None, 0, None),  # rate not on the sheet
         ],
     },
     "apl_unknown_camera": {
         "text": "Is the camera part reported as unknown?",
         "purpose": DEDUCTION, "category": "Diagnosis", "fault_code": "FAULT-UNKNOWN-CAMERA",
         "options": [
-            ("known", "No, the camera part is genuine", None, 0),
-            ("unknown", "Yes, the camera part is unknown", None, 3),
+            ("known", "No, the camera part is genuine", None, 0, None),
+            ("unknown", "Yes, the camera part is unknown", None, 3, None),
         ],
     },
     "apl_unknown_battery": {
         "text": "Is the battery part reported as unknown?",
         "purpose": DEDUCTION, "category": "Diagnosis", "fault_code": "FAULT-UNKNOWN-BATTERY",
         "options": [
-            ("known", "No, the battery part is genuine", None, 0),
-            ("unknown", "Yes, the battery part is unknown", None, 4),
+            ("known", "No, the battery part is genuine", None, 0, None),
+            ("unknown", "Yes, the battery part is unknown", None, 4, None),
         ],
     },
 
@@ -358,17 +367,17 @@ QUESTIONS: dict[str, dict] = {
         "text": "Battery health",
         "purpose": DEDUCTION, "category": "Battery", "fault_code": "FAULT-BATTERY",
         "options": [
-            ("above_85", "Above 85% — good", None, 0),
-            ("80_to_85", "80–85% — moderate", None, 4),
-            ("below_80", "Below 80% — service required or swollen", None, 7),
+            ("above_85", "Above 85% — good", None, 0, None),
+            ("80_to_85", "80–85% — moderate", None, 4, None),
+            ("below_80", "Below 80% — service required or swollen", None, 7, None),
         ],
     },
     "bat_condition_android": {
         "text": "Battery condition",
         "purpose": DEDUCTION, "category": "Battery", "fault_code": "FAULT-BATTERY",
         "options": [
-            ("healthy", "Healthy", None, 0),
-            ("bulged", "Bulged or not working", None, 5),
+            ("healthy", "Healthy", None, 0, None),
+            ("bulged", "Bulged or not working", None, 5, None),
         ],
     },
 
@@ -377,18 +386,18 @@ QUESTIONS: dict[str, dict] = {
         "text": "Which accessories are available?",
         "purpose": DEDUCTION, "category": "Accessories", "fault_code": "FAULT-ACCESSORIES",
         "options": [
-            ("charger_and_box", "Charger and box", None, 0),
-            ("charger_only", "Only charger", None, 5),
-            ("box_only", "Only box", None, 5),
-            ("neither", "Neither", None, 10),
+            ("charger_and_box", "Charger and box", None, 0, None),
+            ("charger_only", "Only charger", None, 5, None),
+            ("box_only", "Only box", None, 5, None),
+            ("neither", "Neither", None, 10, None),
         ],
     },
     "com_purchased_in_india": {
         "text": "Was the device purchased in India?",
         "purpose": DEDUCTION, "category": "General", "fault_code": "FAULT-PURCHASED-ABROAD",
         "options": [
-            ("india", "Purchased in India", None, 0),
-            ("abroad", "Not purchased in India", None, 8),
+            ("india", "Purchased in India", None, 0, None),
+            ("abroad", "Not purchased in India", None, 8, None),
         ],
     },
 }
@@ -474,6 +483,21 @@ SETS = [
 ]
 
 
+# Questions that only make sense on one platform. Enforced by
+# validate_catalogue() and, at runtime, by BuybackQuestionSet.validate().
+BRAND_FAMILY_ONLY = {
+    "elig_icloud_lock": "Apple",
+    "elig_country_lock": "Apple",
+    "fn_face_id": "Apple",
+    "apl_unknown_display": "Apple",
+    "apl_unknown_camera": "Apple",
+    "apl_unknown_battery": "Apple",
+    "bat_health_ios": "Apple",
+    "elig_account_removed": "Android",
+    "bat_condition_android": "Android",
+}
+
+
 def unrated_faults() -> list[str]:
     """Questions whose worst answer still deducts nothing.
 
@@ -485,7 +509,7 @@ def unrated_faults() -> list[str]:
     for code, q in QUESTIONS.items():
         if q["purpose"] != DEDUCTION:
             continue
-        if not any(opt[3] for opt in q["options"]):
+        if not any(opt[3] or opt[4] for opt in q["options"]):
             out.append(code)
     return sorted(out)
 
@@ -505,6 +529,16 @@ def validate_catalogue() -> None:
         if len(codes) != len(set(codes)):
             dupes = {c for c in codes if codes.count(c) > 1}
             raise ValueError(f"{spec['set_name']} repeats: {sorted(dupes)}")
+
+        # A platform-specific question in the wrong set is how a 25% Face ID
+        # rate would reach an Android quote.
+        for code in codes:
+            only = BRAND_FAMILY_ONLY.get(code)
+            if only and spec["brand_family"] != only:
+                raise ValueError(
+                    f"{spec['set_name']} ({spec['brand_family']}) includes "
+                    f"{code}, which is {only}-only"
+                )
 
         faults_in_set: dict[str, str] = {}
         for code in codes:

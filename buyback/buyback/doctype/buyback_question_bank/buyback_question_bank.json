@@ -12,6 +12,7 @@
   "question_code",
   "fault_code",
   "question_purpose",
+  "applies_to_brand_family",
   "column_break_01",
   "diagnosis_type",
   "question_category",
@@ -80,6 +81,14 @@
    "label": "Purpose",
    "options": "Grading\nDeduction\nEligibility",
    "reqd": 1
+  },
+  {
+   "default": "Any",
+   "description": "Guards set membership: an Apple-only question (Face ID, iCloud lock, the unknown-part checks) cannot be added to an Android question set, and vice versa.",
+   "fieldname": "applies_to_brand_family",
+   "fieldtype": "Select",
+   "label": "Applies to Brand Family",
+   "options": "Any\nApple\nAndroid"
   },
   {
    "fieldname": "column_break_01",

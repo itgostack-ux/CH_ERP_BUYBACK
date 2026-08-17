@@ -9,6 +9,7 @@
   "option_value",
   "forces_grade",
   "price_impact_percent",
+  "price_impact_percent_apple",
   "is_default"
  ],
  "fields": [
@@ -42,6 +43,12 @@
    "in_list_view": 1,
    "label": "Price Impact %",
    "description": "Percentage impact on buyback price (negative = deduction)"
+  },
+  {
+   "description": "Deduction for Apple devices, where the depreciation sheet prices the same fault differently — a broken Face ID or charging port costs more on an iPhone. Leave at 0 to charge Apple the standard rate; 0 never means the fault is free on Apple.",
+   "fieldname": "price_impact_percent_apple",
+   "fieldtype": "Percent",
+   "label": "Price Impact % (Apple)"
   },
   {
    "default": "0",
