@@ -177,6 +177,10 @@ def _make_assessment(check, tag, condition_checks=None):
 		kyc_id_type="Aadhar Card",
 		kyc_id_number="234567890123",
 		kyc_name="Nivetha",
+		# The band inputs are mandatory: _price_master_item() picks an item on
+		# its A-grade IW 0-3 price, so quote against that same band.
+		warranty_status="In Warranty",
+		device_age_months="0-3 Months",
 	)
 	return out
 

@@ -13,6 +13,7 @@
   "column_break_01",
   "description",
   "display_order",
+  "is_salvage",
   "disabled"
  ],
  "fields": [
@@ -59,6 +60,13 @@
    "fieldtype": "Int",
    "label": "Display Order",
    "in_list_view": 1
+  },
+  {
+   "default": "0",
+   "description": "Salvage outcomes (Scrap, Phone Dead) are produced by the pricing engine, not chosen by an inspector. Flagged rows are hidden from manual grade pickers.",
+   "fieldname": "is_salvage",
+   "fieldtype": "Check",
+   "label": "Is Salvage Grade"
   },
   {
    "default": "0",

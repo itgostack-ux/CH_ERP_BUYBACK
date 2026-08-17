@@ -61,6 +61,16 @@ class BuybackAssessment(Document):
         # inspector cannot grade a device with a partial question bank.
 
         if not self.get("is_phone_dead"):
+            # Warranty status and age choose the price band, so a quote made
+            # without them is not an approximation — it is a different number.
+            # Drafts may still be part-filled; a real quote may not.
+            if self.status in ("Submitted", "Inspected", "Quoted") and not self._can_price():
+                frappe.throw(
+                    _("Device Age and Warranty Status are required before this "
+                      "assessment can be quoted — they select which price band applies."),
+                    title=_("Incomplete Device Details"),
+                )
+
             if self.responses and self.status in ("Submitted", "Inspected", "Quoted"):
                 unanswered = [r for r in self.responses if not (r.get("answer") or "").strip()]
                 if unanswered:
@@ -310,13 +320,31 @@ class BuybackAssessment(Document):
             if impact is not None:
                 d.depreciation_percent = abs(impact)
 
+    def _can_price(self) -> bool:
+        """Whether the two band-selecting inputs are known.
+
+        The engine refuses to price without them, and rightly so — warranty
+        status and age choose the price band, so guessing either is worth
+        thousands of rupees. A Draft that has not reached those fields yet is
+        normal, though, so hold the estimate at zero instead of throwing at the
+        user mid-form. Submission is gated separately in validate().
+        """
+        return bool(
+            (self.warranty_status or "").strip()
+            and str(self.device_age_months or "").strip()
+        )
+
     def _calculate_estimate(self):
         """Run the pricing engine against customer responses to get estimated price."""
+        if not self._can_price():
+            # Never carry a stale price forward from a previous band.
+            self.estimated_price = 0
+            return
+
         try:
             from buyback.buyback.pricing.engine import calculate_estimated_price
-            from buyback.api import _auto_determine_grade
+            from buyback.api import _provisional_grade_name
 
-            # Auto-determine grade from diagnostic test results
             diagnostic_data = []
             for d in (self.diagnostic_tests or []):
                 diagnostic_data.append({
@@ -326,12 +354,13 @@ class BuybackAssessment(Document):
                     "depreciation_percent": d.depreciation_percent,
                 })
 
-            grade_letter = _auto_determine_grade(diagnostic_data)
-            grade = frappe.db.get_value(
-                "Grade Master", {"grade_name": grade_letter}, "name"
-            )
+            grade = _provisional_grade_name()
             if not grade:
-                frappe.log_error(f"Grade Master missing for grade '{grade_letter}'. Create A/B/C/D records in Grade Master.", "Buyback Grade Missing")
+                frappe.log_error(
+                    "Grade Master has no 'A' record. Create A/B/C/D (and the E/F "
+                    "salvage grades) before quoting.",
+                    "Buyback Grade Missing",
+                )
             self.estimated_grade = grade or None
 
             responses_data = []
@@ -361,13 +390,28 @@ class BuybackAssessment(Document):
             # of clobbering it with 0 (e.g. demo/imported assessments).
             if result.get("base_price") or not self.estimated_price:
                 self.estimated_price = result.get("estimated_price", 0)
+
             final_grade_letter = result.get("grade_letter") or "A"
             final_grade_id = frappe.db.get_value(
                 "Grade Master", {"grade_name": final_grade_letter}, "name"
             )
             if final_grade_id:
                 self.estimated_grade = final_grade_id
-        except (ValueError, KeyError, frappe.ValidationError, frappe.DoesNotExistError):
+            else:
+                # E (Scrap) and F (Phone Dead) come out of the engine as grade
+                # letters. If Grade Master has no row for them the assignment
+                # used to be skipped in silence, leaving a dead handset
+                # displaying Grade A next to its salvage price.
+                frappe.log_error(
+                    f"Grade Master has no record for grade '{final_grade_letter}' "
+                    f"— {self.name} is showing a stale grade beside its price.",
+                    "Buyback Grade Missing",
+                )
+        except frappe.ValidationError:
+            # A pricing gap the operator can act on — no price for the band, no
+            # salvage price configured. Surfacing it beats saving a quote of 0.
+            raise
+        except (ValueError, KeyError, frappe.DoesNotExistError):
             frappe.log_error(title=f"Assessment pricing failed: {self.name}")
 
     # ------------------------------------------------------------------

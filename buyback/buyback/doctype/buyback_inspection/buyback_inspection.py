@@ -128,51 +128,21 @@ class BuybackInspection(Document):
                     pass  # Non-numeric result — skip range check
 
     def _set_condition_grade(self):
-        """Set final condition grade from inspector diagnostics or post-inspection grade.
+        """Set the final condition grade from the inspector's own judgement.
 
-        Auto-determination always runs when inspector has filled in diagnostic results.
-        The inspector's manual `post_inspection_grade` choice is protected only when a
-        `grade_changed_reason` has been entered — signalling an explicit override.
+        The inspector is the authority here. This used to call
+        `_auto_determine_grade()` first and let its result win — but that
+        helper was a stub that always returned "A", so any grade the inspector
+        picked was silently replaced with A unless they happened to type a
+        `grade_changed_reason`. Devices were graded A on their way to a
+        Grade-D payout.
+
+        There is no auto-determination to fall back on: grade is not currently
+        derived from condition at all (the pricing engine reverse-labels it
+        from the final price). Until grading questions drive it directly, the
+        precedence is simply inspector → pre-inspection estimate.
         """
-        auto_grade = None
-
-        # Always try to auto-determine from inspector diagnostic results
-        if self.inspection_diagnostics:
-            diagnostic_data = []
-            for d in self.inspection_diagnostics:
-                result = d.inspector_result or d.assessment_result
-                if result and d.test_code:
-                    diagnostic_data.append({
-                        "test_code": d.test_code,
-                        "result": result,
-                    })
-            if diagnostic_data:
-                try:
-                    from buyback.api import _auto_determine_grade
-                    auto_grade = _auto_determine_grade(diagnostic_data)
-                except Exception:
-                    frappe.log_error(
-                        title=f"Auto-grade determination failed for {self.name}",
-                        message=frappe.get_traceback(),
-                    )
-
-        if auto_grade:
-            # Resolve grade letter ("A"/"B"/"C"/"D") to Grade Master record name.
-            # _auto_determine_grade returns a plain letter, but condition_grade and
-            # post_inspection_grade are Link → Grade Master fields which need the
-            # docname, not the letter.
-            auto_grade_name = (
-                frappe.db.get_value("Grade Master", {"grade_name": auto_grade}, "name")
-                or auto_grade
-            )
-            # Respect inspector's explicit override (signalled by grade_changed_reason)
-            if self.grade_changed_reason and self.post_inspection_grade:
-                self.condition_grade = self.post_inspection_grade
-            else:
-                # Update post_inspection_grade with auto-determined value
-                self.post_inspection_grade = auto_grade_name
-                self.condition_grade = auto_grade_name
-        elif self.post_inspection_grade:
+        if self.post_inspection_grade:
             self.condition_grade = self.post_inspection_grade
         elif self.pre_inspection_grade:
             self.condition_grade = self.pre_inspection_grade

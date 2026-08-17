@@ -7,13 +7,25 @@ Flow:
 1. Look up base price from Buyback Price Master (grade × warranty matrix)
 2. Apply question-based deductions from customer responses
 3. Apply Buyback Pricing Rules (flat, %, slab)
-4. Round per Buyback Settings
-5. Return breakdown: base_price, deductions[], final_price
+4. Clamp the deduction total, then floor at the salvage price
+5. Round per Buyback Settings
+6. Return breakdown: base_price, deductions[], final_price
+
+The engine is STRICT about its inputs: warranty status and device age select
+the price band, so pricing without them is not a lower-confidence estimate,
+it is a different number entirely. Callers that cannot supply them must not
+call the engine — see BuybackAssessment._calculate_estimate for the pattern.
 """
 
 import frappe
 from frappe import _
 from frappe.utils import flt, getdate, nowdate
+
+# Deductions can never take more than this share of the base price unless the
+# Buyback Settings override says otherwise. Without a clamp, a device that
+# answers "faulty" to enough questions produces a negative quote which the
+# salvage floor then silently rescues — hiding the misconfiguration.
+DEFAULT_MAX_TOTAL_DEDUCTION_PERCENT = 100.0
 
 
 def calculate_estimated_price(
@@ -25,9 +37,14 @@ def calculate_estimated_price(
     diagnostic_tests: list = None,
     brand: str = None,
     item_group: str = None,
-    is_phone_dead: bool = False,         
+    is_phone_dead: bool = False,
 ):
-    """Calculate the estimated buyback price for a device."""
+    """Calculate the estimated buyback price for a device.
+
+    Raises:
+        frappe.ValidationError: if warranty status or device age is missing, or
+            if the Buyback Price Master has no price for the resolved band.
+    """
     result = {
         "base_price": 0,
         "deductions": [],
@@ -36,15 +53,24 @@ def calculate_estimated_price(
         "grade_letter": "A",
     }
 
-    # PHONE DEAD OVERRIDE — return Phone Dead price directly
+    # PHONE DEAD OVERRIDE — return Phone Dead price directly.
+    # Age and warranty are deliberately NOT required here: a handset that does
+    # not power on is worth its salvage value whatever its age.
     if is_phone_dead:
         dead_price = _get_phone_dead_price(item_code, warranty_status, device_age_months)
-        
+        if not dead_price:
+            frappe.throw(
+                _("No Phone Dead price is configured for {0}. Set it on the "
+                  "Buyback Price Master before quoting a dead handset.").format(item_code),
+                title=_("Salvage Price Missing"),
+            )
         result["base_price"] = dead_price
         result["estimated_price"] = _round_price(dead_price)
-        result["grade_letter"] = "F" 
+        result["grade_letter"] = "F"
         result["is_phone_dead"] = True
         return result
+
+    _require_band_inputs(warranty_status, device_age_months)
 
     resolved_age = _resolve_age_months(device_age_months)
     base_price = _get_base_price(item_code, grade, warranty_status, device_age_months)
@@ -53,40 +79,52 @@ def calculate_estimated_price(
     if not base_price:
         return result
 
-    # Apply diagnostic + question deductions
-    if diagnostic_tests:
-        for dt in diagnostic_tests:
-            deduction = _get_diagnostic_deduction(dt, base_price)
-            if deduction:
-                result["deductions"].append(deduction)
+    # Collect deductions, keyed so the same physical fault cannot be charged
+    # twice when it is covered by both an automated test and a customer
+    # question (see _deduction_key).
+    collected: dict = {}
 
-    if responses:
-        for resp in responses:
-            deduction = _get_question_deduction(resp, base_price)
-            if deduction:
-                result["deductions"].append(deduction)
+    for dt in (diagnostic_tests or []):
+        _collect_deduction(collected, _get_diagnostic_deduction(dt, base_price))
 
-    # Apply pricing rules
-    rule_deductions = _apply_pricing_rules(
+    for resp in (responses or []):
+        _collect_deduction(collected, _get_question_deduction(resp, base_price))
+
+    result["deductions"] = list(collected.values())
+
+    # Pricing rules are keyed by rule name, never by fault, so they bypass the
+    # fault de-duplication above by design.
+    result["deductions"].extend(_apply_pricing_rules(
         base_price=base_price,
         brand=brand,
         item_group=item_group,
         grade=grade,
         warranty_status=warranty_status,
         device_age_months=resolved_age,
-    )
-    result["deductions"].extend(rule_deductions)
+    ))
 
-    result["total_deductions"] = sum(d["amount"] for d in result["deductions"])
-    estimated = base_price - result["total_deductions"]
+    raw_total = sum(d["amount"] for d in result["deductions"])
+    capped_total = _clamp_deductions(raw_total, base_price)
+    if capped_total < raw_total:
+        result["deduction_cap_applied"] = True
+        result["uncapped_deductions"] = _round_price(raw_total)
 
-    # NEW FLOOR LOGIC:
-    # If estimated < min grade price → use Scrap Price (never below scrap)
+    result["total_deductions"] = _round_price(capped_total)
+    estimated = base_price - capped_total
+
+    # Floor: if deductions drop the quote below the band's minimum grade price,
+    # the device is worth its scrap value rather than a graded price.
     min_grade_price = _get_min_grade_price(item_code, warranty_status, device_age_months)
-    
+
     if estimated < min_grade_price:
-        # Deductions dropped price below minimum grade → use Scrap Price
         scrap_price = _get_scrap_price(item_code, warranty_status, device_age_months)
+        if not scrap_price:
+            frappe.throw(
+                _("Deductions took the quote for {0} below the minimum grade price, "
+                  "but no Scrap Price is configured on its Buyback Price Master. "
+                  "Set a Scrap Price before quoting this device.").format(item_code),
+                title=_("Salvage Price Missing"),
+            )
         estimated = scrap_price
         result["is_scrap"] = True
 
@@ -95,7 +133,7 @@ def calculate_estimated_price(
 
     # Determine grade
     if result.get("is_scrap"):
-        result["grade_letter"] = "E"                         # ← NEW: Always E for scrap
+        result["grade_letter"] = "E"
     else:
         result["grade_letter"] = _determine_grade_from_price(
             item_code=item_code,
@@ -105,6 +143,64 @@ def calculate_estimated_price(
         )
 
     return result
+
+
+def _require_band_inputs(warranty_status, device_age_months):
+    """Refuse to price without the two inputs that select the price band.
+
+    Treating a missing age as 0 put every under-specified quote in the highest
+    In-Warranty band, and a missing warranty status in the lowest — so silence
+    here was worth thousands of rupees in either direction.
+    """
+    missing = []
+    if not (warranty_status or "").strip():
+        missing.append(_("Warranty Status"))
+    if not str(device_age_months or "").strip():
+        missing.append(_("Device Age"))
+    if missing:
+        frappe.throw(
+            _("{0} must be set before a buyback price can be calculated — "
+              "they select which price band applies.").format(", ".join(missing)),
+            title=_("Cannot Price Device"),
+        )
+
+
+def _deduction_key(question_name: str, fault_code: str | None) -> str:
+    """Identity a deduction is charged under.
+
+    Prefer the fault code so two DIFFERENT questions covering one physical
+    fault collapse to a single charge. Fall back to the question itself, which
+    at minimum stops the same question counting twice when it appears in both
+    the diagnostic and the response table.
+    """
+    code = (fault_code or "").strip()
+    return f"fault:{code.lower()}" if code else f"question:{question_name}"
+
+
+def _collect_deduction(collected: dict, deduction: dict | None) -> None:
+    """Keep the largest deduction per fault; drop the rest as duplicates."""
+    if not deduction:
+        return
+    key = deduction.pop("_key", None) or f"anon:{len(collected)}"
+    existing = collected.get(key)
+    if existing is None or deduction["amount"] > existing["amount"]:
+        if existing is not None:
+            deduction["superseded"] = existing["label"]
+        collected[key] = deduction
+
+
+def _clamp_deductions(total: float, base_price: float) -> float:
+    """Cap the deduction total at the configured share of the base price."""
+    try:
+        configured = frappe.db.get_single_value(
+            "Buyback Settings", "max_total_deduction_percent"
+        )
+    except Exception:
+        configured = None
+    percent = flt(configured) or DEFAULT_MAX_TOTAL_DEDUCTION_PERCENT
+    percent = max(0.0, min(percent, 100.0))
+    ceiling = flt(base_price) * percent / 100.0
+    return min(flt(total), ceiling)
 
 
 def calculate_final_price(
@@ -283,32 +379,63 @@ def _get_base_price(item_code, grade, warranty_status=None, device_age_months=No
     )
 
     if not bpm:
-        return 0
+        frappe.throw(
+            _("No Buyback Price Master exists for {0}. Pricing must be configured "
+              "before this device can be quoted.").format(item_code),
+            title=_("Buyback Price Missing"),
+        )
 
+    bucket = _resolve_bucket(warranty_status, device_age_months)
+    price = flt(bpm.get(f"a_grade_{bucket}"))
+
+    # No silent grade fallback. Substituting the B/C/D cell when the A cell is
+    # blank quoted a lower grade's price while still calling it Grade A, and
+    # nothing surfaced the substitution. An unpriced band is a configuration
+    # gap and must be fixed in the master, not papered over here.
+    if not price:
+        frappe.throw(
+            _("No Grade A price is configured for {0} in the {1} band. "
+              "Set it on the Buyback Price Master before quoting this device.").format(
+                item_code, _BUCKET_LABELS.get(bucket, bucket)
+            ),
+            title=_("Buyback Price Missing"),
+        )
+
+    return price
+
+
+# Warranty/age band keys used across Buyback Price Master column names.
+_BUCKET_LABELS = {
+    "iw_0_3": "In Warranty 0–3 Months",
+    "iw_0_6": "In Warranty 4–6 Months",
+    "iw_6_11": "In Warranty 7–11 Months",
+    "oow_11": "Out of Warranty 11+ Months",
+}
+
+
+def _resolve_bucket(warranty_status, device_age_months) -> str:
+    """Map warranty status + age bracket onto a Price Master column suffix."""
     age = _resolve_age_months(device_age_months)
     is_iw = warranty_status == "In Warranty"
 
-    # Determine bucket
     if is_iw and age <= 3:
-        bucket = "iw_0_3"
-    elif is_iw and age <= 6:
-        bucket = "iw_0_6"
-    elif is_iw and age <= 11:
-        bucket = "iw_6_11"
-    else:
-        bucket = "oow_11"
+        return "iw_0_3"
+    if is_iw and age <= 6:
+        return "iw_0_6"
+    if is_iw and age <= 11:
+        return "iw_6_11"
+    return "oow_11"
 
-    field = f"a_grade_{bucket}"
-    price = flt(bpm.get(field))
 
-    if not price:
-        for fallback in ["b", "c", "d"]:
-            fb_price = flt(bpm.get(f"{fallback}_grade_{bucket}"))
-            if fb_price:
-                price = fb_price
-                break
+def _bucket_grade_letters(bucket: str) -> list[str]:
+    """Grades that have a price column in this band.
 
-    return price
+    The 0–3 month band has no Grade D column on Buyback Price Master, so a
+    freshly-bought handset with a cracked screen cannot currently be graded D.
+    Adding that column is tracked separately; this helper keeps every reader of
+    the grid honest about which columns actually exist today.
+    """
+    return ["a", "b", "c"] if bucket == "iw_0_3" else ["a", "b", "c", "d"]
 
 def _resolve_age_months(device_age_months):
     """Convert age bracket label to a representative numeric value.
@@ -339,39 +466,77 @@ def _resolve_age_months(device_age_months):
 
 
 # POS condition-check keys → Buyback Question Bank question_code.
-# The POS quick-grading UI sends short keys (screen/camera/…); the question
-# bank is seeded with diag-*/q-* codes. Without this mapping every failed
-# POS check silently deducted 0%.
+#
+# The POS quick-grading endpoint sends six short keys (screen/body/buttons/
+# charging/camera/speaker_mic). These previously pointed at diag-* codes that
+# exist nowhere in the question bank, so five of the six resolved to nothing
+# and deducted 0% in silence. They now point at the codes actually loaded on
+# the site.
+#
+# "body" has no boolean equivalent: cosmetic condition is captured by the
+# multi-option ladders (touch_glass_condition, back_panel_condition,
+# center_or_side_panel_condition), which a pass/fail flag cannot select an
+# option from. It is deliberately absent so the lookup raises rather than
+# quietly scoring a damaged body at zero.
 _DIAG_CODE_ALIASES = {
-    "screen": "diag-screen",
-    "camera": "diag-camera",
-    "speaker_mic": "diag-speaker",
-    "speaker": "diag-speaker",
-    "charging": "diag-charge",
-    "charge": "diag-charge",
-    "battery": "diag-battery",
-    "body": "q-cosmetic",
-    "cosmetic": "q-cosmetic",
+    "screen": "screen",
+    "camera": "camera_test",
+    "speaker_mic": "speaker",
+    "speaker": "speaker",
+    "mic": "microphone",
+    "microphone": "microphone",
+    "charging": "cha",
+    "charge": "cha",
+    "battery": "battery",
+    "buttons": "power_button",
+    "power_button": "power_button",
+    "volume": "volume_buttons",
+    "wifi": "wifi",
+    "bluetooth": "bluetooth",
+    "gps": "gps",
+    "flash": "flash_light",
+    "fingerprint": "finger_print",
+    "proximity": "proximity_sensor",
 }
 
 
 def _resolve_diag_question(test_code):
-    """Return the enabled Buyback Question Bank name for a diagnostic code,
-    trying the exact code, the known POS alias, then a diag- prefix."""
+    """Return (name, fault_code) for a diagnostic code, or (None, None).
+
+    Tries the code as given, then the POS alias. The old `diag-<key>` guess is
+    gone — it never matched anything on this site and only served to make a
+    miss look like a deliberate zero.
+    """
     key = (test_code or "").strip()
+    if not key:
+        return None, None
+
     candidates = [key]
     alias = _DIAG_CODE_ALIASES.get(key.lower())
-    if alias:
+    if alias and alias != key:
         candidates.append(alias)
-    else:
-        candidates.append(f"diag-{key.lower()}")
+
     for code in candidates:
-        name = frappe.db.get_value(
-            "Buyback Question Bank", {"question_code": code, "disabled": 0}, "name"
+        row = frappe.db.get_value(
+            "Buyback Question Bank",
+            {"question_code": code, "disabled": 0},
+            ["name", "fault_code"],
+            as_dict=True,
         )
-        if name:
-            return name
-    return None
+        if row:
+            return row.name, row.get("fault_code")
+
+    # A condition check the operator answered that maps to no question is a
+    # configuration gap, not a clean bill of health. Make it visible.
+    frappe.log_error(
+        message=(
+            f"Diagnostic code '{key}' resolved to no enabled Buyback Question Bank "
+            f"row (tried: {', '.join(candidates)}). Its result was ignored and "
+            f"deducted nothing."
+        ),
+        title="Buyback: unmapped diagnostic code",
+    )
+    return None, None
 
 
 def _get_diagnostic_deduction(diagnostic_test, base_price):
@@ -382,7 +547,7 @@ def _get_diagnostic_deduction(diagnostic_test, base_price):
     if not test_code or not result:
         return None
 
-    question = _resolve_diag_question(test_code)
+    question, fault_code = _resolve_diag_question(test_code)
     if not question:
         return None
 
@@ -430,6 +595,7 @@ def _get_diagnostic_deduction(diagnostic_test, base_price):
         "amount": deduction_amount,
         "type": "diagnostic_test",
         "percent": abs(option.get("price_impact_percent")),
+        "_key": _deduction_key(question, fault_code),
     }
 
 def _get_question_deduction(response, base_price):
@@ -440,13 +606,15 @@ def _get_question_deduction(response, base_price):
     if not question_code or not answer_value:
         return None
 
-    question = frappe.db.get_value(
+    qrow = frappe.db.get_value(
         "Buyback Question Bank",
         {"question_code": question_code, "disabled": 0},
-        "name",
+        ["name", "fault_code"],
+        as_dict=True,
     )
-    if not question:
+    if not qrow:
         return None
+    question, fault_code = qrow.name, qrow.get("fault_code")
 
     # Find matching option
     option = frappe.db.get_value("Buyback Question Option", {"parent": question, "option_value": answer_value},
@@ -471,6 +639,7 @@ def _get_question_deduction(response, base_price):
         "amount": deduction_amount,
         "type": "question",
         "percent": abs(option.get("price_impact_percent")),
+        "_key": _deduction_key(question, fault_code),
     }
 
 
@@ -519,21 +688,8 @@ def _determine_grade_from_price(item_code, final_price, warranty_status=None, de
     if not bpm or not final_price:
         return "A"
 
-    age = _resolve_age_months(device_age_months)
-    is_iw = warranty_status == "In Warranty"
-
-    if is_iw and age <= 3:
-        bucket = "iw_0_3"
-        grade_letters = ["a", "b", "c"]
-    elif is_iw and age <= 6:
-        bucket = "iw_0_6"
-        grade_letters = ["a", "b", "c", "d"]
-    elif is_iw and age <= 11:
-        bucket = "iw_6_11"
-        grade_letters = ["a", "b", "c", "d"]
-    else:
-        bucket = "oow_11"
-        grade_letters = ["a", "b", "c", "d"]
+    bucket = _resolve_bucket(warranty_status, device_age_months)
+    grade_letters = _bucket_grade_letters(bucket)
 
     grade_prices = []
     for g in grade_letters:
@@ -608,14 +764,6 @@ def _get_min_grade_price(item_code, warranty_status, device_age_months):
     if not bpm:
         return 0
 
-    age = _resolve_age_months(device_age_months)
-    is_iw = warranty_status == "In Warranty"
-
-    if is_iw and age <= 3:
-        return flt(bpm.get("c_grade_iw_0_3"))
-    elif is_iw and age <= 6:
-        return flt(bpm.get("d_grade_iw_0_6"))
-    elif is_iw and age <= 11:
-        return flt(bpm.get("d_grade_iw_6_11"))
-    else:
-        return flt(bpm.get("d_grade_oow_11"))
+    bucket = _resolve_bucket(warranty_status, device_age_months)
+    lowest = _bucket_grade_letters(bucket)[-1]
+    return flt(bpm.get(f"{lowest}_grade_{bucket}"))

@@ -140,21 +140,46 @@ def _ensure_system_settings_ready():
     frappe.db.commit()
 
 
+# A–D are the tradeable condition grades an inspector chooses between.
+# E and F are salvage outcomes the pricing engine produces on its own — it
+# returns grade letter "E" when deductions push a quote below the band's
+# minimum grade price, and "F" for a handset that does not power on. Without
+# rows here those letters resolved to nothing, the grade assignment was
+# skipped, and a dead phone was displayed as Grade A beside its salvage price.
 GRADE_MASTER_SEED = [
     {"grade_name": "A", "description": "Like new / Excellent condition", "display_order": 1},
     {"grade_name": "B", "description": "Good condition, minor cosmetic marks", "display_order": 2},
     {"grade_name": "C", "description": "Fair condition, visible wear", "display_order": 3},
     {"grade_name": "D", "description": "Poor condition, significant damage", "display_order": 4},
+    {"grade_name": "E", "description": "Scrap — value below the lowest condition grade",
+     "display_order": 5, "is_salvage": 1},
+    {"grade_name": "F", "description": "Phone Dead — does not power on",
+     "display_order": 6, "is_salvage": 1},
 ]
 
 
 def seed_grade_master():
-    """Ensure standard A/B/C/D grades exist. Safe to run repeatedly."""
+    """Ensure the A–D condition grades and E/F salvage grades exist.
+
+    Safe to run repeatedly. Existing rows are left alone apart from the
+    is_salvage flag, which is backfilled so sites seeded before E/F existed
+    pick it up on the next migrate.
+    """
+    has_salvage_field = frappe.db.has_column("Grade Master", "is_salvage")
+
     for g in GRADE_MASTER_SEED:
-        if not frappe.db.exists("Grade Master", {"grade_name": g["grade_name"]}):
-            doc = frappe.get_doc({"doctype": "Grade Master", **g})
+        payload = dict(g)
+        if not has_salvage_field:
+            payload.pop("is_salvage", None)
+
+        existing = frappe.db.get_value("Grade Master", {"grade_name": g["grade_name"]}, "name")
+        if not existing:
+            doc = frappe.get_doc({"doctype": "Grade Master", **payload})
             doc.insert(ignore_permissions=True)
             frappe.logger().info(f"Seeded Grade Master: {g['grade_name']}")
+        elif has_salvage_field and g.get("is_salvage"):
+            frappe.db.set_value("Grade Master", existing, "is_salvage", 1)
+
     frappe.db.commit()
 
 

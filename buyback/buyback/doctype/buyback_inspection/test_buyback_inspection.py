@@ -135,7 +135,15 @@ class TestDiagnosticResultCompatibility(FrappeTestCase):
 
 class TestGradeRecalculation(FrappeTestCase):
     """
-    Verify grade auto-determination runs every time diagnostic answers change.
+    Verify the inspector's grade survives a save.
+
+    Grade used to be "auto-determined" by a helper that ignored the diagnostic
+    results it was handed and unconditionally returned "A". Because callers
+    treated that as authoritative, any grade the inspector picked was replaced
+    with A unless they also typed a `grade_changed_reason` — devices went to a
+    Grade-D payout still labelled Grade A. There is no auto-determination now;
+    the inspector decides, with the pre-inspection estimate as the only
+    fallback.
     """
 
     def setUp(self):
@@ -151,11 +159,16 @@ class TestGradeRecalculation(FrappeTestCase):
         self.grade_a = _make_grade("A")
         self.grade_b = _make_grade("B")
 
-    def test_grade_auto_determined_when_diagnostics_filled(self):
-        """When inspector fills in diagnostic result, post_inspection_grade updates."""
-        doc = _make_inspection()
+    def test_inspector_grade_is_not_overwritten_by_diagnostics(self):
+        """The inspector's grade stands, with or without a change reason.
 
-        # Add a diagnostic row with inspector result = "Fail"
+        Regression guard: filling in a diagnostic result used to trigger
+        "auto-determination" that silently reset the grade to A.
+        """
+        doc = _make_inspection()
+        doc.post_inspection_grade = self.grade_b
+
+        # A failed diagnostic used to be enough to trigger the reset.
         doc.append("inspection_diagnostics", {
             "test": self.q_name,
             "test_code": "test_screen_e2e",
@@ -163,13 +176,24 @@ class TestGradeRecalculation(FrappeTestCase):
             "inspector_result": "Fail",
         })
 
-        # validate() should call _set_condition_grade() → auto-determine
-        # (If _auto_determine_grade returns None for unknown combos, grade falls back)
         doc.save(ignore_permissions=True)
         doc.reload()
 
-        # Grade should be set (either auto-determined or pre_inspection_grade fallback)
+        self.assertEqual(
+            doc.condition_grade, self.grade_b,
+            "inspector's Grade B was replaced — the auto-grade stub is back",
+        )
+        self.assertEqual(doc.post_inspection_grade, self.grade_b)
+
+    def test_grade_falls_back_to_pre_inspection_estimate(self):
+        """With no inspector choice yet, the assessment's grade carries over."""
+        doc = _make_inspection()
+        doc.post_inspection_grade = None
+        doc.save(ignore_permissions=True)
+        doc.reload()
+
         self.assertIsNotNone(doc.condition_grade)
+        self.assertEqual(doc.condition_grade, doc.pre_inspection_grade)
 
     def test_grade_respects_explicit_override_when_reason_set(self):
         """If grade_changed_reason is set, inspector's post_inspection_grade is kept."""

@@ -479,8 +479,14 @@ def create_order(
     imei_serial: str | None = None,
     warranty_status: str | None = None,
     brand: str | None = None,
+    device_age_months: str | None = None,
 ) -> dict:
-    """Create a Buyback Order (submittable)."""
+    """Create a Buyback Order (submittable).
+
+    device_age_months pairs with warranty_status to select the price band. It
+    matters only on the fallback path below, where no assessment or inspection
+    exists to take an authoritative price from.
+    """
     require_configured_role("order_operation_roles", action=_("create Buyback orders"))
     frappe.has_permission("Buyback Order", ptype="create", throw=True)
     mobile_no = validate_indian_phone(mobile_no, "Mobile No")
@@ -535,10 +541,15 @@ def create_order(
     else:
         from buyback.buyback.pricing.engine import calculate_estimated_price
 
+        # No assessment or inspection to take a price from, so the engine is
+        # the authority — and it needs both band inputs. Passing only warranty
+        # status left age at 0, which put every In-Warranty order in the
+        # highest price band.
         pricing = calculate_estimated_price(
             item_code=item,
             grade=condition_grade,
             warranty_status=warranty_status,
+            device_age_months=device_age_months,
             brand=brand or item_doc.brand,
             item_group=item_doc.item_group,
         )
@@ -1368,6 +1379,8 @@ def submit_mobile_diagnostic(
     brand: str | None = None,
     item_group: str | None = None,
     external_diagnostic_id: str | None = None,
+    warranty_status: str | None = None,
+    device_age_months: str | None = None,
 ) -> dict:
     """
     Receive diagnostic data from the mobile diagnostic app.
@@ -1387,6 +1400,13 @@ def submit_mobile_diagnostic(
         brand: Device brand
         item_group: Device category
         external_diagnostic_id: Reference ID from the mobile diagnostic app
+        warranty_status: "In Warranty" / "Out of Warranty"
+        device_age_months: Age bracket, e.g. "0-3 Months" … "12+ Months"
+
+    warranty_status and device_age_months select the price band. When the app
+    does not send them, no estimated price is returned rather than one priced
+    off an assumed band — the previous behaviour quoted every device from the
+    Out of Warranty 11+ band regardless of its real age.
 
     Returns:
         dict with inspection name, inspection_id, status
@@ -1451,28 +1471,36 @@ def submit_mobile_diagnostic(
         "imei_serial": imei_serial,
         "diagnostic_data": json.dumps(diag_list, indent=2),
         "results": result_rows,
+        "warranty_status": warranty_status,
+        "device_age_months": device_age_months,
         "remarks": f"Auto-created from mobile diagnostic app",
     })
     doc.insert()
 
-    # Calculate estimated price from diagnostic answers using the pricing engine
+    # Calculate estimated price from diagnostic answers using the pricing engine.
+    # Without a warranty status and age there is no band to price against, so
+    # skip rather than quote off an assumed one.
     estimated_price = 0
-    try:
-        from buyback.buyback.pricing.engine import calculate_estimated_price
-        # Map diagnostic results to question-style responses for pricing
-        resp_for_pricing = _map_diagnostic_to_responses(diag_list)
-        pricing = calculate_estimated_price(
-            item_code=item_code,
-            grade=None,
-            responses=resp_for_pricing,
-            brand=brand,
-            item_group=item_group,
-        )
-        estimated_price = pricing.get("estimated_price", 0)
-    except (ValueError, KeyError, frappe.ValidationError, frappe.DoesNotExistError):
-        frappe.log_error(
-            title=f"Mobile diagnostic pricing failed for {doc.name}",
-        )
+    priced = bool((warranty_status or "").strip() and str(device_age_months or "").strip())
+    if priced:
+        try:
+            from buyback.buyback.pricing.engine import calculate_estimated_price
+            # Map diagnostic results to question-style responses for pricing
+            resp_for_pricing = _map_diagnostic_to_responses(diag_list)
+            pricing = calculate_estimated_price(
+                item_code=item_code,
+                grade=None,
+                warranty_status=warranty_status,
+                device_age_months=device_age_months,
+                responses=resp_for_pricing,
+                brand=brand,
+                item_group=item_group,
+            )
+            estimated_price = pricing.get("estimated_price", 0)
+        except (ValueError, KeyError, frappe.ValidationError, frappe.DoesNotExistError):
+            frappe.log_error(
+                title=f"Mobile diagnostic pricing failed for {doc.name}",
+            )
 
     # Update Serial No status to "Quoted" if IMEI provided
     if imei_serial:
@@ -1492,6 +1520,9 @@ def submit_mobile_diagnostic(
         "customer_found": bool(customer),
         "results_count": len(result_rows),
         "estimated_price": estimated_price,
+        # False when the app sent no warranty status / age — the caller should
+        # show "pricing pending inspection" rather than treat 0 as the offer.
+        "priced": priced,
     }
 
 
@@ -1668,12 +1699,20 @@ def get_questions(category: str | None = None) -> list[dict]:
 
 
 @frappe.whitelist()
-def get_grades() -> list[dict]:
-    """Get all active grades."""
+def get_grades(include_salvage: int | str = 0) -> list[dict]:
+    """Get the grades an inspector can choose between.
+
+    Salvage grades (E Scrap, F Phone Dead) are produced by the pricing engine,
+    never picked by hand, so they are excluded unless a caller explicitly asks
+    for the full set (e.g. a report legend).
+    """
     _require_app_read(_("view Buyback grades"), "Grade Master")
+    filters = {"disabled": 0}
+    if not int(include_salvage or 0):
+        filters["is_salvage"] = 0
     return frappe.get_list(
         "Grade Master",
-        filters={"disabled": 0},
+        filters=filters,
         fields=["name", "grade_id", "grade_name", "description", "display_order"],
         order_by="display_order asc",
         limit_page_length=100,
@@ -2251,11 +2290,17 @@ def calculate_live_estimate(
     return result
 
 
-#updated Auto determine grade :
+def _provisional_grade_name() -> str | None:
+    """Grade Master name for the provisional grade used before pricing runs.
 
-def _auto_determine_grade(diagnostic_tests: list, device_age_months: str = None) -> str:
-    """Deprecated. Returns provisional 'A'. Real grade comes from engine."""
-    return "A"
+    Pricing currently starts from the Grade A cell and derives the final grade
+    from the resulting price, so callers need an A to hand the engine. This
+    replaces the old `_auto_determine_grade()`, which claimed to read the
+    diagnostic results but unconditionally returned "A" — and, because callers
+    treated that return as authoritative, silently overwrote the grade an
+    inspector had chosen by hand.
+    """
+    return frappe.db.get_value("Grade Master", {"grade_name": "A"}, "name")
 
 
 # ── Item Question Map Helper ──────────────────────────────────────

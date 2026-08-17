@@ -159,8 +159,10 @@ def search_buyback_items(query: str = "", limit: int = 12) -> list[dict]:
 @frappe.whitelist(allow_guest=True)
 @rate_limit(limit=60, seconds=60, ip_based=True)
 def get_quote_grades() -> list[dict]:
+    # Salvage grades are engine outcomes; never offer them to a public caller.
     return frappe.get_all(
         "Grade Master",
+        filters={"is_salvage": 0},
         fields=["name", "grade_name", "description", "display_order"],
         order_by="display_order asc, grade_name asc",
         limit_page_length=min(get_int_setting("public_response_row_limit", 100), 500),
