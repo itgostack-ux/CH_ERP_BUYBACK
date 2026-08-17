@@ -43,6 +43,10 @@
   "price_cards_html",
   "diagnostic_tests_section",
   "diagnostic_tests",
+  "eligibility_section",
+  "eligibility_responses",
+  "grading_section",
+  "grading_responses",
   "responses_section",
   "responses",
   "pricing_section",
@@ -238,7 +242,7 @@
    "label": "IMEI / Serial No"
   },
   {
-   "description": "Age bracket \u2014 pricing varies by bracket",
+   "description": "Age bracket — pricing varies by bracket",
    "fieldname": "device_age_months",
    "fieldtype": "Select",
    "label": "Device Age",
@@ -251,7 +255,7 @@
    "options": "\nIn Warranty\nOut of Warranty"
   },
   {
-   "description": "Optional at this stage, but recommended before inspection \u2014 catching a blacklisted/stolen device here avoids wasting inspector time. Carried forward to the Buyback Order automatically if completed here.",
+   "description": "Optional at this stage, but recommended before inspection — catching a blacklisted/stolen device here avoids wasting inspector time. Carried forward to the Buyback Order automatically if completed here.",
    "fieldname": "imei_validation_section",
    "fieldtype": "Section Break",
    "label": "IMEI / Sanchar Saathi Validation"
@@ -315,22 +319,47 @@
    "label": "Automated Diagnostic Tests"
   },
   {
-   "description": "Automated test results from mobile app \u2014 each test produces Yes/No",
+   "description": "Automated test results from mobile app — each test produces Yes/No",
    "fieldname": "diagnostic_tests",
    "fieldtype": "Table",
    "label": "Diagnostic Tests",
    "options": "Buyback Assessment Diagnostic"
   },
   {
-   "fieldname": "responses_section",
+   "fieldname": "eligibility_section",
    "fieldtype": "Section Break",
-   "label": "Customer Question Responses"
+   "label": "Eligibility Checks",
+   "description": "A device that fails these cannot be resold at any grade. They gate the deal rather than reducing the price."
   },
   {
-   "description": "Customer's answers to multiple-choice diagnostic questions",
+   "fieldname": "eligibility_responses",
+   "fieldtype": "Table",
+   "label": "Eligibility",
+   "options": "Buyback Assessment Response"
+  },
+  {
+   "fieldname": "grading_section",
+   "fieldtype": "Section Break",
+   "label": "Condition — decides the Grade",
+   "description": "These answers choose the grade, and the grade chooses which price band cell is used. They never deduct a percentage."
+  },
+  {
+   "fieldname": "grading_responses",
+   "fieldtype": "Table",
+   "label": "Condition",
+   "options": "Buyback Assessment Response"
+  },
+  {
+   "fieldname": "responses_section",
+   "fieldtype": "Section Break",
+   "label": "Faults — deduct from the Grade price",
+   "description": "Component faults. Each takes a percentage off the price the grade selected. They never change the grade."
+  },
+  {
+   "description": "Answers to the component fault checks.",
    "fieldname": "responses",
    "fieldtype": "Table",
-   "label": "Responses",
+   "label": "Faults",
    "options": "Buyback Assessment Response"
   },
   {
@@ -339,7 +368,7 @@
    "label": "Estimated Pricing"
   },
   {
-   "description": "Grade used for pricing \u2014 defaults to A (best condition)",
+   "description": "Grade used for pricing — defaults to A (best condition)",
    "fieldname": "estimated_grade",
    "fieldtype": "Link",
    "label": "Estimated Grade",

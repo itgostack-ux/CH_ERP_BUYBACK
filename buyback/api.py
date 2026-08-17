@@ -2493,7 +2493,7 @@ def get_customer_questions_for_item(item_code: str) -> list:
     questions = frappe.get_list(
         "Buyback Question Bank",
         filters=filters,
-        fields=["name", "question_code", "question_text"],
+        fields=["name", "question_code", "question_text", "question_purpose"],
         order_by="idx asc, name asc",
         limit_page_length=500,
     )
@@ -2511,6 +2511,11 @@ def get_customer_questions_for_item(item_code: str) -> list:
             "name": q.name,
             "question_code": q.question_code,
             "question_text": q.question_text,
+            # Drives which table the assessment form puts the row in: condition
+            # questions decide the grade, fault questions deduct from it, and
+            # showing them in one undifferentiated list is what made it
+            # impossible to see which answer moved what.
+            "question_purpose": q.get("question_purpose") or "Deduction",
             "options": [
                 {
                     "value": o.get("option_value"),

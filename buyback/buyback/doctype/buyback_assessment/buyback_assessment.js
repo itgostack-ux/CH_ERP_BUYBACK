@@ -66,7 +66,7 @@ frappe.ui.form.on("Buyback Assessment", {
 		}
 
 		// Action buttons
-		const has_data = (frm.doc.responses && frm.doc.responses.length)
+		const has_data = (_buyback_all_answer_rows(frm).length)
 			|| (frm.doc.diagnostic_tests && frm.doc.diagnostic_tests.length);
 
 		if (frm.doc.status === "Draft" && has_data) {
@@ -141,12 +141,14 @@ frappe.ui.form.on("Buyback Assessment", {
 		);
 		frm.fields_dict.diagnostic_tests.grid.refresh();
 
-		frm.fields_dict.responses.grid.cannot_add_rows = true;
-		frm.fields_dict.responses.grid.cannot_delete_rows = true;
-		frm.fields_dict.responses.grid.update_docfield_property(
-			"answer_value", "read_only", 1
-		);
-		frm.fields_dict.responses.grid.refresh();
+		BUYBACK_ANSWER_TABLES.forEach(table => {
+			const grid = frm.fields_dict[table] && frm.fields_dict[table].grid;
+			if (!grid) return;
+			grid.cannot_add_rows = true;
+			grid.cannot_delete_rows = true;
+			grid.update_docfield_property("answer_value", "read_only", 1);
+			grid.refresh();
+		});
 
 		// Filter diagnostic_tests Link to only show Automated Test type
 		frm.set_query("test", "diagnostic_tests", () => ({
@@ -154,9 +156,11 @@ frappe.ui.form.on("Buyback Assessment", {
 		}));
 
 		// Filter responses Link to only show Customer Question type
-		frm.set_query("question", "responses", () => ({
-			filters: { diagnosis_type: "Customer Question", disabled: 0 },
-		}));
+		BUYBACK_ANSWER_TABLES.forEach(table => {
+			frm.set_query("question", table, () => ({
+				filters: { diagnosis_type: "Customer Question", disabled: 0 },
+			}));
+		});
 
 		// Render reference price cards
 		buyback_render_price_cards(frm);
@@ -173,9 +177,8 @@ frappe.ui.form.on("Buyback Assessment", {
 	item(frm) {
 		// Force reload when item changes (clear guard)
 		frm.clear_table("diagnostic_tests");
-		frm.clear_table("responses");
 		frm.refresh_field("diagnostic_tests");
-		frm.refresh_field("responses");
+		BUYBACK_ANSWER_TABLES.forEach(t => { frm.clear_table(t); frm.refresh_field(t); });
 
 		buyback_render_price_cards(frm);
 		buyback_load_diagnostic_tests(frm);
@@ -229,11 +232,16 @@ frappe.ui.form.on("Buyback Assessment Response", {
 					row._impact_map[o.option_value] = o.price_impact_percent || 0;
 				});
 
+				// The row may sit in any of the three answer tables, so target the
+				// grid it actually belongs to rather than assuming `responses`.
 				const opts = r.message.map(o => o.option_value);
-				frm.fields_dict.responses.grid.update_docfield_property(
-					"answer_value", "options", ["" , ...opts].join("\n")
-				);
-				frm.fields_dict.responses.grid.refresh();
+				const field = frm.fields_dict[row.parentfield];
+				if (field && field.grid) {
+					field.grid.update_docfield_property(
+						"answer_value", "options", ["", ...opts].join("\n")
+					);
+					field.grid.refresh();
+				}
 			},
 		});
 	},
@@ -354,7 +362,7 @@ function buyback_recalculate_estimate(frm) {
 			result: d.result,
 			depreciation_percent: d.depreciation_percent,
 		}));
-		const resp = (frm.doc.responses || []).map(r => ({
+		const resp = _buyback_all_answer_rows(frm).map(r => ({
 			question: r.question,
 			question_code: r.question_code,
 			answer_value: r.answer_value,
@@ -603,6 +611,26 @@ function _buyback_render_diagnostic_radios(frm) {
 }
 
 
+// The three answer tables, in the order the form shows them. A question's
+// `question_purpose` decides which one it belongs to: Grading answers choose
+// the grade (and so which price-band cell is used), Deduction answers take a
+// percentage off that price, Eligibility answers gate the deal without pricing
+// it. One undifferentiated list made it impossible to see which answer moved
+// what.
+const BUYBACK_ANSWER_TABLES = ["grading_responses", "responses", "eligibility_responses"];
+
+function _buyback_table_for(purpose) {
+	if (purpose === "Grading") return "grading_responses";
+	if (purpose === "Eligibility") return "eligibility_responses";
+	return "responses";
+}
+
+function _buyback_all_answer_rows(frm) {
+	return BUYBACK_ANSWER_TABLES.reduce(
+		(rows, table) => rows.concat(frm.doc[table] || []), []
+	);
+}
+
 // ── Auto-load Customer Questions when Item is selected ──────────
 function buyback_load_customer_questions(frm) {
 	if (!frm.doc.item || frm.doc.is_phone_dead) return;
@@ -613,7 +641,7 @@ function buyback_load_customer_questions(frm) {
 		callback(r) {
 			if (frm.doc.is_phone_dead) return;
 			if (!r.message || !r.message.length) return;
-			const existing_rows = frm.doc.responses || [];
+			const existing_rows = _buyback_all_answer_rows(frm);
 			const questions_by_name = Object.fromEntries(
 				r.message.map(question => [question.name, question])
 			);
@@ -629,11 +657,13 @@ function buyback_load_customer_questions(frm) {
 				return;
 			}
 
-			// Clear existing empty rows
-			frm.clear_table("responses");
+			// Each question lands in the table for what it DOES, so the form
+			// shows at a glance which answers moved the grade and which took
+			// money off it.
+			BUYBACK_ANSWER_TABLES.forEach(t => frm.clear_table(t));
 
 			r.message.forEach(q => {
-				const row = frm.add_child("responses");
+				const row = frm.add_child(_buyback_table_for(q.question_purpose));
 				row.question = q.name;
 				row.question_code = q.question_code;
 				row.question_text = q.question_text;
@@ -641,21 +671,8 @@ function buyback_load_customer_questions(frm) {
 				_buyback_set_response_option_maps(row, q.options);
 			});
 
-			frm.refresh_field("responses");
+			BUYBACK_ANSWER_TABLES.forEach(t => frm.refresh_field(t));
 
-			// Each question may have different answer options (yes/no, scales, etc.)
-			// Update the Select options dynamically when a row is clicked
-			frm.fields_dict.responses.grid.wrapper.off("click.cq_opts");
-			frm.fields_dict.responses.grid.wrapper.on("click.cq_opts", "[data-idx]", function () {
-				const idx = $(this).attr("data-idx") || $(this).closest("[data-idx]").attr("data-idx");
-				if (!idx) return;
-				const row = frm.doc.responses[parseInt(idx) - 1];
-				if (row && row._answer_options && row._answer_options.length) {
-					frm.fields_dict.responses.grid.update_docfield_property(
-						"answer_value", "options", ["", ...row._answer_options].join("\n")
-					);
-				}
-			});
 			_buyback_render_response_radios(frm);
 
 			frappe.show_alert({
@@ -700,8 +717,13 @@ function _buyback_answer_radio_html(row, value, frm, df) {
 // comment on _buyback_render_diagnostic_radios for why appending to the cell
 // and hiding .field-area once cannot work.
 function _buyback_render_response_radios(frm) {
-	const grid = frm.fields_dict.responses && frm.fields_dict.responses.grid;
-	if (!grid || frm.doc.is_phone_dead) return;
+	if (frm.doc.is_phone_dead) return;
+	BUYBACK_ANSWER_TABLES.forEach(table => _buyback_render_radios_for(frm, table));
+}
+
+function _buyback_render_radios_for(frm, table) {
+	const grid = frm.fields_dict[table] && frm.fields_dict[table].grid;
+	if (!grid) return;
 
 	if (!document.getElementById("buyback-answer-radio-styles")) {
 		const style = document.createElement("style");
@@ -732,7 +754,7 @@ function _buyback_render_response_radios(frm) {
 	grid.wrapper.on("change.buyback_answer_radio", ".buyback-answer-radio", function (event) {
 		event.stopPropagation();
 		const row_name = $(this).closest(".grid-row").attr("data-name");
-		const row = (frm.doc.responses || []).find(item => item.name === row_name);
+		const row = _buyback_all_answer_rows(frm).find(item => item.name === row_name);
 		if (!row) return;
 		frappe.model.set_value(row.doctype, row.name, "answer_value", $(this).val());
 	});
@@ -780,14 +802,15 @@ function _buyback_set_phone_dead_state(frm, reload_when_alive) {
 	const is_dead = Boolean(frm.doc.is_phone_dead);
 	frm.set_df_property("diagnostic_tests_section", "hidden", is_dead ? 1 : 0);
 	frm.set_df_property("diagnostic_tests", "hidden", is_dead ? 1 : 0);
-	frm.set_df_property("responses_section", "hidden", is_dead ? 1 : 0);
-	frm.set_df_property("responses", "hidden", is_dead ? 1 : 0);
+	["responses_section", "grading_section", "eligibility_section"].forEach(
+		section => frm.set_df_property(section, "hidden", is_dead ? 1 : 0));
+	BUYBACK_ANSWER_TABLES.forEach(
+		table => frm.set_df_property(table, "hidden", is_dead ? 1 : 0));
 
 	if (is_dead) {
 		frm.clear_table("diagnostic_tests");
-		frm.clear_table("responses");
 		frm.refresh_field("diagnostic_tests");
-		frm.refresh_field("responses");
+		BUYBACK_ANSWER_TABLES.forEach(t => { frm.clear_table(t); frm.refresh_field(t); });
 	} else if (reload_when_alive && frm.doc.item && frm.doc.status === "Draft") {
 		buyback_load_diagnostic_tests(frm);
 		buyback_load_customer_questions(frm);

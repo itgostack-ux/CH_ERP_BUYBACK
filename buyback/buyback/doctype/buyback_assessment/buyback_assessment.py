@@ -47,11 +47,11 @@ class BuybackAssessment(Document):
         self._auto_fill_item_details()
         impact_cache = (
             self._load_question_impact_cache()
-            if self.diagnostic_tests or self.responses else None
+            if self.diagnostic_tests or self.all_answers() else None
         )
         if self.diagnostic_tests:
             self._fill_diagnostic_impacts(impact_cache)
-        if self.responses:
+        if self.all_answers():
             self._fill_response_impacts(impact_cache)
         if self.item:
             # Price whenever the item is known — the base grade/warranty/age
@@ -71,8 +71,9 @@ class BuybackAssessment(Document):
                     title=_("Incomplete Device Details"),
                 )
 
-            if self.responses and self.status in ("Submitted", "Inspected", "Quoted"):
-                unanswered = [r for r in self.responses if not (r.get("answer") or "").strip()]
+            answers = self.all_answers()
+            if answers and self.status in ("Submitted", "Inspected", "Quoted"):
+                unanswered = [r for r in answers if not (r.get("answer") or "").strip()]
                 if unanswered:
                     missing = ", ".join(
                         (r.get("question_text") or r.get("question_code") or r.get("name") or "")
@@ -106,6 +107,22 @@ class BuybackAssessment(Document):
                 )
             except (ImportError, frappe.ValidationError):
                 frappe.log_error(title=f"Audit log failed for buyback {self.name}")
+
+    # ------------------------------------------------------------------
+    # Answer tables
+    # ------------------------------------------------------------------
+    # Answers are split across three tables so the form can show which
+    # question does what — condition decides the grade, faults deduct from the
+    # price it selected, eligibility gates the deal. They are one list to
+    # everything downstream, so every consumer goes through this rather than
+    # touching `self.responses` directly.
+    ANSWER_TABLES = ("grading_responses", "responses", "eligibility_responses")
+
+    def all_answers(self) -> list:
+        rows = []
+        for fieldname in self.ANSWER_TABLES:
+            rows.extend(self.get(fieldname) or [])
+        return rows
 
     def _check_imei_blacklist(self):
         if self.imei_serial:
@@ -182,7 +199,7 @@ class BuybackAssessment(Document):
 
     def _load_question_impact_cache(self) -> dict:
         """Resolve all response/diagnostic question options in bounded queries."""
-        response_rows = list(self.responses or [])
+        response_rows = self.all_answers()
         diagnostic_rows = list(self.diagnostic_tests or [])
         linked_names = {
             row.question
@@ -279,7 +296,7 @@ class BuybackAssessment(Document):
     def _fill_response_impacts(self, cache=None):
         """Look up price_impact_percent from Question Bank options for each response."""
         cache = cache or self._load_question_impact_cache()
-        for r in self.responses:
+        for r in self.all_answers():
             if not r.question_code or not r.answer_value:
                 continue
 
@@ -365,7 +382,7 @@ class BuybackAssessment(Document):
                 )
 
             responses_data = []
-            for r in (self.responses or []):
+            for r in self.all_answers():
                 responses_data.append({
                     "question": r.question,
                     "question_code": r.question_code,
@@ -429,7 +446,7 @@ class BuybackAssessment(Document):
                 _("Can only submit a Draft assessment."),
                 exc=BuybackStatusError,
             )
-        if not self.responses and not self.diagnostic_tests:
+        if not self.all_answers() and not self.diagnostic_tests:
             frappe.throw(
                 _("At least one diagnostic test or customer response is required."),
                 exc=BuybackStatusError,
@@ -597,8 +614,8 @@ class BuybackAssessment(Document):
                 row["inspector_depreciation"] = d.depreciation_percent
             inspection.append("inspection_diagnostics", row)
 
-        # Copy responses → inspection_responses
-        for r in (self.responses or []):
+        # Copy every answer table → inspection_responses
+        for r in self.all_answers():
             row = {
                 "question": r.question,
                 "question_code": r.question_code,
