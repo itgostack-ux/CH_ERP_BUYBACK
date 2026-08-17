@@ -7,6 +7,7 @@
  "field_order": [
   "option_label",
   "option_value",
+  "forces_grade",
   "price_impact_percent",
   "is_default"
  ],
@@ -26,6 +27,13 @@
    "label": "Option Value",
    "reqd": 1,
    "description": "Internal value used for pricing logic e.g. 'yes', 'no', 'minor'"
+  },
+  {
+   "description": "Worst grade this answer allows. The device takes the lowest grade forced by any answer. Blank means this answer does not limit the grade.",
+   "fieldname": "forces_grade",
+   "fieldtype": "Select",
+   "label": "Forces Grade",
+   "options": "\nB\nC\nD"
   },
   {
    "default": "0",

@@ -354,14 +354,15 @@ class BuybackAssessment(Document):
                     "depreciation_percent": d.depreciation_percent,
                 })
 
-            grade = _provisional_grade_name()
-            if not grade:
+            # Grade now comes out of the grading answers inside the engine.
+            # Whatever is on the doc is only a starting point for a quote that
+            # carries no grading answers yet.
+            if not self.estimated_grade and not _provisional_grade_name():
                 frappe.log_error(
                     "Grade Master has no 'A' record. Create A/B/C/D (and the E/F "
                     "salvage grades) before quoting.",
                     "Buyback Grade Missing",
                 )
-            self.estimated_grade = grade or None
 
             responses_data = []
             for r in (self.responses or []):

@@ -412,6 +412,20 @@ CUSTOM_FIELDS = {
                 "Only items with an active Buyback Price Master should be flagged."
             ),
         },
+        {
+            "fieldname": "ch_is_foldable",
+            "label": _("Foldable / Flip"),
+            "fieldtype": "Check",
+            "insert_after": "ch_is_buyback_eligible",
+            "default": "0",
+            "in_standard_filter": 1,
+            "description": _(
+                "Book-fold and clamshell handsets. Selects the buyback question set "
+                "that adds the inner screen, outer screen and hinge checks. This is a "
+                "per-model flag rather than a name match: 'Lava Flip Phone' is a "
+                "feature phone, not a foldable."
+            ),
+        },
     ],
 }
 

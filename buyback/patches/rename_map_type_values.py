@@ -6,7 +6,7 @@ import frappe
 
 
 def execute():
-    if not frappe.db.table_exists("tabBuyback Item Question Map"):
+    if not frappe.db.table_exists("Buyback Item Question Map"):
         return
     if not frappe.db.has_column("Buyback Item Question Map", "map_type"):
         return

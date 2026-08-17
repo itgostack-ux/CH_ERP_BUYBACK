@@ -161,6 +161,7 @@ class TestPricingIntegrity(FrappeTestCase):
         self.assertEqual(_clamp_deductions(500, 10000), 500)
 
     def test_stacked_faults_land_on_scrap_not_a_negative_quote(self):
+        # 90% off the OOW base leaves 780, which is under the 900 scrap value.
         result = self._price(
             warranty_status="Out of Warranty", device_age_months="12+ Months",
             responses=[{"question_code": "_test_heavy", "answer_value": "Yes"}],
@@ -169,17 +170,45 @@ class TestPricingIntegrity(FrappeTestCase):
         self.assertEqual(flt(result["estimated_price"]), SCRAP)
         self.assertEqual(result["grade_letter"], "E")
 
+    def test_a_light_fault_does_not_trip_the_scrap_floor(self):
+        """The floor is the salvage value, not the band's lowest grade price.
+
+        While every quote started from the Grade A cell, "below the lowest
+        grade price" was a reasonable proxy for scrap. Once the grade selects
+        the cell it stopped being one: a Grade D device starts at the D price,
+        so any deduction at all would have tipped it into scrap.
+        """
+        result = self._price(
+            warranty_status="Out of Warranty", device_age_months="12+ Months",
+            diagnostic_tests=[{"test_code": "_test_speaker_auto", "result": "Fail"}],
+        )
+        self.assertFalse(result.get("is_scrap"))
+        self.assertEqual(flt(result["estimated_price"]), BASE_OOW_11 * 0.98)
+
     # ── B10 ─────────────────────────────────────────────────────────
-    def test_missing_salvage_price_is_named_not_quoted_as_zero(self):
+    def test_missing_phone_dead_price_is_named_not_quoted_as_zero(self):
         _ensure_price_master(scrap=0, dead=0)
         try:
             with self.assertRaises(frappe.ValidationError):
                 self._price(is_phone_dead=True)
-            with self.assertRaises(frappe.ValidationError):
-                self._price(
-                    warranty_status="Out of Warranty", device_age_months="12+ Months",
-                    responses=[{"question_code": "_test_heavy", "answer_value": "Yes"}],
-                )
+        finally:
+            _ensure_price_master()
+
+    def test_unset_scrap_price_never_silently_floors_a_quote(self):
+        """With no scrap value configured the floor simply does not engage.
+
+        It must not floor to ₹0 — that was the behaviour that offered a
+        customer nothing and called it a quote. The deduction cap already
+        keeps the remainder non-negative.
+        """
+        _ensure_price_master(scrap=0, dead=0)
+        try:
+            result = self._price(
+                warranty_status="Out of Warranty", device_age_months="12+ Months",
+                responses=[{"question_code": "_test_heavy", "answer_value": "Yes"}],
+            )
+            self.assertFalse(result.get("is_scrap"))
+            self.assertEqual(flt(result["estimated_price"]), BASE_OOW_11 * 0.10)
         finally:
             _ensure_price_master()
 

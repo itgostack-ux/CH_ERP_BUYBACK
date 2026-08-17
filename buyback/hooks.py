@@ -34,6 +34,7 @@ after_migrate = [
     "buyback.install.ensure_workflow_system_manager_parity",
     "buyback.install.create_reporting_indexes",
     "buyback.install.seed_grade_master",
+    "buyback.setup.seed_question_sets.run",
     "buyback.print_setup.ensure_print_formats",
     "buyback.setup_workspace.setup",
 ]

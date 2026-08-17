@@ -1,0 +1,71 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-08-17 10:00:00",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "istable": 1,
+ "field_order": [
+  "question",
+  "question_code",
+  "question_text",
+  "column_break_01",
+  "question_purpose",
+  "display_order"
+ ],
+ "fields": [
+  {
+   "fieldname": "question",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Question",
+   "options": "Buyback Question Bank",
+   "reqd": 1
+  },
+  {
+   "fetch_from": "question.question_code",
+   "fieldname": "question_code",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Code",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "question.question_text",
+   "fieldname": "question_text",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Question Text",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_01",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fetch_from": "question.question_purpose",
+   "fieldname": "question_purpose",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Purpose",
+   "read_only": 1
+  },
+  {
+   "fieldname": "display_order",
+   "fieldtype": "Int",
+   "label": "Display Order"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-08-17 10:00:00",
+ "modified_by": "Administrator",
+ "module": "Buyback",
+ "name": "Buyback Question Set Item",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

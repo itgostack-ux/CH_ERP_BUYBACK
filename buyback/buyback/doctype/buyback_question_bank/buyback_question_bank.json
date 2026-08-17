@@ -11,6 +11,7 @@
   "question_text",
   "question_code",
   "fault_code",
+  "question_purpose",
   "column_break_01",
   "diagnosis_type",
   "question_category",
@@ -69,6 +70,16 @@
    "fieldtype": "Data",
    "label": "Fault Code",
    "search_index": 1
+  },
+  {
+   "default": "Deduction",
+   "description": "What the answer DOES. Grading moves the condition grade and never deducts. Deduction takes a percentage off the graded price. Eligibility gates the buyback entirely (activation locks, account not removed) and never prices.",
+   "fieldname": "question_purpose",
+   "fieldtype": "Select",
+   "in_standard_filter": 1,
+   "label": "Purpose",
+   "options": "Grading\nDeduction\nEligibility",
+   "reqd": 1
   },
   {
    "fieldname": "column_break_01",

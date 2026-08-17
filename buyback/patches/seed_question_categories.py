@@ -28,7 +28,7 @@ DEFAULT_CATEGORIES = [
 def execute():
     # Guard: the table is created by bench migrate from our new DocType JSON.
     # On a fresh site the table may not exist on the first run — safe to skip.
-    if not frappe.db.table_exists("tabBuyback Question Category"):
+    if not frappe.db.table_exists("Buyback Question Category"):
         frappe.logger("patch").warning(
             "seed_question_categories: tabBuyback Question Category does not exist yet — "
             "skipping (will run after next bench migrate)"
@@ -42,7 +42,7 @@ def execute():
 
     # Collect values already stored in live question records
     in_use: set = set()
-    if frappe.db.table_exists("tabBuyback Question Bank"):
+    if frappe.db.table_exists("Buyback Question Bank"):
         in_use = {
             r[0]
             for r in frappe.db.sql(

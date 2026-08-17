@@ -8,9 +8,9 @@ def execute():
     - Skips when target child table/docfield is unavailable.
     - Skips rows already present in the child table.
     """
-    if not frappe.db.table_exists("tabBuyback Question Bank"):
+    if not frappe.db.table_exists("Buyback Question Bank"):
         return
-    if not frappe.db.table_exists("tabBuyback Question Applicable Category"):
+    if not frappe.db.table_exists("Buyback Question Applicable Category"):
         return
 
     rows = frappe.get_all(

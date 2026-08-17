@@ -1,0 +1,116 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "field:set_name",
+ "creation": "2026-08-17 10:00:00",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "set_name",
+  "disabled",
+  "column_break_01",
+  "applies_to_brand_family",
+  "applies_to_form_factor",
+  "description",
+  "questions_section",
+  "questions"
+ ],
+ "fields": [
+  {
+   "fieldname": "set_name",
+   "fieldtype": "Data",
+   "label": "Set Name",
+   "reqd": 1,
+   "unique": 1,
+   "description": "e.g. Apple Handset, Android Handset, Foldable Handset"
+  },
+  {
+   "default": "0",
+   "fieldname": "disabled",
+   "fieldtype": "Check",
+   "label": "Disabled"
+  },
+  {
+   "fieldname": "column_break_01",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "applies_to_brand_family",
+   "fieldtype": "Select",
+   "label": "Applies to Brand Family",
+   "options": "Any\nApple\nAndroid",
+   "default": "Any",
+   "reqd": 1,
+   "description": "Face ID, iCloud lock and the Apple unknown-part checks only make sense on Apple; Google/Samsung account removal only on Android."
+  },
+  {
+   "fieldname": "applies_to_form_factor",
+   "fieldtype": "Select",
+   "label": "Applies to Form Factor",
+   "options": "Any\nStandard\nFoldable",
+   "default": "Any",
+   "reqd": 1,
+   "description": "Foldable sets add the inner/outer screen and hinge questions."
+  },
+  {
+   "fieldname": "description",
+   "fieldtype": "Small Text",
+   "label": "Description"
+  },
+  {
+   "fieldname": "questions_section",
+   "fieldtype": "Section Break",
+   "label": "Questions"
+  },
+  {
+   "fieldname": "questions",
+   "fieldtype": "Table",
+   "label": "Questions",
+   "options": "Buyback Question Set Item"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-08-17 10:00:00",
+ "modified_by": "Administrator",
+ "module": "Buyback",
+ "name": "Buyback Question Set",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Buyback Admin",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "role": "Buyback Manager",
+   "share": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

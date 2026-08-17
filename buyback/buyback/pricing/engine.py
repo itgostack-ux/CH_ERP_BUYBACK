@@ -72,8 +72,19 @@ def calculate_estimated_price(
 
     _require_band_inputs(warranty_status, device_age_months)
 
+    # Condition decides the grade, the grade decides the cell. When the answers
+    # carry grading questions they are authoritative and the caller's `grade`
+    # is only a starting point; a caller that passes no grading answers (an
+    # API quote, a re-price from a stored grade) keeps the grade it supplied.
+    graded = resolve_grade_from_answers(responses)
+    if _has_grading_answers(responses):
+        grade_letter = graded
+    else:
+        grade_letter = _grade_letter(grade)
+    result["grade_letter"] = grade_letter
+
     resolved_age = _resolve_age_months(device_age_months)
-    base_price = _get_base_price(item_code, grade, warranty_status, device_age_months)
+    base_price = _get_base_price(item_code, grade_letter, warranty_status, device_age_months)
     result["base_price"] = base_price
 
     if not base_price:
@@ -112,37 +123,43 @@ def calculate_estimated_price(
     result["total_deductions"] = _round_price(capped_total)
     estimated = base_price - capped_total
 
-    # Floor: if deductions drop the quote below the band's minimum grade price,
-    # the device is worth its scrap value rather than a graded price.
-    min_grade_price = _get_min_grade_price(item_code, warranty_status, device_age_months)
-
-    if estimated < min_grade_price:
-        scrap_price = _get_scrap_price(item_code, warranty_status, device_age_months)
-        if not scrap_price:
-            frappe.throw(
-                _("Deductions took the quote for {0} below the minimum grade price, "
-                  "but no Scrap Price is configured on its Buyback Price Master. "
-                  "Set a Scrap Price before quoting this device.").format(item_code),
-                title=_("Salvage Price Missing"),
-            )
+    # Floor: a device is never worth less than what scrapping it returns.
+    #
+    # This used to compare against the band's LOWEST GRADE price, which made
+    # sense only while every quote started from the Grade A cell. Now that the
+    # grade selects the cell, a Grade D device starts at the D price — so any
+    # deduction at all would have dropped it under that threshold and turned
+    # every damaged D handset into scrap. The salvage value is the real floor.
+    scrap_price = _get_scrap_price(item_code, warranty_status, device_age_months)
+    if scrap_price and estimated < scrap_price:
         estimated = scrap_price
         result["is_scrap"] = True
 
     estimated = _round_price(estimated)
     result["estimated_price"] = estimated
 
-    # Determine grade
+    # Scrap is the one grade the price decides rather than the condition: the
+    # device graded normally, then deductions took it under the band's floor.
+    # Every other grade was settled before pricing started.
     if result.get("is_scrap"):
         result["grade_letter"] = "E"
-    else:
-        result["grade_letter"] = _determine_grade_from_price(
-            item_code=item_code,
-            final_price=estimated,
-            warranty_status=warranty_status,
-            device_age_months=device_age_months,
-        )
 
     return result
+
+
+def _has_grading_answers(responses: list | None) -> bool:
+    """Whether any answer belongs to a Grading question."""
+    codes = [
+        (r.get("question_code") or "").strip()
+        for r in (responses or [])
+        if (r.get("question_code") or "").strip() and r.get("answer_value")
+    ]
+    if not codes:
+        return False
+    return bool(frappe.db.exists(
+        "Buyback Question Bank",
+        {"question_code": ["in", codes], "question_purpose": "Grading", "disabled": 0},
+    ))
 
 
 def _require_band_inputs(warranty_status, device_age_months):
@@ -163,6 +180,70 @@ def _require_band_inputs(warranty_status, device_age_months):
               "they select which price band applies.").format(", ".join(missing)),
             title=_("Cannot Price Device"),
         )
+
+
+# Best to worst. A device takes the worst grade any single answer forces.
+GRADE_ORDER = ["A", "B", "C", "D"]
+
+
+def resolve_grade_from_answers(responses: list | None) -> str:
+    """Derive the condition grade from the grading questions' answers.
+
+    Condition decides grade; grade decides which price cell is used. This is
+    the direction the grading sheet describes, and the reverse of what the
+    engine used to do — it priced everything off the Grade A cell, subtracted
+    whatever it could find, then read a grade back off the resulting number, so
+    the grade an inspector saw was an artefact of arithmetic rather than a
+    judgement about the device.
+
+    Each option on a grading question declares the worst grade it still allows
+    (`forces_grade`). The device lands on the worst grade any answer forces —
+    one cracked screen is enough for D no matter how clean the body is.
+
+    Answers to Deduction and Eligibility questions are ignored here; they never
+    move the grade.
+    """
+    worst = 0  # index into GRADE_ORDER
+
+    for resp in (responses or []):
+        code = (resp.get("question_code") or "").strip()
+        answer = resp.get("answer_value")
+        if not code or not answer:
+            continue
+
+        question = frappe.db.get_value(
+            "Buyback Question Bank",
+            {"question_code": code, "disabled": 0},
+            ["name", "question_purpose"],
+            as_dict=True,
+        )
+        if not question or question.question_purpose != "Grading":
+            continue
+
+        forced = frappe.db.get_value(
+            "Buyback Question Option",
+            {"parent": question.name, "option_value": answer},
+            "forces_grade",
+        )
+        if forced and forced in GRADE_ORDER:
+            worst = max(worst, GRADE_ORDER.index(forced))
+
+    return GRADE_ORDER[worst]
+
+
+def _grade_letter(grade) -> str:
+    """Accept a Grade Master docname, a bare letter, or nothing.
+
+    Callers pass whichever they have — the assessment holds a Link to Grade
+    Master, the POS passes a letter, older code passes None.
+    """
+    value = (grade or "").strip()
+    if not value:
+        return "A"
+    if value.upper() in GRADE_ORDER:
+        return value.upper()
+    letter = frappe.db.get_value("Grade Master", value, "grade_name")
+    return (letter or "A").upper()
 
 
 def _deduction_key(question_name: str, fault_code: str | None) -> str:
@@ -386,17 +467,34 @@ def _get_base_price(item_code, grade, warranty_status=None, device_age_months=No
         )
 
     bucket = _resolve_bucket(warranty_status, device_age_months)
-    price = flt(bpm.get(f"a_grade_{bucket}"))
+    letter = _grade_letter(grade)
 
-    # No silent grade fallback. Substituting the B/C/D cell when the A cell is
-    # blank quoted a lower grade's price while still calling it Grade A, and
-    # nothing surfaced the substitution. An unpriced band is a configuration
+    # The grade selects the cell. This argument used to be accepted and
+    # ignored, so every device was priced off the Grade A column and the
+    # inspector's grade could not move the payout at all.
+    available = _bucket_grade_letters(bucket)
+    if letter.lower() not in available:
+        # The 0–3 month band has no Grade D column, so a nearly-new handset
+        # with a cracked screen has nowhere to land. Fall to the worst grade
+        # the band does price, and say so.
+        frappe.log_error(
+            f"{item_code}: grade {letter} has no column in the {bucket} band; "
+            f"priced at grade {available[-1].upper()} instead.",
+            "Buyback: grade not priced in band",
+        )
+        letter = available[-1].upper()
+
+    price = flt(bpm.get(f"{letter.lower()}_grade_{bucket}"))
+
+    # No silent grade fallback. Substituting a different grade's cell when this
+    # one is blank quoted the wrong grade's price under the right grade's name,
+    # and nothing surfaced the substitution. An unpriced cell is a configuration
     # gap and must be fixed in the master, not papered over here.
     if not price:
         frappe.throw(
-            _("No Grade A price is configured for {0} in the {1} band. "
+            _("No Grade {0} price is configured for {1} in the {2} band. "
               "Set it on the Buyback Price Master before quoting this device.").format(
-                item_code, _BUCKET_LABELS.get(bucket, bucket)
+                letter, item_code, _BUCKET_LABELS.get(bucket, bucket)
             ),
             title=_("Buyback Price Missing"),
         )
@@ -673,49 +771,6 @@ def _apply_pricing_rules(base_price, brand=None, item_group=None,
 def _round_price(price):
     return round(float(price or 0), 2)
 
-def _determine_grade_from_price(item_code, final_price, warranty_status=None, device_age_months=None):
-    """Determine grade by finding which price bracket the final price falls into."""
-    bpm = frappe.db.get_value(
-        "Buyback Price Master",
-        {"item_code": item_code},
-        ["a_grade_iw_0_3", "b_grade_iw_0_3", "c_grade_iw_0_3",
-         "a_grade_iw_0_6", "b_grade_iw_0_6", "c_grade_iw_0_6", "d_grade_iw_0_6",
-         "a_grade_iw_6_11", "b_grade_iw_6_11", "c_grade_iw_6_11", "d_grade_iw_6_11",
-         "a_grade_oow_11", "b_grade_oow_11", "c_grade_oow_11", "d_grade_oow_11"],
-        as_dict=True,
-    )
-
-    if not bpm or not final_price:
-        return "A"
-
-    bucket = _resolve_bucket(warranty_status, device_age_months)
-    grade_letters = _bucket_grade_letters(bucket)
-
-    grade_prices = []
-    for g in grade_letters:
-        p = flt(bpm.get(f"{g}_grade_{bucket}"))
-        if p > 0:
-            grade_prices.append((g.upper(), p))
-
-    if not grade_prices:
-        return "A"
-
-    grade_prices.sort(key=lambda x: x[1], reverse=True)
-    final = flt(final_price)
-
-    if final >= grade_prices[0][1]:
-        return grade_prices[0][0]
-    if final <= grade_prices[-1][1]:
-        return grade_prices[-1][0]
-
-    for i in range(len(grade_prices) - 1):
-        upper_grade, upper_price = grade_prices[i]
-        lower_grade, lower_price = grade_prices[i + 1]
-        if lower_price <= final <= upper_price:
-            midpoint = (upper_price + lower_price) / 2
-            return upper_grade if final >= midpoint else lower_grade
-
-    return grade_prices[-1][0]
 
 def _get_phone_dead_price(item_code, warranty_status=None, device_age_months=None):
     """Return the Phone Dead price — one value, whatever the age or warranty.
@@ -735,35 +790,13 @@ def _get_phone_dead_price(item_code, warranty_status=None, device_age_months=Non
 def _get_scrap_price(item_code, warranty_status=None, device_age_months=None):
     """Return the Scrap price — one value, whatever the age or warranty.
 
-    Scrap is the floor applied when deductions drop the quote below the
-    bucket's minimum grade price. The THRESHOLD stays band-specific (see
-    _get_min_grade_price); only the salvage value itself is flat.
+    Scrap is the hard floor on a quote: a handset is never worth less than
+    what breaking it for parts returns. The warranty/age arguments are
+    accepted and ignored so this keeps a uniform signature with the grade
+    price helpers beside it.
     """
     return flt(
         frappe.db.get_value(
             "Buyback Price Master", {"item_code": item_code}, "scrap_price"
         )
     )
-
-
-def _get_min_grade_price(item_code, warranty_status, device_age_months):
-    """Return the minimum grade price for the bucket.
-    
-    - 0-3 months: C grade (no D)
-    - Other buckets: D grade
-    """
-    bpm = frappe.db.get_value(
-        "Buyback Price Master",
-        {"item_code": item_code},
-        [
-            "c_grade_iw_0_3",
-            "d_grade_iw_0_6", "d_grade_iw_6_11", "d_grade_oow_11",
-        ],
-        as_dict=True,
-    )
-    if not bpm:
-        return 0
-
-    bucket = _resolve_bucket(warranty_status, device_age_months)
-    lowest = _bucket_grade_letters(bucket)[-1]
-    return flt(bpm.get(f"{lowest}_grade_{bucket}"))

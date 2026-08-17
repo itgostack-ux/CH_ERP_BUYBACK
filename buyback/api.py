@@ -2306,6 +2306,33 @@ def _provisional_grade_name() -> str | None:
 # ── Item Question Map Helper ──────────────────────────────────────
 
 
+def _question_names_from_set(item_code: str, diagnosis_type: str) -> list[str] | None:
+    """Ordered questions from the Buyback Question Set for this device.
+
+    Returns None when no set matches, which keeps the caller's existing
+    "no mapping configured" behaviour.
+    """
+    if diagnosis_type == "Automated Test":
+        # Sets hold the single inspector-facing list. Automated tests come
+        # from the mobile diagnostic app and are mapped separately.
+        return None
+
+    from buyback.buyback.doctype.buyback_question_set.buyback_question_set import (
+        resolve_set_for_item,
+    )
+
+    set_name = resolve_set_for_item(item_code)
+    if not set_name:
+        return None
+
+    return frappe.get_all(
+        "Buyback Question Set Item",
+        filters={"parent": set_name, "parenttype": "Buyback Question Set"},
+        pluck="question",
+        order_by="display_order asc, idx asc",
+    ) or None
+
+
 def _get_mapped_question_names(item_code: str, diagnosis_type: str) -> list[str] | None:
     """Return ordered list of Question Bank names mapped to an item.
 
@@ -2344,7 +2371,11 @@ def _get_mapped_question_names(item_code: str, diagnosis_type: str) -> list[str]
             candidates.append(group_map)
 
     if not candidates:
-        return None  # No mapping exists at any level
+        # No per-model or per-subcategory map. Fall back to the question set
+        # the device profile resolves to (Apple / Android / Foldable), so a
+        # model nobody has mapped yet still gets the right questions instead of
+        # every question in the bank.
+        return _question_names_from_set(item_code, diagnosis_type)
 
     # Try each candidate; use the first one that has rows for this type
     for map_name in candidates:
