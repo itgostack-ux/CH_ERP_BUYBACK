@@ -17,6 +17,7 @@ from buyback.buyback.pricing.engine import calculate_estimated_price, _clamp_ded
 
 ITEM_CODE = "_TEST_BUYBACK_PRICING_ITEM"
 BASE_IW_0_3 = 10000.0
+BASE_C_IW_0_3 = 7000.0
 BASE_OOW_11 = 7800.0
 FLOOR_OOW_11 = 4928.0
 SCRAP = 900.0
@@ -49,6 +50,7 @@ def _ensure_price_master(scrap=SCRAP, dead=DEAD):
     doc.item_code = _ensure_item()
     doc.is_active = 1
     doc.a_grade_iw_0_3 = BASE_IW_0_3
+    doc.c_grade_iw_0_3 = BASE_C_IW_0_3
     doc.a_grade_oow_11 = BASE_OOW_11
     doc.d_grade_oow_11 = FLOOR_OOW_11
     doc.scrap_price = scrap
@@ -58,7 +60,7 @@ def _ensure_price_master(scrap=SCRAP, dead=DEAD):
     return doc.name
 
 
-def _ensure_question(code, diagnosis_type, options, fault_code=None):
+def _ensure_question(code, diagnosis_type, options, fault_code=None, purpose=None):
     name = frappe.db.get_value("Buyback Question Bank", {"question_code": code}, "name")
     doc = (frappe.get_doc("Buyback Question Bank", name) if name
            else frappe.new_doc("Buyback Question Bank"))
@@ -66,13 +68,17 @@ def _ensure_question(code, diagnosis_type, options, fault_code=None):
     doc.question_code = code
     doc.fault_code = fault_code
     doc.diagnosis_type = diagnosis_type
+    if purpose:
+        doc.question_purpose = purpose
     doc.question_type = "Single Select"
     doc.disabled = 0
     doc.set("options", [])
-    for value, impact in options:
+    for option in options:
+        value, impact = option[:2]
         doc.append("options", {
             "option_value": value, "option_label": value,
             "price_impact_percent": impact,
+            "forces_grade": option[2] if len(option) > 2 else None,
         })
     doc.save(ignore_permissions=True)
     return doc.name
@@ -97,6 +103,11 @@ class TestPricingIntegrity(FrappeTestCase):
         # A large impact used to blow past the deduction cap.
         _ensure_question("_test_heavy", "Customer Question",
                          [("Yes", -90), ("No", 0)])
+        cls.preview_grade_question = _ensure_question(
+            "_test_preview_grade", "Customer Question",
+            [("Clean", 0, "A"), ("Worn", 0, "C")],
+            purpose="Grading",
+        )
         frappe.db.commit()
 
     def _price(self, **kwargs):
@@ -128,6 +139,24 @@ class TestPricingIntegrity(FrappeTestCase):
             BASE_OOW_11,
         )
 
+    def test_live_preview_normalizes_question_name_to_grading_code(self):
+        """POS preview and assessment save must resolve the same grade."""
+        import json
+        from buyback.api import calculate_live_estimate
+
+        result = calculate_live_estimate(
+            item_code=ITEM_CODE,
+            warranty_status="In Warranty",
+            device_age_months="0-3 Months",
+            responses=json.dumps([{
+                "question": self.preview_grade_question,
+                "answer_value": "Worn",
+            }]),
+            diagnostic_tests="[]",
+        )
+        self.assertEqual(result["grade"], "C")
+        self.assertEqual(flt(result["base_price"]), BASE_C_IW_0_3)
+
     # ── B6 ──────────────────────────────────────────────────────────
     def test_unpriced_band_throws_instead_of_borrowing_a_lower_grade(self):
         """The A cell for IW 7-11 is blank on the test row.
@@ -146,6 +175,16 @@ class TestPricingIntegrity(FrappeTestCase):
         )
         self.assertEqual(len(result["deductions"]), 1, result["deductions"])
         self.assertEqual(flt(result["total_deductions"]), BASE_IW_0_3 * 0.02)
+
+    def test_yes_means_diagnostic_pass_and_no_means_failure(self):
+        yes = self._price(diagnostic_tests=[
+            {"test_code": "_test_speaker_auto", "result": "Yes"},
+        ])
+        no = self._price(diagnostic_tests=[
+            {"test_code": "_test_speaker_auto", "result": "No"},
+        ])
+        self.assertEqual(flt(yes["total_deductions"]), 0)
+        self.assertEqual(flt(no["total_deductions"]), BASE_IW_0_3 * 0.02)
 
     def test_distinct_faults_still_stack(self):
         result = self._price(diagnostic_tests=[

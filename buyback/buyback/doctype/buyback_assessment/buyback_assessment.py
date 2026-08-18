@@ -73,7 +73,14 @@ class BuybackAssessment(Document):
 
             answers = self.all_answers()
             if answers and self.status in ("Submitted", "Inspected", "Quoted"):
-                unanswered = [r for r in answers if not (r.get("answer") or "").strip()]
+                # Buyback Assessment Response stores the selected value in
+                # ``answer_value``. The old check used a nonexistent ``answer``
+                # field, so every completed POS response looked blank and the
+                # dialog misleadingly listed the first five questions.
+                unanswered = [
+                    r for r in answers
+                    if not str(r.get("answer_value") or "").strip()
+                ]
                 if unanswered:
                     missing = ", ".join(
                         (r.get("question_text") or r.get("question_code") or r.get("name") or "")
@@ -446,7 +453,7 @@ class BuybackAssessment(Document):
                 _("Can only submit a Draft assessment."),
                 exc=BuybackStatusError,
             )
-        if not self.all_answers() and not self.diagnostic_tests:
+        if not self.all_answers() and not self.diagnostic_tests and not self.get("is_phone_dead"):
             frappe.throw(
                 _("At least one diagnostic test or customer response is required."),
                 exc=BuybackStatusError,

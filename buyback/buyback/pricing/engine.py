@@ -699,18 +699,34 @@ def _get_diagnostic_deduction(diagnostic_test, base_price, brand_family="Android
                 "price_impact_percent_apple"],
     )
 
-    # Prefer the option explicitly configured for this question. This matters
-    # because Yes can mean either a healthy result ("Camera working?") or a
-    # defect ("Water damage visible?"). A global Yes -> Fail conversion loses
-    # that question-specific meaning.
-    option = next(
-        (
-            opt
-            for opt in all_opts
-            if str(opt.option_value or "").strip().casefold() == result_str
-        ),
-        None,
-    )
+    # POS diagnostics ask whether each function works. Keep this contract
+    # independent of legacy option rows, some of which were seeded with the
+    # inverse "Yes = defect exists" meaning: Yes always passes, No uses the
+    # strongest configured failure rate.
+    if result_str == "yes":
+        return None
+    if result_str == "no":
+        option = max(
+            all_opts,
+            key=lambda opt: abs(_rate_for_family(opt, brand_family)),
+            default=None,
+        )
+        if not option or not _rate_for_family(option, brand_family):
+            return None
+    else:
+        option = None
+
+    # Non-Yes/No integrations may still send the configured Pass/Fail/Partial
+    # value, so resolve those legacy values exactly.
+    if option is None:
+        option = next(
+            (
+                opt
+                for opt in all_opts
+                if str(opt.option_value or "").strip().casefold() == result_str
+            ),
+            None,
+        )
 
     # Compatibility for old diagnostic masters which still use
     # Pass/Fail/Partial. Current Yes/No masters always take the exact path.

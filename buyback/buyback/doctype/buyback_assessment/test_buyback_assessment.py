@@ -100,6 +100,23 @@ class TestBuybackAssessment(FrappeTestCase):
             "validate() must populate estimated_price for a priced item.",
         )
 
+    def test_submitted_response_uses_answer_value(self):
+        """A completed POS response must not be reported as unanswered."""
+        doc = frappe.new_doc("Buyback Assessment")
+        doc.status = "Submitted"
+        doc.mobile_no = "9999999999"
+        doc.warranty_status = "In Warranty"
+        doc.device_age_months = "0-3 Months"
+        doc.append("responses", {
+            "question_text": "Is the screen working?",
+            "answer_value": "Yes",
+            "answer_label": "Yes",
+        })
+
+        doc.run_method("validate")
+
+        self.assertEqual(doc.responses[0].answer_value, "Yes")
+
 
 class TestBuybackQuestionBankCategories(FrappeTestCase):
     """Unit tests for multi-category applicability (added May 2026).

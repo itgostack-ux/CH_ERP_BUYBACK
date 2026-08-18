@@ -22,7 +22,7 @@ import re
 import frappe
 from frappe import _
 from frappe.rate_limiter import rate_limit
-from frappe.utils import flt, now_datetime
+from frappe.utils import cint, flt, now_datetime
 
 from buyback.exceptions import (
     BuybackStatusError,
@@ -2121,7 +2121,8 @@ def _normalize_automated_test_options(options: list[dict]) -> list[dict]:
     """Normalize automated-test options to Yes/No.
 
     Legacy Question Bank rows may still store Pass/Fail/Partial values.
-    Map these to Yes/No for UI while preserving price impact behavior.
+    In the POS diagnostic form the prompt means "is this function working?",
+    so Yes is always Pass and No is the configured failure impact.
     """
     if not options:
         return []
@@ -2136,28 +2137,34 @@ def _normalize_automated_test_options(options: list[dict]) -> list[dict]:
     }
 
     if "yes" in by_value and "no" in by_value:
+        failure_impact = max(
+            (
+                by_value["yes"].get("price_impact_percent") or 0,
+                by_value["no"].get("price_impact_percent") or 0,
+            ),
+            key=lambda value: abs(flt(value)),
+        )
         return [
             {
                 "option_value": "Yes",
                 "option_label": by_value["yes"].get("option_label") or "Yes",
-                "price_impact_percent": by_value["yes"].get("price_impact_percent") or 0,
+                "price_impact_percent": 0,
             },
             {
                 "option_value": "No",
                 "option_label": by_value["no"].get("option_label") or "No",
-                "price_impact_percent": by_value["no"].get("price_impact_percent") or 0,
+                "price_impact_percent": failure_impact,
             },
         ]
 
     # Legacy Pass/Fail/Partial mapping
-    # Yes = defect exists → use Fail (or Partial) impact
-    # No  = no defect    → use Pass impact (usually 0)
+    # Yes = function passes; No = function fails.
     fail_impact = by_value.get("fail", {}).get("price_impact_percent", 0)
     partial_impact = by_value.get("partial", {}).get("price_impact_percent", 0)
     pass_impact = by_value.get("pass", {}).get("price_impact_percent", 0)
 
-    yes_impact = max(fail_impact, partial_impact) if (fail_impact or partial_impact) else 0
-    no_impact = pass_impact
+    yes_impact = pass_impact
+    no_impact = max((fail_impact, partial_impact), key=lambda value: abs(flt(value)))
 
     return [
         {
@@ -2252,6 +2259,34 @@ def calculate_live_estimate(
     input_limit = min(get_int_setting("max_diagnostic_rows", 100), 500)
     if len(diag_data) > input_limit or len(resp_data) > input_limit:
         frappe.throw(_("Estimate inputs may contain at most {0} rows each.").format(input_limit))
+
+    # The POS keys answers by Question Bank document name, while the pricing
+    # engine grades and deducts by stable question_code. Normalize preview
+    # payloads exactly as assessment creation does; otherwise preview can keep
+    # provisional Grade A while save correctly resolves a different grade.
+    refs = {
+        row.get("question") for row in resp_data
+        if row.get("question") and not row.get("question_code")
+    } | {
+        row.get("test") for row in diag_data
+        if row.get("test") and not row.get("test_code")
+    }
+    code_by_name = {}
+    if refs:
+        code_by_name = {
+            row.name: row.question_code
+            for row in frappe.get_all(
+                "Buyback Question Bank",
+                filters={"name": ("in", list(refs)), "disabled": 0},
+                fields=["name", "question_code"],
+            )
+        }
+    for row in resp_data:
+        if not row.get("question_code"):
+            row["question_code"] = code_by_name.get(row.get("question"))
+    for row in diag_data:
+        if not row.get("test_code"):
+            row["test_code"] = code_by_name.get(row.get("test"))
 
     provisional_grade_id = frappe.db.get_value(
         "Grade Master", {"grade_name": "A"}, "name"
@@ -2825,3 +2860,334 @@ def raise_buyback_exception(
         store_warehouse=warehouse,
         customer=o.get("customer"),
     )
+
+
+# ── POS Guided Intake ─────────────────────────────────────────────
+
+
+#: Where an answer lands, keyed by what the question DOES. Mirrors
+#: _buyback_table_for() in buyback_assessment.js — grading answers choose the
+#: grade, deduction answers take a percentage off it, eligibility answers gate
+#: the deal without pricing it.
+_INTAKE_PURPOSE_TABLE = {
+    "Grading": "grading_responses",
+    "Eligibility": "eligibility_responses",
+}
+
+
+@frappe.whitelist()
+def create_assessment_from_intake(
+    mobile_no: str,
+    item_code: str,
+    store: str | None = None,
+    customer: str | None = None,
+    imei_serial: str | None = None,
+    warranty_status: str | None = None,
+    device_age_months: str | None = None,
+    is_phone_dead: int | str = 0,
+    diagnostics: str | None = None,
+    answers: str | None = None,
+    remarks: str | None = None,
+) -> dict:
+    """Create and submit a Buyback Assessment from the POS guided intake wizard.
+
+    The wizard gathers exactly what the desk form does, one section at a time.
+    The payload is NOT trusted: this re-derives the question and test set for
+    the item server-side and keeps an answer only when the question belongs to
+    that set AND the answer names one of that question's configured options. A
+    stale tab or a crafted request therefore cannot introduce a question the
+    catalogue never mapped, or an option carrying an impact nobody priced.
+
+    Grade and price are never taken from the client either —
+    ``BuybackAssessment.before_save`` runs the pricing engine, so the quote
+    returned here is always the server's own.
+
+    Args:
+        mobile_no: Customer mobile; the buyback identity key.
+        item_code: Device being traded in.
+        store: Warehouse the trade-in happens at (scope-checked).
+        customer: Existing Customer, else resolved from ``mobile_no``.
+        imei_serial: Device IMEI.
+        warranty_status / device_age_months: Select the price band. Without both
+            the engine refuses to quote rather than assuming a band.
+        is_phone_dead: Short-circuits grading — a dead phone is salvage-priced,
+            so its questions and tests are not collected.
+        diagnostics: JSON ``[{"test": <Question Bank name>, "result": <value>}]``
+        answers: JSON ``[{"question": <Question Bank name>, "answer": <value>}]``
+        remarks: Free-text note from the executive.
+
+    Returns:
+        dict: name, status, estimated_grade, estimated_price, and the count of
+        answers/diagnostics actually accepted (so the UI can flag silent drops).
+    """
+    require_configured_role(
+        "assessment_operation_roles", action=_("create a Buyback Assessment")
+    )
+    frappe.has_permission("Buyback Assessment", ptype="create", throw=True)
+    frappe.has_permission("Item", ptype="read", throw=True)
+
+    mobile_no = validate_indian_phone(mobile_no, "Mobile No")
+    if not item_code or not frappe.db.exists("Item", item_code):
+        frappe.throw(_("Select a valid device."), title=_("Device Required"))
+
+    dead = cint(is_phone_dead)
+
+    def _as_list(raw, label):
+        if not raw:
+            return []
+        rows = json.loads(raw) if isinstance(raw, str) else raw
+        if not isinstance(rows, list):
+            frappe.throw(_("{0} must be a list.").format(label))
+        if any(not isinstance(r, dict) for r in rows):
+            frappe.throw(_("Every {0} entry must be an object.").format(label))
+        limit = min(get_int_setting("max_diagnostic_rows", 100), 500)
+        if len(rows) > limit:
+            frappe.throw(_("{0} exceeds the configured row limit.").format(label))
+        return rows
+
+    answer_rows = [] if dead else _as_list(answers, _("Answers"))
+    diag_rows = [] if dead else _as_list(diagnostics, _("Diagnostics"))
+
+    # Resolve store + company, then apply the same scope gate every other
+    # buyback write goes through.
+    store_name = None
+    company = None
+    if store:
+        store_doc = frappe.get_doc("Warehouse", store)
+        store_doc.check_permission("read")
+        store_name = store
+        company = store_doc.company
+    if not store_name and not is_privileged_user():
+        frappe.throw(_("Store is required."), frappe.PermissionError)
+    assert_buyback_scope(warehouse=store_name, company=company)
+
+    if not customer:
+        customer = frappe.db.get_value("Customer", {"mobile_no": mobile_no}, "name")
+
+    doc = frappe.new_doc("Buyback Assessment")
+    doc.source = "Store Manual"
+    doc.status = "Draft"
+    doc.mobile_no = mobile_no
+    doc.customer = customer or None
+    doc.store = store_name
+    doc.company = company
+    doc.item = item_code
+    doc.imei_serial = (imei_serial or "").strip() or None
+    doc.warranty_status = warranty_status or None
+    doc.device_age_months = device_age_months or None
+    doc.is_phone_dead = dead
+    doc.remarks = (remarks or "").strip() or None
+
+    accepted_answers = accepted_diagnostics = 0
+
+    if not dead:
+        allowed_q = {q["name"]: q for q in get_customer_questions_for_item(item_code)}
+        for row in answer_rows:
+            q = allowed_q.get(row.get("question"))
+            if not q:
+                continue
+            option = next(
+                (o for o in (q.get("options") or [])
+                 if str(o.get("value")) == str(row.get("answer"))),
+                None,
+            )
+            if not option:
+                continue
+            table = _INTAKE_PURPOSE_TABLE.get(q.get("question_purpose"), "responses")
+            doc.append(table, {
+                "question": q["name"],
+                "question_code": q.get("question_code"),
+                "question_text": q.get("question_text"),
+                "answer_value": option.get("value"),
+                "answer_label": option.get("label") or option.get("value"),
+                "price_impact_percent": option.get("impact") or 0,
+            })
+            accepted_answers += 1
+
+        allowed_t = {t["name"]: t for t in get_diagnostic_tests_for_item(item_code)}
+        for row in diag_rows:
+            t = allowed_t.get(row.get("test"))
+            if not t:
+                continue
+            option = next(
+                (o for o in (t.get("options") or [])
+                 if str(o.get("value")) == str(row.get("result"))),
+                None,
+            )
+            if not option:
+                continue
+            doc.append("diagnostic_tests", {
+                "test": t["name"],
+                "test_code": t.get("test_code"),
+                "test_name": t.get("test_name"),
+                "result": option.get("value"),
+                "depreciation_percent": abs(flt(option.get("impact") or 0)),
+            })
+            accepted_diagnostics += 1
+
+    # A counter executive has completed the entire controlled questionnaire,
+    # so the POS record is operationally ready for inspection. Only customer
+    # self-service channels (Web and In-Store Kiosk) remain Draft for later
+    # review/completion.
+    doc.insert(ignore_permissions=False)
+    doc.submit_assessment()
+
+    return {
+        "name": doc.name,
+        "status": doc.status,
+        "estimated_grade": doc.estimated_grade,
+        "estimated_price": flt(doc.estimated_price),
+        "accepted_answers": accepted_answers,
+        "accepted_diagnostics": accepted_diagnostics,
+        "submitted_answers": len(answer_rows),
+        "submitted_diagnostics": len(diag_rows),
+    }
+
+
+@frappe.whitelist()
+def lookup_imei_for_intake(imei: str) -> dict:
+    """Tell the counter whether this IMEI is a device WE sold, and identify it.
+
+    Two things the executive needs before grading a trade-in:
+
+      * Is it ours? A handset we sold has a Serial No in our books, so the model
+        never has to be typed — and its sale date tells us how old it really is,
+        which is the input the price band is chosen from.
+      * Has it been through buyback before? ``ch_buyback_count`` catches a device
+        being recycled through the counter a second time.
+
+    The sale date comes from the Serial and Batch Bundle rather than Serial No:
+    v15 moved serial movement onto the bundle, so the outward voucher is the
+    only place the real hand-over date lives.
+
+    Returns:
+        dict: origin ("ours" | "external"), plus item/brand/last-sold detail when
+        the serial is ours. Never raises for an unknown IMEI — an external
+        device is a normal, expected answer here.
+    """
+    require_configured_role(
+        "assessment_operation_roles", action=_("look up a device by IMEI")
+    )
+    imei = (imei or "").strip()
+    if not imei:
+        return {"origin": "unknown"}
+
+    sn = frappe.db.get_value(
+        "Serial No", imei,
+        ["name", "item_code", "item_name", "brand", "warranty_expiry_date",
+         "ch_buyback_status", "ch_buyback_count"],
+        as_dict=True,
+    )
+    if not sn:
+        return {"origin": "external", "imei": imei}
+
+    out = {
+        "origin": "ours",
+        "imei": imei,
+        "item_code": sn.item_code,
+        "item_name": sn.item_name,
+        "brand": sn.brand,
+        "warranty_expiry_date": sn.warranty_expiry_date,
+        "buyback_status": sn.ch_buyback_status,
+        "buyback_count": sn.ch_buyback_count or 0,
+        "last_sold_on": None,
+        "last_sold_voucher": None,
+        "last_sold_customer": None,
+    }
+
+    sale = frappe.db.sql(
+        """
+        SELECT sbb.voucher_type, sbb.voucher_no, sbb.posting_datetime
+          FROM `tabSerial and Batch Entry` sbe
+          JOIN `tabSerial and Batch Bundle` sbb ON sbb.name = sbe.parent
+         WHERE sbe.serial_no = %s
+           AND sbb.docstatus = 1
+           AND sbb.type_of_transaction = 'Outward'
+           AND sbb.voucher_type IN ('Sales Invoice', 'POS Invoice', 'Delivery Note')
+         ORDER BY sbb.posting_datetime DESC
+         LIMIT 1
+        """,
+        imei,
+        as_dict=True,
+    )
+    if sale:
+        row = sale[0]
+        out["last_sold_on"] = row.posting_datetime
+        out["last_sold_voucher"] = row.voucher_no
+        if frappe.db.exists(row.voucher_type, row.voucher_no):
+            out["last_sold_customer"] = frappe.db.get_value(
+                row.voucher_type, row.voucher_no, "customer"
+            )
+    return out
+
+
+@frappe.whitelist()
+def check_device_quotable(
+    item_code: str,
+    warranty_status: str | None = None,
+    device_age_months: str | None = None,
+) -> dict:
+    """Can this device be quoted at all, before anyone answers 60+ questions?
+
+    The pricing engine hard-throws when an item has no Buyback Price Master
+    (engine._get_base_price), and it only reaches that point on save — after the
+    whole assessment has been filled in. Serialised non-phones make this easy to
+    trip: scanning a speaker's serial identifies a real item we sold, which is
+    simply not a trade-in device.
+
+    Kept deliberately cheap so the intake wizard can call it the moment a device
+    is picked.
+    """
+    require_configured_role(
+        "assessment_operation_roles", action=_("check device buyback pricing")
+    )
+    if not item_code:
+        return {"quotable": False, "reason": _("No device selected.")}
+
+    bpm = frappe.db.get_value(
+        "Buyback Price Master", {"item_code": item_code},
+        ["name", "current_market_price"], as_dict=True,
+    )
+    if not bpm:
+        return {
+            "quotable": False,
+            "reason": _("No buyback price is configured for this device, so it "
+                        "cannot be quoted. Ask the category team to add a "
+                        "Buyback Price Master."),
+        }
+    result = {
+        "quotable": True,
+        "price_master": bpm.name,
+        "market_price": flt(bpm.current_market_price),
+    }
+    if warranty_status and device_age_months:
+        from buyback.buyback.pricing.engine import (
+            _BUCKET_LABELS,
+            _bucket_grade_letters,
+            _resolve_bucket,
+        )
+
+        bucket = _resolve_bucket(warranty_status, device_age_months)
+        letters = _bucket_grade_letters(bucket)
+        fields = [f"{letter}_grade_{bucket}" for letter in letters]
+        prices = frappe.db.get_value(
+            "Buyback Price Master", bpm.name, fields, as_dict=True,
+        ) or {}
+        missing = [
+            letter.upper() for letter, fieldname in zip(letters, fields)
+            if not flt(prices.get(fieldname))
+        ]
+        if missing:
+            band = _BUCKET_LABELS.get(bucket, bucket)
+            return {
+                **result,
+                "quotable": False,
+                "missing_grades": missing,
+                "band": band,
+                "reason": _(
+                    "Grade {0} price is missing for {1} in the {2} band. "
+                    "Ask the category team to complete Buyback Price Master {3} "
+                    "before starting the assessment."
+                ).format(", ".join(missing), item_code, band, bpm.name),
+            }
+    return result
