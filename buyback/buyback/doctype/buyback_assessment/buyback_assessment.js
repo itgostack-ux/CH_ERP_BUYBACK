@@ -569,6 +569,23 @@ function _buyback_render_diagnostic_radios(frm) {
 			.buyback-diagnostic-grid .grid-row [data-fieldname="result"] .field-area { display: none !important; }
 			.buyback-diagnostic-grid .grid-row [data-fieldname="result"] .static-area { display: block !important; }
 			.buyback-diagnostic-grid .grid-row [data-fieldname="result"] .static-area.ellipsis { overflow: visible; text-overflow: clip; }
+
+			/* Radio groups wrap onto several lines, but Frappe pins every grid
+			   cell to a fixed 43px (.grid-static-col in grid.scss), so the
+			   second line of options was cut off mid-glyph. Let the cell grow
+			   with its content, keeping 43px as the floor so single-line rows
+			   look exactly as before. max-height must go too — it is 200px. */
+			.buyback-diagnostic-grid .grid-row .grid-static-col,
+			.buyback-diagnostic-grid .grid-row .row-index,
+			.buyback-diagnostic-grid .grid-row .row-check {
+				height: auto !important;
+				max-height: none !important;
+				min-height: 43px;
+			}
+			.buyback-diagnostic-grid .grid-row [data-fieldname="result"] .static-area {
+				white-space: normal !important;
+				padding: 6px 0;
+			}
 		`;
 		document.head.appendChild(style);
 	}
@@ -579,17 +596,26 @@ function _buyback_render_diagnostic_radios(frm) {
 	// .formatter there silently did nothing and the cell rendered empty.
 	// update_docfield_property writes to every row's `docfields` plus the
 	// parent's — which is exactly what GridRow.refresh_field() looks up.
-	// Set once per grid: update_docfield_property fires debounced_refresh, and
-	// this function runs on every form refresh. It also throws if any row is
-	// missing the field, which must never break the rest of the form.
-	if (!grid._buyback_radio_formatter) {
+	// Keyed by DOCNAME, not a boolean. One Grid object serves every document of
+	// this doctype — formview.js reuses the cached frm and only calls
+	// frm.refresh(name) — but Grid.setup_fields() re-reads
+	// frappe.meta.get_docfields(doctype, frm.docname), which is a per-parent-
+	// docname COPY of the docfields. A second new assessment therefore gets a
+	// fresh copy carrying no formatter, and a once-only flag meant it was never
+	// re-attached: the Result column rendered blank AND unclickable, because the
+	// stylesheet below hides the Select the formatter was replacing.
+	// The copy is carried over on save (form.js rename_notify), so re-running
+	// after a rename is cheap and idempotent.
+	// It also throws if any row is missing the field, which must never break the
+	// rest of the form.
+	if (grid._buyback_radio_formatter_for !== frm.docname) {
 		try {
 			grid.update_docfield_property(
 				"result",
 				"formatter",
 				(value, df, _options, doc) => _buyback_diagnostic_radio_html(doc, value, frm, df)
 			);
-			grid._buyback_radio_formatter = true;
+			grid._buyback_radio_formatter_for = frm.docname;
 		} catch (e) {
 			console.warn("Buyback: could not attach diagnostic radio formatter", e);
 		}
@@ -732,19 +758,37 @@ function _buyback_render_radios_for(frm, table) {
 			.buyback-answer-grid .grid-row [data-fieldname="answer_value"] .field-area { display: none !important; }
 			.buyback-answer-grid .grid-row [data-fieldname="answer_value"] .static-area { display: block !important; }
 			.buyback-answer-grid .grid-row [data-fieldname="answer_value"] .static-area.ellipsis { overflow: visible; text-overflow: clip; }
+
+			/* Radio groups wrap onto several lines, but Frappe pins every grid
+			   cell to a fixed 43px (.grid-static-col in grid.scss), so the
+			   second line of options was cut off mid-glyph. Let the cell grow
+			   with its content, keeping 43px as the floor so single-line rows
+			   look exactly as before. max-height must go too — it is 200px. */
+			.buyback-answer-grid .grid-row .grid-static-col,
+			.buyback-answer-grid .grid-row .row-index,
+			.buyback-answer-grid .grid-row .row-check {
+				height: auto !important;
+				max-height: none !important;
+				min-height: 43px;
+			}
+			.buyback-answer-grid .grid-row [data-fieldname="answer_value"] .static-area {
+				white-space: normal !important;
+				padding: 6px 0;
+			}
 		`;
 		document.head.appendChild(style);
 	}
 	grid.wrapper.addClass("buyback-answer-grid");
 
-	if (!grid._buyback_radio_formatter) {
+	// Per-docname, for the reason spelled out on _buyback_render_diagnostic_radios.
+	if (grid._buyback_radio_formatter_for !== frm.docname) {
 		try {
 			grid.update_docfield_property(
 				"answer_value",
 				"formatter",
 				(value, df, _options, doc) => _buyback_answer_radio_html(doc, value, frm, df)
 			);
-			grid._buyback_radio_formatter = true;
+			grid._buyback_radio_formatter_for = frm.docname;
 		} catch (e) {
 			console.warn("Buyback: could not attach answer radio formatter", e);
 		}

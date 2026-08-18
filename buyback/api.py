@@ -2397,8 +2397,13 @@ def _get_mapped_question_names(item_code: str, diagnosis_type: str) -> list[str]
         if rows:
             return [r.question for r in rows]
 
-    # Mappings exist but none have rows for this type
-    return []
+    # A map existed, but none of the candidates carried rows for THIS type.
+    # The lookups are independent per type (see the docstring): the 5k+
+    # auto-generated model maps hold customer questions only, and treating that
+    # as "mapped to no automated tests" silently emptied the diagnostics grid on
+    # every device. No rows for a type means the type is unmapped, so hand back
+    # None and let the caller fall back to the full enabled set.
+    return None
 
 
 # ── Diagnostic Test Loader ────────────────────────────────────────

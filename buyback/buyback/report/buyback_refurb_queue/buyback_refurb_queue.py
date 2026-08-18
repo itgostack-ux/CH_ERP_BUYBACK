@@ -12,6 +12,7 @@ from __future__ import annotations
 from typing import Any
 
 import frappe
+from ch_erp15.ch_erp15.report_scope import scope_where_clause
 from frappe import _
 from frappe.utils import cint
 
@@ -125,6 +126,11 @@ def _rows(filters: dict[str, Any]) -> list[dict]:
             "DATEDIFF(CURDATE(), bo.modified) >= %(min_age)s"
         )
         values["min_age"] = min_age
+
+    # Row-level scope: a user only sees refurb rows for stores in their scope.
+    scope = scope_where_clause(warehouse_field="bo.store")
+    if scope:
+        conditions.append(scope)
 
     where = " AND ".join(conditions)
 

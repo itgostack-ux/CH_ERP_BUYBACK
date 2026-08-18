@@ -2120,8 +2120,10 @@ class BuybackOrder(Document):
         # Falls back to the store base warehouse if the bin doesn't exist yet.
         target_warehouse = resolve_store_bin_warehouse(self.store, self.company, warehouse_bin_type) if self.store else None
         if not target_warehouse:
-            target_warehouse = frappe.db.get_value(
-                "Company", self.company or settings.default_company, "default_warehouse"
+            # Company carries no default_warehouse in ERPNext; the site-wide
+            # stock default lives on Stock Settings.
+            target_warehouse = frappe.db.get_single_value(
+                "Stock Settings", "default_warehouse"
             )
         if not target_warehouse:
             frappe.throw(

@@ -13,6 +13,7 @@
   "column_break_01",
   "description",
   "display_order",
+  "price_factor",
   "is_salvage",
   "disabled"
  ],
@@ -60,6 +61,14 @@
    "fieldtype": "Int",
    "label": "Display Order",
    "in_list_view": 1
+  },
+  {
+   "fieldname": "price_factor",
+   "fieldtype": "Float",
+   "label": "Resale Price Factor",
+   "default": "1",
+   "precision": "3",
+   "description": "Multiplier applied to the item's POS selling price when suggesting a resale price for this grade. 1 = no adjustment."
   },
   {
    "default": "0",
