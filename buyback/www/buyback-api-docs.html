@@ -1,0 +1,26 @@
+{% extends "templates/web.html" %}
+
+{% block page_content %}
+<link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css">
+<div id="swagger-ui"></div>
+<script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+<script>
+  fetch("/api/method/buyback.swagger_api.get_buyback_openapi")
+    .then(function (response) {
+      if (!response.ok) throw new Error("Unable to load Buyback OpenAPI specification");
+      return response.json();
+    })
+    .then(function (payload) {
+      window.ui = SwaggerUIBundle({
+        spec: payload.message,
+        dom_id: "#swagger-ui",
+        deepLinking: true,
+        persistAuthorization: true,
+        displayRequestDuration: true,
+      });
+    })
+    .catch(function (error) {
+      document.querySelector("#swagger-ui").textContent = error.message;
+    });
+</script>
+{% endblock %}
