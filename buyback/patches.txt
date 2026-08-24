@@ -23,3 +23,4 @@ buyback.patches.v0_0_20_consolidate_salvage_prices
 buyback.patches.v0_0_21_group_duplicate_question_faults
 buyback.patches.v0_0_21_correct_double_counted_deductions
 buyback.patches.v0_0_21_report_missing_salvage_prices
+buyback.patches.backfill_assessment_kyc_to_order

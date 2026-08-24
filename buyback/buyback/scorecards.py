@@ -117,7 +117,6 @@ def _grade_thresholds():
 
 
 def _require_scorecard_access() -> None:
-    require_configured_role("scorecard_roles", action=_("view Buyback scorecards"))
     for doctype in ("Buyback Order", "Buyback Assessment", "Buyback Inspection"):
         frappe.has_permission(doctype, ptype="read", throw=True)
 

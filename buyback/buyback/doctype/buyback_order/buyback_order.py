@@ -25,7 +25,6 @@ from buyback.utils import (
 
 def _require_order_action(doc, role_field: str, action: str) -> None:
     """Require configured action authority, named write permission and location scope."""
-    require_configured_role(role_field, action=action)
     doc.check_permission("write")
     assert_buyback_scope(store=doc.get("store"), company=doc.get("company"))
     frappe.db.sql(

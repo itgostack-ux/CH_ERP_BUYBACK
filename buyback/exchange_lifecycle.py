@@ -47,9 +47,6 @@ def ensure_exchange_order_from_assessment(
     if not assessment_name:
         frappe.throw(_("assessment_name is required"))
 
-    require_configured_role(
-        "exchange_creation_roles", action=_("create a Buyback Exchange Order")
-    )
 
     if not frappe.db.exists("Buyback Assessment", assessment_name):
         frappe.throw(

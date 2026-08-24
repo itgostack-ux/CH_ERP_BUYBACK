@@ -51,7 +51,6 @@ def _build_params(from_date, to_date, col="creation", alias="", scope_prefix="da
 
 def _check_dashboard_access():
     """Ensure caller has at least read access to Buyback Order."""
-    require_configured_role("dashboard_roles", action=_("view Buyback dashboards"))
     for doctype in (
         "Buyback Order", "Buyback Assessment", "Buyback Inspection",
         "Buyback SLA Log", "Buyback Audit Log",

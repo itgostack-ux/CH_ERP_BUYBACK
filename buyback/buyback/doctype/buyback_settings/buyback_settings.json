@@ -273,8 +273,10 @@
   {
    "default": "Buyback Agent\nBuyback Store Manager\nBuyback Manager\nBuyback Auditor\nBuyback Admin",
    "fieldname": "app_access_roles",
-   "fieldtype": "Small Text",
-   "label": "App Access Roles"
+   "fieldtype": "Table MultiSelect",
+   "label": "App Access Roles",
+   "options": "CH Role Link",
+   "description": "Pick roles from the list."
   },
   {
    "default": "50000",
@@ -286,57 +288,74 @@
   {
    "default": "Buyback Manager\nBuyback Admin\nSystem Manager",
    "fieldname": "manager_approval_roles",
-   "fieldtype": "Small Text",
-   "label": "Manager Approval Roles"
+   "fieldtype": "Table MultiSelect",
+   "label": "Manager Approval Roles",
+   "options": "CH Role Link",
+   "description": "Pick roles from the list."
   },
   {
    "default": "Buyback Agent\nBuyback Store Manager\nBuyback Manager\nBuyback Admin",
    "fieldname": "order_operation_roles",
    "fieldtype": "Small Text",
-   "label": "Order Operation Roles"
+   "label": "Order Operation Roles",
+   "hidden": 1,
+   "description": "Retired. This gate is now enforced by Role Permission Manager (document permissions)."
   },
   {
    "default": "Buyback Store Manager\nBuyback Manager\nBuyback Admin",
    "fieldname": "payment_operation_roles",
    "fieldtype": "Small Text",
-   "label": "Payment Operation Roles"
+   "label": "Payment Operation Roles",
+   "hidden": 1,
+   "description": "Retired. This gate is now enforced by Role Permission Manager (document permissions)."
   },
   {
    "default": "Buyback Agent\nBuyback Store Manager\nBuyback Manager\nBuyback Admin",
-   "description": "Roles allowed to create exchange orders from a named, in-scope assessment. Administrator and System Manager always retain access.",
+   "description": "Retired. This gate is now enforced by Role Permission Manager (document permissions).",
    "fieldname": "exchange_creation_roles",
    "fieldtype": "Small Text",
-   "label": "Exchange Order Creation Roles"
+   "label": "Exchange Order Creation Roles",
+   "hidden": 1
   },
   {
    "default": "Buyback Store Manager\nBuyback Manager\nBuyback Admin",
    "fieldname": "otp_bypass_roles",
    "fieldtype": "Small Text",
-   "label": "In-Store OTP Bypass Roles"
+   "label": "In-Store OTP Bypass Roles",
+   "hidden": 1,
+   "description": "Retired. This gate is now enforced by Role Permission Manager (document permissions)."
   },
   {
    "default": "Buyback Agent\nBuyback Store Manager\nBuyback Manager\nBuyback Admin",
    "fieldname": "imei_validation_roles",
    "fieldtype": "Small Text",
-   "label": "IMEI Validation Roles"
+   "label": "IMEI Validation Roles",
+   "hidden": 1,
+   "description": "Retired. This gate is now enforced by Role Permission Manager (document permissions)."
   },
   {
    "default": "Buyback Store Manager\nBuyback Manager\nBuyback Admin",
    "fieldname": "pickup_request_roles",
    "fieldtype": "Small Text",
-   "label": "Pickup Request Roles"
+   "label": "Pickup Request Roles",
+   "hidden": 1,
+   "description": "Retired. This gate is now enforced by Role Permission Manager (document permissions)."
   },
   {
    "default": "Buyback Agent\nBuyback Store Manager\nBuyback Manager\nBuyback Admin",
    "fieldname": "assessment_operation_roles",
    "fieldtype": "Small Text",
-   "label": "Assessment Operation Roles"
+   "label": "Assessment Operation Roles",
+   "hidden": 1,
+   "description": "Retired. This gate is now enforced by Role Permission Manager (document permissions)."
   },
   {
    "default": "Buyback Agent\nBuyback Store Manager\nBuyback Manager\nBuyback Admin",
    "fieldname": "inspection_operation_roles",
    "fieldtype": "Small Text",
-   "label": "Inspection Operation Roles"
+   "label": "Inspection Operation Roles",
+   "hidden": 1,
+   "description": "Retired. This gate is now enforced by Role Permission Manager (document permissions)."
   },
   {
    "default": "100",
@@ -365,15 +384,18 @@
   {
    "default": "System Manager",
    "fieldname": "portal_preview_roles",
-   "fieldtype": "Small Text",
-   "label": "Portal Preview Roles"
+   "fieldtype": "Table MultiSelect",
+   "label": "Portal Preview Roles",
+   "options": "CH Role Link",
+   "description": "Pick roles from the list."
   },
   {
    "default": "Buyback Manager\nBuyback Auditor\nBuyback Admin",
-   "description": "Roles allowed to open Buyback dashboards. Administrator and System Manager always retain access.",
+   "description": "Retired. This gate is now enforced by Role Permission Manager (document permissions).",
    "fieldname": "dashboard_roles",
    "fieldtype": "Small Text",
-   "label": "Dashboard Roles"
+   "label": "Dashboard Roles",
+   "hidden": 1
   },
   {
    "default": "3",
@@ -420,10 +442,11 @@
   },
   {
    "default": "Buyback Manager\nBuyback Auditor\nBuyback Admin",
-   "description": "Roles allowed to view store, inspector and executive scorecards.",
+   "description": "Retired. This gate is now enforced by Role Permission Manager (document permissions).",
    "fieldname": "scorecard_roles",
    "fieldtype": "Small Text",
-   "label": "Scorecard Roles"
+   "label": "Scorecard Roles",
+   "hidden": 1
   },
   {
    "default": "366",
@@ -467,17 +490,19 @@
   },
   {
    "default": "Buyback Agent\nBuyback Store Manager\nBuyback Manager\nBuyback Auditor\nBuyback Admin",
-   "description": "Roles allowed to search consolidated IMEI history, subject to their assigned location scope.",
+   "description": "Retired. This gate is now enforced by Role Permission Manager (document permissions).",
    "fieldname": "imei_history_roles",
    "fieldtype": "Small Text",
-   "label": "IMEI History Roles"
+   "label": "IMEI History Roles",
+   "hidden": 1
   },
   {
    "default": "Buyback Agent\nBuyback Store Manager\nBuyback Manager\nBuyback Auditor\nBuyback Admin",
-   "description": "Roles allowed to look up buyback records by phone, subject to assigned location scope.",
+   "description": "Retired. This gate is now enforced by Role Permission Manager (document permissions).",
    "fieldname": "customer_lookup_roles",
    "fieldtype": "Small Text",
-   "label": "Customer Lookup Roles"
+   "label": "Customer Lookup Roles",
+   "hidden": 1
   },
   {
    "default": "50",
@@ -488,24 +513,27 @@
   },
   {
    "default": "Buyback Store Manager\nBuyback Manager\nBuyback Admin",
-   "description": "Roles allowed to create Refurbishment Orders from submitted customer returns.",
+   "description": "Retired. This gate is now enforced by Role Permission Manager (document permissions).",
    "fieldname": "refurbishment_creation_roles",
    "fieldtype": "Small Text",
-   "label": "Refurbishment Creation Roles"
+   "label": "Refurbishment Creation Roles",
+   "hidden": 1
   },
   {
    "default": "Buyback Store Manager\nBuyback Manager\nBuyback Admin",
-   "description": "Roles allowed to advance non-financial Refurbishment Order states.",
+   "description": "Retired. This gate is now enforced by Role Permission Manager (document permissions).",
    "fieldname": "refurbishment_operation_roles",
    "fieldtype": "Small Text",
-   "label": "Refurbishment Operation Roles"
+   "label": "Refurbishment Operation Roles",
+   "hidden": 1
   },
   {
    "default": "Buyback Manager\nBuyback Admin",
-   "description": "Roles allowed to materialize a graded device into resale stock.",
+   "description": "Retired. This gate is now enforced by Role Permission Manager (document permissions).",
    "fieldname": "refurbishment_restock_roles",
    "fieldtype": "Small Text",
-   "label": "Refurbishment Restock Roles"
+   "label": "Refurbishment Restock Roles",
+   "hidden": 1
   },
   {
    "default": "100",
@@ -596,24 +624,27 @@
   },
   {
    "default": "Buyback Store Manager\nBuyback Manager\nBuyback Admin",
-   "description": "Roles notified for SLA breaches, filtered to the affected store.",
+   "description": "Retired. This gate is now enforced by Role Permission Manager (document permissions).",
    "fieldname": "sla_alert_roles",
    "fieldtype": "Small Text",
-   "label": "SLA Alert Roles"
+   "label": "SLA Alert Roles",
+   "hidden": 1
   },
   {
    "default": "Buyback Manager\nBuyback Admin",
-   "description": "Roles notified for high-value and manager-approval events, filtered to the affected store.",
+   "description": "Retired. This gate is now enforced by Role Permission Manager (document permissions).",
    "fieldname": "approval_alert_roles",
    "fieldtype": "Small Text",
-   "label": "Approval Alert Roles"
+   "label": "Approval Alert Roles",
+   "hidden": 1
   },
   {
    "default": "Buyback Auditor\nBuyback Admin",
-   "description": "Roles notified for fraud indicators such as duplicate IMEIs.",
+   "description": "Retired. This gate is now enforced by Role Permission Manager (document permissions).",
    "fieldname": "fraud_alert_roles",
    "fieldtype": "Small Text",
-   "label": "Fraud Alert Roles"
+   "label": "Fraud Alert Roles",
+   "hidden": 1
   },
   {
    "default": "15",
@@ -663,17 +694,19 @@
   },
   {
    "default": "Buyback Manager\nBuyback Admin",
-   "description": "Roles notified when a store reaches its configured daily cash threshold.",
+   "description": "Retired. This gate is now enforced by Role Permission Manager (document permissions).",
    "fieldname": "cash_alert_roles",
    "fieldtype": "Small Text",
-   "label": "Cash Alert Roles"
+   "label": "Cash Alert Roles",
+   "hidden": 1
   },
   {
    "default": "Buyback Store Manager\nBuyback Manager",
-   "description": "Roles notified for conversion and inspection-backlog alerts, filtered to the affected store.",
+   "description": "Retired. This gate is now enforced by Role Permission Manager (document permissions).",
    "fieldname": "performance_alert_roles",
    "fieldtype": "Small Text",
-   "label": "Performance Alert Roles"
+   "label": "Performance Alert Roles",
+   "hidden": 1
   },
   {
    "fieldname": "accounting_section",
@@ -731,9 +764,9 @@
    "default": "10",
    "fieldname": "loyalty_points_per_100",
    "fieldtype": "Int",
-   "label": "Points per ₹100",
+   "label": "Points per \u20b9100",
    "depends_on": "enable_loyalty_points",
-   "description": "Number of loyalty points awarded per ₹100 of buyback value"
+   "description": "Number of loyalty points awarded per \u20b9100 of buyback value"
   },
   {
    "default": "365",

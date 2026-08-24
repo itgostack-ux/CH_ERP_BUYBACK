@@ -38,9 +38,6 @@ def _suggested_price(item_code: str, grade: str | None) -> float:
 
 class RefurbishmentOrder(Document):
 	def before_insert(self):
-		require_configured_role(
-			"refurbishment_creation_roles", action=_("create Refurbishment Orders")
-		)
 		self.status = "Received"
 		self.resulting_disposition = None
 		self.resulting_stock_entry = None
@@ -176,9 +173,6 @@ class RefurbishmentOrder(Document):
 
 	@frappe.whitelist(methods=["POST"])
 	def advance_status(self, next_status: str):
-		require_configured_role(
-			"refurbishment_operation_roles", action=_("advance Refurbishment Orders")
-		)
 		self.check_permission("write")
 		frappe.db.get_value(self.doctype, self.name, "name", for_update=True)
 		self.reload()
@@ -201,9 +195,6 @@ class RefurbishmentOrder(Document):
 
 	@frappe.whitelist(methods=["POST"])
 	def restock(self, target_warehouse: str | None = None):
-		require_configured_role(
-			"refurbishment_restock_roles", action=_("restock refurbished devices")
-		)
 		self.check_permission("write")
 		frappe.db.get_value(self.doctype, self.name, "name", for_update=True)
 		self.reload()
@@ -308,9 +299,6 @@ class RefurbishmentOrder(Document):
 def create_from_return(return_invoice: str, original_invoice: str | None = None, items: list | None = None,
 		customer: str | None = None, company: str | None = None, physical_condition: str | None = None,
 		return_reason: str | None = None, return_remarks: str | None = None) -> dict:
-	require_configured_role(
-		"refurbishment_creation_roles", action=_("create Refurbishment Orders")
-	)
 	frappe.has_permission("Refurbishment Order", ptype="create", throw=True)
 	if not return_invoice:
 		frappe.throw(_("A submitted return invoice is required."))

@@ -410,7 +410,6 @@ def _create_sla_log(doctype, name, sla_type, actual_minutes, breached=False,
 @frappe.whitelist()
 def get_order_sla_summary(order_name) -> dict:
     """Get SLA status for all stages of a Buyback Order."""
-    require_configured_role("dashboard_roles", action=_("view order SLA details"))
     doc = frappe.get_doc("Buyback Order", order_name)
     _require_sla_read("Buyback Order", doc)
     assert_buyback_scope(store=doc.store, company=doc.company)
@@ -471,7 +470,6 @@ def get_order_sla_summary(order_name) -> dict:
 @frappe.whitelist()
 def get_branch_sla_summary(store, date=None) -> dict:
     """Get SLA summary for a branch on a given date."""
-    require_configured_role("dashboard_roles", action=_("view branch SLA details"))
     _require_sla_read("Buyback Order")
     _require_sla_read("CH Store")
     store_row = frappe.db.get_value(

@@ -9,7 +9,6 @@ from ch_erp15.ch_erp15.scope import intersect_filters
 
 
 def _check_hub_access() -> None:
-    require_configured_role("dashboard_roles", action=_("view the Buyback Hub"))
     for doctype in ("Buyback Order", "Buyback Assessment", "Buyback Inspection"):
         frappe.has_permission(doctype, ptype="read", throw=True)
 

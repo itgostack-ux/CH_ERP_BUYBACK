@@ -25,9 +25,6 @@ from buyback.utils import assert_buyback_scope, is_privileged_user, require_conf
 
 class CHDataWipeCertificate(Document):
     def before_insert(self):
-        require_configured_role(
-            "inspection_operation_roles", action=_("record a Buyback data wipe")
-        )
         order = frappe.get_doc("Buyback Order", self.buyback_order)
         if not is_privileged_user():
             order.check_permission("read")

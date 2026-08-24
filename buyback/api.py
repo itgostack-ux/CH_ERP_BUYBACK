@@ -76,7 +76,6 @@ def _has_pos_bypass() -> bool:
     return bool(roles & {"POS User", "POS Manager", "CH Store Executive", "CH Store Manager"})
 
 def _require_app_read(action: str, *doctypes: str) -> None:
-    require_configured_role("app_access_roles", action=action)
     for doctype in doctypes:
         frappe.has_permission(doctype, ptype="read", throw=True)
 
@@ -319,7 +318,6 @@ def create_inspection_from_assessment(
 @frappe.whitelist()
 def get_assessment(assessment_name: str) -> dict:
     """Get assessment details including responses and linked inspection."""
-    require_configured_role("app_access_roles", action=_("view Buyback assessments"))
     doc = frappe.get_doc("Buyback Assessment", assessment_name)
     doc.check_permission("read")
     assert_buyback_scope(store=doc.store, company=doc.company)
@@ -487,7 +485,6 @@ def create_order(
     matters only on the fallback path below, where no assessment or inspection
     exists to take an authoritative price from.
     """
-    require_configured_role("order_operation_roles", action=_("create Buyback orders"))
     frappe.has_permission("Buyback Order", ptype="create", throw=True)
     mobile_no = validate_indian_phone(mobile_no, "Mobile No")
 
@@ -1288,7 +1285,6 @@ def create_exchange(
         DeprecationWarning,
         stacklevel=2,
     )
-    require_configured_role("exchange_creation_roles", action=_("create Buyback exchanges"))
     frappe.has_permission("Buyback Exchange Order", ptype="create", throw=True)
     mobile_no = validate_indian_phone(mobile_no, "Mobile No")
     source_order = frappe.get_doc("Buyback Order", buyback_order)
@@ -1411,9 +1407,6 @@ def submit_mobile_diagnostic(
     Returns:
         dict with inspection name, inspection_id, status
     """
-    require_configured_role(
-        "assessment_operation_roles", action=_("submit a mobile Buyback diagnostic")
-    )
     frappe.has_permission("Buyback Inspection", ptype="create", throw=True)
     frappe.has_permission("Item", ptype="read", throw=True)
     mobile_no = validate_indian_phone(mobile_no, "Mobile No")
@@ -1534,7 +1527,6 @@ def get_inspections_by_phone(mobile_no: str) -> list[dict]:
     Used by store agents to find pending mobile diagnostics that need
     physical inspection.
     """
-    require_configured_role("customer_lookup_roles", action=_("find customer inspections"))
     for doctype in ("Buyback Inspection", "Customer", "Item"):
         if not frappe.has_permission(doctype, ptype="read"):
             frappe.throw(
@@ -1867,7 +1859,6 @@ def search_items(
 @frappe.whitelist()
 def get_assessments_by_phone(mobile_no: str) -> list[dict]:
     """Look up Buyback Assessments within the caller's assigned stores."""
-    require_configured_role("customer_lookup_roles", action=_("look up buyback customers"))
     frappe.has_permission("Buyback Assessment", "read", throw=True)
     mobile_no = validate_indian_phone(mobile_no, "Mobile No")
     return _query_assessments_by_phone(mobile_no, enforce_user_scope=True)
@@ -1899,7 +1890,6 @@ def get_orders_by_phone(mobile_no: str) -> list[dict]:
 
     Used by store agents to find existing orders for a customer.
     """
-    require_configured_role("customer_lookup_roles", action=_("look up buyback customers"))
     frappe.has_permission("Buyback Order", "read", throw=True)
     mobile_no = validate_indian_phone(mobile_no, "Mobile No")
     return _query_orders_by_phone(mobile_no, enforce_user_scope=True)
@@ -1949,7 +1939,7 @@ def get_imei_history(imei: str) -> dict:
     and returns a unified timeline view. Reuses ERPNext's Serial No
     DocType — no separate IMEI History DocType needed.
     """
-    require_configured_role("imei_history_roles", action=_("view IMEI history"))
+    frappe.has_permission("Serial No", ptype="read", throw=True)
     from buyback.serial_no_utils import get_imei_history as _get_history
     return _get_history(imei)
 
@@ -2192,7 +2182,6 @@ def get_reference_prices(item_code: str) -> dict:
     if not item_code:
         return {"market_price": 0, "vendor_price": 0}
 
-    require_configured_role("assessment_operation_roles", action=_("view reference prices"))
     # item_doc = frappe.get_doc("Item", item_code)
     # for doctype, doc in (("Item", item_doc), ("Buyback Price Master", None)):
     #     if not frappe.has_permission(doctype, ptype="read", doc=doc):
@@ -2595,7 +2584,6 @@ def get_open_exchange_orders_for_customer(
     Returns:
         List of dicts with exchange order details and amount to credit.
     """
-    require_configured_role("app_access_roles", action=_("view Buyback exchanges"))
     frappe.has_permission("Buyback Exchange Order", ptype="read", throw=True)
     customer_doc = frappe.get_doc("Customer", customer) if customer else None
     if customer_doc:
@@ -2677,7 +2665,6 @@ def apply_exchange_to_invoice(
     """
     exo = frappe.get_doc("Buyback Exchange Order", exchange_order)
     si  = frappe.get_doc("Sales Invoice", sales_invoice)
-    require_configured_role("exchange_creation_roles", action=_("apply Buyback exchange credit"))
     exo.check_permission("write")
     si.check_permission("write")
     assert_buyback_scope(store=exo.store, company=exo.company)
@@ -2875,7 +2862,7 @@ _INTAKE_PURPOSE_TABLE = {
 }
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def create_assessment_from_intake(
     mobile_no: str,
     item_code: str,
@@ -2920,9 +2907,6 @@ def create_assessment_from_intake(
         dict: name, status, estimated_grade, estimated_price, and the count of
         answers/diagnostics actually accepted (so the UI can flag silent drops).
     """
-    require_configured_role(
-        "assessment_operation_roles", action=_("create a Buyback Assessment")
-    )
     frappe.has_permission("Buyback Assessment", ptype="create", throw=True)
     frappe.has_permission("Item", ptype="read", throw=True)
 
@@ -3065,9 +3049,7 @@ def lookup_imei_for_intake(imei: str) -> dict:
         the serial is ours. Never raises for an unknown IMEI — an external
         device is a normal, expected answer here.
     """
-    require_configured_role(
-        "assessment_operation_roles", action=_("look up a device by IMEI")
-    )
+    frappe.has_permission("Serial No", ptype="read", throw=True)
     imei = (imei or "").strip()
     if not imei:
         return {"origin": "unknown"}
@@ -3138,9 +3120,7 @@ def check_device_quotable(
     Kept deliberately cheap so the intake wizard can call it the moment a device
     is picked.
     """
-    require_configured_role(
-        "assessment_operation_roles", action=_("check device buyback pricing")
-    )
+    frappe.has_permission("Buyback Price Master", ptype="read", throw=True)
     if not item_code:
         return {"quotable": False, "reason": _("No device selected.")}
 

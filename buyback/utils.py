@@ -9,6 +9,7 @@ import re
 
 import frappe
 from frappe import _
+
 from frappe.model.naming import getseries
 from frappe.utils import cint, now_datetime
 
@@ -217,10 +218,14 @@ def get_buyback_setting_value(fieldname: str, default=None):
     return default if value is None else value
 
 
+# ---------------------------------------------------------------------------
+# Operational override gates only. Everything else is enforced by native
+# Frappe DocPerm via frappe.has_permission(...).
+# ---------------------------------------------------------------------------
 def get_role_setting(fieldname: str, defaults=()) -> frozenset[str]:
-    value = get_buyback_setting_value(fieldname)
-    db_roles = frozenset(role.strip() for role in re.split(r"[,\n]", value) if role.strip()) if value else frozenset()
-    return frozenset(defaults) | db_roles
+    from ch_erp15.role_settings import get_setting_roles
+
+    return get_setting_roles("Buyback Settings", fieldname, defaults)
 
 
 def is_privileged_user(user: str | None = None) -> bool:
@@ -267,7 +272,7 @@ def has_configured_role(fieldname: str, *, user: str | None = None) -> bool:
         return True
     defaults = ROLE_SETTING_DEFAULTS.get(fieldname)
     if defaults is None:
-        return False
+        return False          # unknown action fields fail closed
     return bool(set(frappe.get_roles(user)).intersection(get_role_setting(fieldname, defaults)))
 
 
@@ -287,8 +292,7 @@ def require_configured_role(
     immutable bypass identities; all other users need a configured role.
     """
     user = user or frappe.session.user
-    defaults = ROLE_SETTING_DEFAULTS.get(fieldname)
-    if defaults is None:
+    if ROLE_SETTING_DEFAULTS.get(fieldname) is None:
         frappe.throw(_("Unknown Buyback permission action."), frappe.PermissionError)
     if has_configured_role(fieldname, user=user):
         return
@@ -383,7 +387,6 @@ def assert_buyback_scope(
 
 def require_scoped_document_action(doc, fieldname: str, action: str) -> None:
     """Authorize and lock a named Buyback document before a bound mutation."""
-    require_configured_role(fieldname, action=action)
     doc.check_permission("write")
     assert_buyback_scope(
         store=doc.get("store"),

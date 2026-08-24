@@ -130,7 +130,6 @@ def schedule_pickup(
     Auto-increments the attempt number; refuses to schedule beyond
     the configured attempt cap (raises an exception request instead).
     """
-    require_configured_role("pickup_request_roles", action=_("schedule a Buyback pickup"))
     frappe.has_permission("CH Buyback Pickup Appointment", ptype="create", throw=True)
     order = frappe.get_doc("Buyback Order", order_name)
     order.check_permission("write")
@@ -205,7 +204,6 @@ def schedule_pickup(
 @frappe.whitelist(methods=["POST"])
 def complete_pickup(appointment: str, remarks: str | None = None) -> dict:
     doc = frappe.get_doc("CH Buyback Pickup Appointment", appointment)
-    require_configured_role("pickup_request_roles", action=_("complete a Buyback pickup"))
     doc.check_permission("write")
     order = frappe.get_doc("Buyback Order", doc.buyback_order)
     order.check_permission("read")
@@ -235,7 +233,6 @@ def fail_pickup(
     next_action: str,
     remarks: str | None = None,
 ) -> dict:
-    require_configured_role("pickup_request_roles", action=_("record a failed Buyback pickup"))
     allowed_reasons = {
         "Customer Unavailable", "Wrong Address", "Device Not Ready",
         "Customer Refused Pickup", "Device Condition Mismatch",
@@ -282,7 +279,6 @@ def reschedule_pickup(
     appointment_slot: str | None = None,
 ) -> dict:
     """Create a follow-up appointment linked to the failed prior attempt."""
-    require_configured_role("pickup_request_roles", action=_("reschedule a Buyback pickup"))
     frappe.has_permission("CH Buyback Pickup Appointment", ptype="create", throw=True)
     prior = frappe.get_doc("CH Buyback Pickup Appointment", appointment)
     prior.check_permission("write")
@@ -373,7 +369,6 @@ def record_data_wipe(
     submit: bool = True,
 ) -> dict:
     """Create a Data Wipe Certificate for a Buyback Order and (by default) submit it."""
-    require_configured_role("inspection_operation_roles", action=_("record a Buyback data wipe"))
     frappe.has_permission("CH Data Wipe Certificate", ptype="create", throw=True)
     order = frappe.get_doc("Buyback Order", order_name)
     order.check_permission("read")
@@ -429,7 +424,6 @@ def verify_data_wipe(certificate: str, verification_method: str | None = None) -
     Enforces the maker-checker rule (verifier != wiper) at validate time
     via CHDataWipeCertificate.validate.
     """
-    require_configured_role("inspection_operation_roles", action=_("verify a Buyback data wipe"))
     doc = frappe.get_doc("CH Data Wipe Certificate", certificate)
     doc.check_permission("write")
     order = frappe.get_doc("Buyback Order", doc.buyback_order)

@@ -12,6 +12,14 @@
   "session_id",
   "column_break_meta",
   "status",
+  "kyc_section",
+  "kyc_id_type",
+  "kyc_id_number",
+  "kyc_name",
+  "column_break_kyc",
+  "customer_id_front",
+  "customer_id_back",
+  "customer_photo",
   "kyc_id_front",
   "customer_section",
   "customer",
@@ -483,6 +491,53 @@
    "print_hide": 1,
    "read_only": 1,
    "search_index": 1
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "kyc_section",
+   "fieldtype": "Section Break",
+   "label": "Customer KYC"
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "kyc_id_type",
+   "fieldtype": "Select",
+   "label": "ID Proof Type",
+   "options": "\nAadhar Card\nPAN Card\nDriving License\nVoter ID\nPassport"
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "kyc_id_number",
+   "fieldtype": "Data",
+   "label": "ID Number"
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "kyc_name",
+   "fieldtype": "Data",
+   "label": "Name on ID"
+  },
+  {
+   "fieldname": "column_break_kyc",
+   "fieldtype": "Column Break"
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "customer_id_front",
+   "fieldtype": "Attach Image",
+   "label": "ID Front Image"
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "customer_id_back",
+   "fieldtype": "Attach Image",
+   "label": "ID Back Image"
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "customer_photo",
+   "fieldtype": "Attach Image",
+   "label": "Customer Photo"
   },
   {
    "fieldname": "kyc_id_front",

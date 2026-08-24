@@ -12,18 +12,15 @@ import frappe
 from frappe import _
 from frappe.utils import (
     nowdate, now_datetime, get_datetime, add_days,
-    get_url_to_form, flt, cint, fmt_money,
-)
+    get_url_to_form, flt, cint, fmt_money)
 import json
 
 from buyback.utils import (
-    ROLE_SETTING_DEFAULTS,
     filter_enabled_system_users,
     get_int_setting,
     get_role_setting,
     claim_scheduler_alert,
-    new_scheduler_alert_budget,
-)
+    new_scheduler_alert_budget)
 from buyback.outbound_security import post_whatsapp_webhook
 
 
@@ -59,8 +56,7 @@ def send_alert(subject, message, recipients=None, doctype=None, docname=None,
                 frappe.publish_realtime(
                     "msgprint",
                     {"message": message, "title": subject, "indicator": _indicator(alert_type)},
-                    user=user,
-                )
+                    user=user)
             except Exception:
                 frappe.log_error(frappe.get_traceback(), "Buyback realtime alert delivery failed")
 
@@ -72,8 +68,7 @@ def send_alert(subject, message, recipients=None, doctype=None, docname=None,
                 subject=subject,
                 message=message,
                 reference_doctype=doctype,
-                reference_name=docname,
-            )
+                reference_name=docname)
         except Exception:
             frappe.log_error(frappe.get_traceback(), title=f"Alert email failed: {subject}")
 
@@ -99,8 +94,7 @@ def _send_whatsapp(subject, message):
             settings.whatsapp_webhook_url,
             settings.get("whatsapp_allowed_hosts"),
             payload,
-            timeout=10,
-        )
+            timeout=10)
     except Exception:
         frappe.log_error(title="WhatsApp alert failed")
 
@@ -122,8 +116,7 @@ def alert_sla_breach(doctype, docname, sla_type, minutes_taken, target_minutes):
         doctype,
         docname,
         _configured_alert_roles("sla_alert_roles"),
-        store=store,
-    )
+        store=store)
     # SLA remains visible in Buyback dashboards and the notification bell;
     # send email for escalation, but never interrupt the user's active screen.
     send_alert(
@@ -134,8 +127,7 @@ def alert_sla_breach(doctype, docname, sla_type, minutes_taken, target_minutes):
         docname,
         "Critical",
         send_email=True,
-        send_realtime=False,
-    )
+        send_realtime=False)
 
 
 def alert_high_value_order(docname, final_price, threshold):
@@ -164,8 +156,7 @@ def alert_manager_approval_required(docname, final_price=None, threshold=None):
         "Buyback Order",
         docname,
         ["store", "customer_name", "item_name", "final_price"],
-        as_dict=True,
-    )
+        as_dict=True)
     if not row:
         return
 
@@ -186,8 +177,7 @@ def alert_manager_approval_required(docname, final_price=None, threshold=None):
         docname,
         _configured_alert_roles("approval_alert_roles"),
         store=row.store,
-        include_owner=False,
-    )
+        include_owner=False)
     if not recipients:
         return
 
@@ -198,8 +188,7 @@ def alert_manager_approval_required(docname, final_price=None, threshold=None):
         "Buyback Order",
         docname,
         "Warning",
-        send_email=True,
-    )
+        send_email=True)
     frappe.cache.set_value(cache_key, 1, expires_in_sec=7 * 86400)
 
 
@@ -377,8 +366,7 @@ def _check_inspection_backlogs(alert_budget=None):
         LIMIT %s
     """, (
         backlog_threshold,
-        min(get_int_setting("scheduler_batch_limit", 500), 5000),
-    ), as_dict=1)
+        min(get_int_setting("scheduler_batch_limit", 500), 5000)), as_dict=1)
 
     today = nowdate()
     for b in backlogs:
@@ -392,7 +380,7 @@ def _check_inspection_backlogs(alert_budget=None):
 
 def _configured_alert_roles(fieldname):
     """Return the site-configured role set for one alert category."""
-    return list(get_role_setting(fieldname, ROLE_SETTING_DEFAULTS[fieldname]))
+    return list(get_role_setting(fieldname))
 
 
 def _alert_recipient_limit():
@@ -435,8 +423,7 @@ def _get_alert_recipients(doctype=None, docname=None, roles=None, store=None, in
             "Has Role",
             filters={"role": ("in", list(roles or [])), "parenttype": "User"},
             pluck="parent",
-            limit=_alert_recipient_limit(),
-        ) if roles else []
+            limit=_alert_recipient_limit()) if roles else []
         users.update(user for user in role_rows if user)
 
     return filter_enabled_system_users(users, limit=_alert_recipient_limit())

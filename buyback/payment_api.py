@@ -211,7 +211,7 @@ def initiate_payout(buyback_order: str, bank_profile: str | None = None) -> dict
         Dict with ``bpr`` (name), ``payment_status``, ``transaction_amount``,
         ``payment_mode``, ``customer_txn_ref`` and ``already_existed`` flag.
     """
-    require_configured_role("payment_operation_roles", action=_("initiate Buyback payouts"))
+    frappe.has_permission("Bank Payment Request", ptype="create", throw=True)
     order = _load_order(buyback_order, "write")
     _validate_payout_eligibility(order)
 
@@ -265,7 +265,6 @@ def approve_and_send_payout(bpr: str) -> dict:
     Returns:
         Dict with the updated BPR snapshot (status / bank_ref / utr / cms_ref).
     """
-    require_configured_role("payment_operation_roles", action=_("approve Buyback payouts"))
     if not bpr:
         frappe.throw(_("Bank Payment Request name is required"), exc=BuybackValidationError)
 
@@ -313,7 +312,7 @@ def get_payout_status(buyback_order: str) -> dict:
         the same fields as :func:`_serialize_bpr` plus the local
         ``payment_status`` on the order itself.
     """
-    require_configured_role("app_access_roles", action=_("view Buyback payout status"))
+    frappe.has_permission("Bank Payment Request", ptype="read", throw=True)
     order = _load_order(buyback_order)
 
     bpr_name = _find_existing_bpr(order.name)
@@ -341,7 +340,6 @@ def get_payout_status(buyback_order: str) -> dict:
 @rate_limit(limit=30, seconds=60, ip_based=False)
 def refresh_payout_status(buyback_order: str) -> dict:
     """Call the bank's inquiry API for this order's latest payout and return the updated status."""
-    require_configured_role("payment_operation_roles", action=_("refresh Buyback payouts"))
     order = _load_order(buyback_order, "write")
 
     bpr_name = _find_existing_bpr(order.name)
@@ -360,7 +358,7 @@ def refresh_payout_status(buyback_order: str) -> dict:
 @frappe.whitelist()
 def list_payouts(buyback_order: str) -> list[dict]:
     """Return the full history of payouts (BPRs) created for a Buyback Order."""
-    require_configured_role("app_access_roles", action=_("view Buyback payouts"))
+    frappe.has_permission("Bank Payment Request", ptype="read", throw=True)
     order = _load_order(buyback_order)
 
     rows = frappe.get_list(
@@ -392,7 +390,6 @@ def list_payouts(buyback_order: str) -> list[dict]:
 @rate_limit(limit=10, seconds=60, ip_based=False)
 def retry_payout(buyback_order: str) -> dict:
     """Retry the most recent failed/rejected payout for this Buyback Order."""
-    require_configured_role("payment_operation_roles", action=_("retry Buyback payouts"))
     order = _load_order(buyback_order, "write")
 
     bpr_name = frappe.db.get_value(
