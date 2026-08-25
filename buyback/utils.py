@@ -16,71 +16,34 @@ from frappe.utils import cint, now_datetime
 
 _PRIVILEGED_ROLE = "System Manager"
 
-# Runtime code refers only to setting field names.  The role values below are
-# bootstrap defaults for sites that have not migrated the corresponding
-# Buyback Settings fields yet; after migration every set is editable in the
-# singleton and takes precedence.
-ROLE_SETTING_DEFAULTS: dict[str, frozenset[str]] = {
-    "app_access_roles": frozenset(
-        {"Buyback Agent", "Buyback Store Manager", "Buyback Manager", "Buyback Auditor", "Buyback Admin",
-         "POS User", "POS Manager", "CH Store Executive", "CH Store Manager"}
-    ),
-    "order_operation_roles": frozenset(
-        {"Buyback Agent", "Buyback Store Manager", "Buyback Manager", "Buyback Admin",
-         "POS User", "POS Manager", "CH Store Executive", "CH Store Manager"}
-    ),
-    "payment_operation_roles": frozenset(
-        {"Buyback Store Manager", "Buyback Manager", "Buyback Admin",
-        "POS User", "POS Manager", "CH Store Executive", "CH Store Manager"}
-    ),
-    "manager_approval_roles": frozenset({"Buyback Manager", "Buyback Admin"}),
-    "exchange_creation_roles": frozenset(
-        {"Buyback Agent", "Buyback Store Manager", "Buyback Manager", "Buyback Admin"}
-    ),
-    "otp_bypass_roles": frozenset(
-        {"Buyback Store Manager", "Buyback Manager", "Buyback Admin"}
-    ),
-    "imei_validation_roles": frozenset(
-        {"Buyback Agent", "Buyback Store Manager", "Buyback Manager", "Buyback Admin",
-         "POS User", "POS Manager", "CH Store Executive", "CH Store Manager"}
-    ),
-    "pickup_request_roles": frozenset(
-        {"Buyback Store Manager", "Buyback Manager", "Buyback Admin"}
-    ),
-    "assessment_operation_roles": frozenset(
-        {"Buyback Agent", "Buyback Store Manager", "Buyback Manager", "Buyback Admin",
-         "POS User", "POS Manager", "CH Store Executive", "CH Store Manager"}
-    ),
-    "inspection_operation_roles": frozenset(
-        {"Buyback Agent", "Buyback Store Manager", "Buyback Manager", "Buyback Admin"}
-    ),
-    "dashboard_roles": frozenset({"Buyback Manager", "Buyback Auditor", "Buyback Admin"}),
-    "scorecard_roles": frozenset({"Buyback Manager", "Buyback Auditor", "Buyback Admin"}),
-    "imei_history_roles": frozenset(
-        {"Buyback Agent", "Buyback Store Manager", "Buyback Manager", "Buyback Auditor", "Buyback Admin"}
-    ),
-    "customer_lookup_roles": frozenset(
-        {"Buyback Agent", "Buyback Store Manager", "Buyback Manager", "Buyback Auditor", "Buyback Admin"}
-    ),
-    "refurbishment_creation_roles": frozenset(
-        {"Buyback Store Manager", "Buyback Manager", "Buyback Admin"}
-    ),
-    "refurbishment_operation_roles": frozenset(
-        {"Buyback Store Manager", "Buyback Manager", "Buyback Admin"}
-    ),
-    "refurbishment_restock_roles": frozenset(
-        {"Buyback Manager", "Buyback Admin"}
-    ),
-    "sla_alert_roles": frozenset(
-        {"Buyback Store Manager", "Buyback Manager", "Buyback Admin"}
-    ),
-    "approval_alert_roles": frozenset({"Buyback Manager", "Buyback Admin"}),
-    "fraud_alert_roles": frozenset({"Buyback Auditor", "Buyback Admin"}),
-    "cash_alert_roles": frozenset({"Buyback Manager", "Buyback Admin"}),
-    "performance_alert_roles": frozenset(
-        {"Buyback Store Manager", "Buyback Manager"}
-    ),
-}
+# Buyback action fields that resolve through Buyback Settings.  This is a NAME
+# registry only -- unknown field names fail closed.  The roles themselves live
+# in the DB (Table MultiSelect -> CH Role Link); an empty list means DENY, and
+# no shipped default can override what an administrator configured.
+ROLE_SETTING_FIELDS: frozenset[str] = frozenset({
+    "app_access_roles",
+    "approval_alert_roles",
+    "assessment_operation_roles",
+    "cash_alert_roles",
+    "customer_lookup_roles",
+    "dashboard_roles",
+    "exchange_creation_roles",
+    "fraud_alert_roles",
+    "imei_history_roles",
+    "imei_validation_roles",
+    "inspection_operation_roles",
+    "manager_approval_roles",
+    "order_operation_roles",
+    "otp_bypass_roles",
+    "payment_operation_roles",
+    "performance_alert_roles",
+    "pickup_request_roles",
+    "refurbishment_creation_roles",
+    "refurbishment_operation_roles",
+    "refurbishment_restock_roles",
+    "scorecard_roles",
+    "sla_alert_roles",
+})
 
 
 _NUMERIC_EXTERNAL_ID_SERIES = {
@@ -270,10 +233,9 @@ def has_configured_role(fieldname: str, *, user: str | None = None) -> bool:
         return False
     if is_privileged_user(user):
         return True
-    defaults = ROLE_SETTING_DEFAULTS.get(fieldname)
-    if defaults is None:
+    if fieldname not in ROLE_SETTING_FIELDS:
         return False          # unknown action fields fail closed
-    return bool(set(frappe.get_roles(user)).intersection(get_role_setting(fieldname, defaults)))
+    return bool(set(frappe.get_roles(user)).intersection(get_role_setting(fieldname)))
 
 
 def has_app_permission(user: str | None = None) -> bool:
@@ -292,7 +254,7 @@ def require_configured_role(
     immutable bypass identities; all other users need a configured role.
     """
     user = user or frappe.session.user
-    if ROLE_SETTING_DEFAULTS.get(fieldname) is None:
+    if fieldname not in ROLE_SETTING_FIELDS:
         frappe.throw(_("Unknown Buyback permission action."), frappe.PermissionError)
     if has_configured_role(fieldname, user=user):
         return

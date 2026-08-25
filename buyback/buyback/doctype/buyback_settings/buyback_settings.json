@@ -623,28 +623,25 @@
    "label": "Send SMS on Order"
   },
   {
-   "default": "Buyback Store Manager\nBuyback Manager\nBuyback Admin",
-   "description": "Retired. This gate is now enforced by Role Permission Manager (document permissions).",
+   "description": "Roles notified for this alert. Empty means nobody is notified.",
    "fieldname": "sla_alert_roles",
-   "fieldtype": "Small Text",
+   "fieldtype": "Table MultiSelect",
    "label": "SLA Alert Roles",
-   "hidden": 1
+   "options": "CH Role Link"
   },
   {
-   "default": "Buyback Manager\nBuyback Admin",
-   "description": "Retired. This gate is now enforced by Role Permission Manager (document permissions).",
+   "description": "Roles notified for this alert. Empty means nobody is notified.",
    "fieldname": "approval_alert_roles",
-   "fieldtype": "Small Text",
+   "fieldtype": "Table MultiSelect",
    "label": "Approval Alert Roles",
-   "hidden": 1
+   "options": "CH Role Link"
   },
   {
-   "default": "Buyback Auditor\nBuyback Admin",
-   "description": "Retired. This gate is now enforced by Role Permission Manager (document permissions).",
+   "description": "Roles notified for this alert. Empty means nobody is notified.",
    "fieldname": "fraud_alert_roles",
-   "fieldtype": "Small Text",
+   "fieldtype": "Table MultiSelect",
    "label": "Fraud Alert Roles",
-   "hidden": 1
+   "options": "CH Role Link"
   },
   {
    "default": "15",
@@ -693,20 +690,18 @@
    "label": "Send Email on Order"
   },
   {
-   "default": "Buyback Manager\nBuyback Admin",
-   "description": "Retired. This gate is now enforced by Role Permission Manager (document permissions).",
+   "description": "Roles notified for this alert. Empty means nobody is notified.",
    "fieldname": "cash_alert_roles",
-   "fieldtype": "Small Text",
+   "fieldtype": "Table MultiSelect",
    "label": "Cash Alert Roles",
-   "hidden": 1
+   "options": "CH Role Link"
   },
   {
-   "default": "Buyback Store Manager\nBuyback Manager",
-   "description": "Retired. This gate is now enforced by Role Permission Manager (document permissions).",
+   "description": "Roles notified for this alert. Empty means nobody is notified.",
    "fieldname": "performance_alert_roles",
-   "fieldtype": "Small Text",
+   "fieldtype": "Table MultiSelect",
    "label": "Performance Alert Roles",
-   "hidden": 1
+   "options": "CH Role Link"
   },
   {
    "fieldname": "accounting_section",

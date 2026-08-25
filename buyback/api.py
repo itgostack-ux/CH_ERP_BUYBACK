@@ -42,6 +42,7 @@ from buyback.utils import (
     validate_bounded_text,
     validate_indian_phone,
 )
+from ch_erp15.config import has_counter_staff_bypass
 
 
 # ---------------------------------------------------------------------------
@@ -72,8 +73,7 @@ def _has_pos_bypass() -> bool:
     from buyback.utils import is_privileged_user
     if is_privileged_user():
         return True
-    roles = set(frappe.get_roles())
-    return bool(roles & {"POS User", "POS Manager", "CH Store Executive", "CH Store Manager"})
+    return has_counter_staff_bypass()
 
 def _require_app_read(action: str, *doctypes: str) -> None:
     for doctype in doctypes:
