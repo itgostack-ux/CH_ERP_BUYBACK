@@ -12,7 +12,6 @@ on this site are skipped -- seeding them would only create dead rows.
 """
 import frappe
 
-from ch_erp15.role_settings import set_setting_roles
 
 DOCTYPE = "Buyback Settings"
 
@@ -27,12 +26,33 @@ PREVIOUS_DEFAULTS = {
 }
 
 
+def _role_settings():
+    """Import the ch_erp15 helpers, failing with something actionable.
+
+    This patch lives in buyback but writes role settings owned by ch_erp15, so the
+    two apps must be deployed together. A bare module-level import turns a stale
+    ch_erp15 into an unreadable ImportError that aborts the whole migrate.
+    """
+    try:
+        from ch_erp15.role_settings import set_setting_roles
+
+        return set_setting_roles
+    except ImportError as exc:
+        frappe.throw(
+            "ch_erp15 is out of date on this site: {0}.\n\n"
+            "buyback patches write role settings owned by ch_erp15, so update it "
+            "first (it must provide role_settings.set_setting_roles), then re-run "
+            "bench migrate.".format(exc),
+            title="Update ch_erp15 first",
+        )
+
 def execute():
     if not frappe.db.exists("DocType", DOCTYPE):
         return
     if not frappe.db.table_exists("CH Role Link"):
         # ch_erp15 not migrated yet on this site; the next migrate will pick it up.
         return
+    set_setting_roles = _role_settings()
 
     meta = frappe.get_meta(DOCTYPE)
     for fieldname, defaults in PREVIOUS_DEFAULTS.items():
