@@ -2862,6 +2862,38 @@ _INTAKE_PURPOSE_TABLE = {
 }
 
 
+def _get_or_create_walkin_customer(mobile_no: str) -> str:
+    """Resolve a Customer for a buyback trade-in whose mobile number has no
+    existing match — creates a minimal walk-in record instead of leaving
+    Customer blank, since a blank customer here passes Buyback Assessment
+    fine but fails later at Buyback Order (Customer is mandatory there).
+
+    customer_group/territory aren't enforced by the Customer doctype itself
+    (this site already has thousands of Customers with either blank), but
+    "Individual"/"India" is the convention this site's other manually
+    created walk-in customers use, so match that where available.
+    """
+    existing = frappe.db.get_value("Customer", {"mobile_no": mobile_no}, "name")
+    if existing:
+        return existing
+
+    doc = frappe.new_doc("Customer")
+    doc.customer_name = mobile_no
+    doc.mobile_no = mobile_no
+    doc.customer_type = "Individual"
+    if frappe.db.exists("Customer Group", "Individual"):
+        doc.customer_group = "Individual"
+    if frappe.db.exists("Territory", "India"):
+        doc.territory = "India"
+    doc.flags.ignore_mandatory = True
+    try:
+        doc.insert(ignore_permissions=True)
+    except frappe.DuplicateEntryError:
+        # Race with a concurrent intake for the same new mobile number.
+        return frappe.db.get_value("Customer", {"mobile_no": mobile_no}, "name")
+    return doc.name
+
+
 @frappe.whitelist(methods=["POST"])
 def create_assessment_from_intake(
     mobile_no: str,
@@ -2947,6 +2979,14 @@ def create_assessment_from_intake(
 
     if not customer:
         customer = frappe.db.get_value("Customer", {"mobile_no": mobile_no}, "name")
+    if not customer:
+        # New/walk-in trade-in with no matching Customer by mobile number.
+        # Leaving this blank used to silently pass here (Customer isn't
+        # mandatory on Buyback Assessment) and only blow up later with a
+        # cryptic mandatory-field error when the assessment is converted to
+        # a Buyback Order (Customer IS mandatory there). Create a minimal
+        # walk-in Customer now instead, so every assessment always has one.
+        customer = _get_or_create_walkin_customer(mobile_no)
 
     doc = frappe.new_doc("Buyback Assessment")
     doc.source = "Store Manual"
