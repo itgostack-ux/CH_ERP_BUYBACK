@@ -7,7 +7,6 @@ import frappe
 from frappe import _
 from frappe.utils import cint
 
-
 BUYBACK_ROLES = [
     {
         "role_name": "Buyback Agent",

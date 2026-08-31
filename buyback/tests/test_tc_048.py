@@ -28,7 +28,6 @@ import unittest
 import frappe
 from frappe.tests.utils import FrappeTestCase
 
-
 ITEM = "I04508"
 AGE_LABELS = ("0-3 Months", "4-6 Months", "7-11 Months", "12+ Months")
 

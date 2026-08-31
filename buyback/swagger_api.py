@@ -9,7 +9,6 @@ from typing import Any
 import frappe
 from frappe.utils import get_url
 
-
 _API_MODULES = (
     "buyback.api",
     "buyback.public_portal_api",

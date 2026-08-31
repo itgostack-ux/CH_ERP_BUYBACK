@@ -6,14 +6,14 @@
 import frappe
 from frappe import _
 
+from buyback.buyback.constants import AGING_BUCKETS_HOURS, PENDING_PAYMENT_STATUSES
 from buyback.buyback.report.report_utils import (
+	aging_bucket_case,
 	date_condition,
-	standard_conditions,
 	in_condition,
 	sla_minutes,
-	aging_bucket_case,
+	standard_conditions,
 )
-from buyback.buyback.constants import PENDING_PAYMENT_STATUSES, AGING_BUCKETS_HOURS
 
 
 def execute(filters=None):

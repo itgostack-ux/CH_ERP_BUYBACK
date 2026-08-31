@@ -3,9 +3,8 @@
 # Eliminates duplicated condition-building and date-filter logic.
 
 import frappe
-from frappe.utils import getdate
-
 from ch_erp15.ch_erp15.report_scope import scope_where_clause
+from frappe.utils import getdate
 
 
 def date_condition(field="creation", filters=None, alias=""):

@@ -1,8 +1,8 @@
 import secrets
 
 import frappe
-from frappe.utils import cint
 from frappe.model.document import Document
+from frappe.utils import cint
 
 from buyback.utils import get_buyback_setting_value, next_numeric_external_id
 

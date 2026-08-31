@@ -13,7 +13,7 @@ import frappe
 from frappe.tests.utils import FrappeTestCase
 from frappe.utils import flt
 
-from buyback.buyback.pricing.engine import calculate_estimated_price, _clamp_deductions
+from buyback.buyback.pricing.engine import _clamp_deductions, calculate_estimated_price
 
 ITEM_CODE = "_TEST_BUYBACK_PRICING_ITEM"
 BASE_IW_0_3 = 10000.0
@@ -142,6 +142,7 @@ class TestPricingIntegrity(FrappeTestCase):
     def test_live_preview_normalizes_question_name_to_grading_code(self):
         """POS preview and assessment save must resolve the same grade."""
         import json
+
         from buyback.api import calculate_live_estimate
 
         result = calculate_live_estimate(

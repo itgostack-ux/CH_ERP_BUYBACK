@@ -19,13 +19,12 @@ from __future__ import annotations
 import unittest
 
 import frappe
-
 from ch_erp15.ch_erp15.scope import clear_scope_cache
+
 from buyback.buyback.report.report_utils import (
     scope_condition,
     standard_conditions,
 )
-
 
 _TEST_USER = "tier4-bb-user@ch-tests.local"
 _TEST_STORE = "TIER4-BB-STORE-A"
@@ -190,6 +189,9 @@ class TestReportScopeBuyback(unittest.TestCase):
         from buyback.buyback.report.duplicate_imei_attempts.duplicate_imei_attempts import (
             execute as dup_execute,
         )
+        from buyback.buyback.report.otp_failure_report.otp_failure_report import (
+            execute as otp_execute,
+        )
         from buyback.buyback.report.pending_confirmations.pending_confirmations import (
             execute as pc_execute,
         )
@@ -198,9 +200,6 @@ class TestReportScopeBuyback(unittest.TestCase):
         )
         from buyback.buyback.report.refurb_pipeline.refurb_pipeline import (
             execute as rp_execute,
-        )
-        from buyback.buyback.report.otp_failure_report.otp_failure_report import (
-            execute as otp_execute,
         )
         for fn in (dup_execute, pc_execute, pp_execute, rp_execute, otp_execute):
             result = fn({})
@@ -212,14 +211,14 @@ class TestReportScopeBuyback(unittest.TestCase):
         from buyback.buyback.report.buyback_funnel.buyback_funnel import (
             execute as funnel_execute,
         )
+        from buyback.buyback.report.otp_failure_report.otp_failure_report import (
+            execute as otp_execute,
+        )
         from buyback.buyback.report.pending_confirmations.pending_confirmations import (
             execute as pc_execute,
         )
         from buyback.buyback.report.pending_payments.pending_payments import (
             execute as pp_execute,
-        )
-        from buyback.buyback.report.otp_failure_report.otp_failure_report import (
-            execute as otp_execute,
         )
         funnel_execute({})
         pc_execute({})

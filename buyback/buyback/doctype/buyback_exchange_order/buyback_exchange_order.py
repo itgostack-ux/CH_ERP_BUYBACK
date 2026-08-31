@@ -1,16 +1,15 @@
 import frappe
 from frappe import _
 from frappe.model.document import Document
-from frappe.utils import now_datetime, flt
+from frappe.utils import flt, now_datetime
 
+from buyback.exceptions import BuybackStatusError
 from buyback.utils import (
+    log_audit,
     next_numeric_external_id,
     sync_customer_identity,
     validate_indian_phone,
 )
-
-from buyback.exceptions import BuybackStatusError
-from buyback.utils import log_audit
 
 
 class BuybackExchangeOrder(Document):

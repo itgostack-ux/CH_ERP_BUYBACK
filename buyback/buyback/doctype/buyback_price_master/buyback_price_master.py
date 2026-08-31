@@ -5,7 +5,6 @@ from frappe.utils import flt
 
 from buyback.utils import next_numeric_external_id
 
-
 # Fields that can only be written via the CH Price Upload Batch (maker/checker)
 _PRICE_FIELDS = [
     "current_market_price", "vendor_price",

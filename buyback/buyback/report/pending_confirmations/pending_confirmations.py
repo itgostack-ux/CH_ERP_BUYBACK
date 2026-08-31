@@ -4,6 +4,7 @@
 
 import frappe
 from frappe import _
+
 from buyback.buyback.report.report_utils import scope_condition
 
 

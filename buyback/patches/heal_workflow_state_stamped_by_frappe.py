@@ -34,24 +34,24 @@ def execute():
             continue
 
         drifted = frappe.db.sql(
-            """
+            f"""
             SELECT COUNT(*)
             FROM `tab{doctype}`
             WHERE IFNULL(status, '') != ''
               AND IFNULL(workflow_state, '') != status
-            """.format(doctype=doctype)
+            """
         )[0][0]
         if not drifted:
             continue
 
         # `status` is the state machine; the mirror always follows it.
         frappe.db.sql(
-            """
+            f"""
             UPDATE `tab{doctype}`
             SET workflow_state = status
             WHERE IFNULL(status, '') != ''
               AND IFNULL(workflow_state, '') != status
-            """.format(doctype=doctype)
+            """
         )
         frappe.logger().info(
             f"[heal_workflow_state_stamped_by_frappe] {doctype}: realigned {drifted} row(s)"

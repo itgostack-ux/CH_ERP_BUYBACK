@@ -15,7 +15,6 @@ import frappe
 from frappe.tests.utils import FrappeTestCase
 from frappe.utils import now_datetime
 
-
 # ─── helpers ────────────────────────────────────────────────────────────────
 
 def _make_grade(name):
@@ -615,7 +614,7 @@ class TestDuplicateButtonsPrevented(FrappeTestCase):
         )
         # Check it's decorated @frappe.whitelist
         import inspect
-        method = getattr(type(doc), "recalculate_grade_and_price")
+        method = type(doc).recalculate_grade_and_price
         self.assertTrue(
             getattr(method, "__frappe_whitelist__", False)
             or "whitelistmethod" in str(type(method)).lower()

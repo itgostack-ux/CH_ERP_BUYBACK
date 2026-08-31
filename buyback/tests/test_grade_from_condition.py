@@ -14,11 +14,13 @@ import frappe
 from frappe.tests.utils import FrappeTestCase
 from frappe.utils import flt
 
-from buyback.buyback.pricing.engine import (
-    calculate_estimated_price, resolve_grade_from_answers,
-)
 from buyback.buyback.doctype.buyback_question_set.buyback_question_set import (
-    get_device_profile, resolve_set_for_item,
+    get_device_profile,
+    resolve_set_for_item,
+)
+from buyback.buyback.pricing.engine import (
+    calculate_estimated_price,
+    resolve_grade_from_answers,
 )
 from buyback.setup.question_catalogue import QUESTIONS, SETS, validate_catalogue
 

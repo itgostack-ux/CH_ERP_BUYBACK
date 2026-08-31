@@ -9,6 +9,7 @@ stage of the buyback flow — Assessment → Inspection → Order → Close.
 """
 
 import frappe
+
 from buyback.serial_no_utils import update_serial_buyback_status
 
 

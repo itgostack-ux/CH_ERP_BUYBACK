@@ -15,9 +15,7 @@ integration site.
 from __future__ import annotations
 
 import frappe
-
 from ch_erp15.testing.e2e import E2ETestCase
-
 
 # Sentinel prefix keeps the e2e-created grades identifiable inside the
 # transaction and easy to grep if a rollback ever leaks (it shouldn't).

@@ -6,7 +6,6 @@ clean up custom roles, custom fields, and other artefacts.
 
 import frappe
 
-
 BUYBACK_ROLES = [
     "Buyback Agent",
     "Buyback Manager",

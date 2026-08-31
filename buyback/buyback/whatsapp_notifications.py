@@ -122,7 +122,7 @@ def send_otp(mobile_no: str, otp_code: str, purpose: str,
 
     # 1) SMS via the company's gateway (CH SMS Account) → global SMS Settings.
     try:
-        from ch_item_master.ch_core.sms import send_company_sms, get_otp_expiry
+        from ch_item_master.ch_core.sms import get_otp_expiry, send_company_sms
         mins = get_otp_expiry(company)
         msg = (f"Your OTP for {purpose} is {otp_code}. "
                f"Valid for {mins} minutes. Do not share it with anyone.")
@@ -172,7 +172,7 @@ def _get_settings(company=None):
 
 def _notify_awaiting_customer_approval(doc, phone, customer_name):
     """Send approval link via WhatsApp + Email when order moves to Awaiting Customer Approval."""
-    from frappe.utils import fmt_money, get_url, escape_html
+    from frappe.utils import escape_html, fmt_money, get_url
 
     approval_url = f"{get_url()}/buyback-approval?token={doc.approval_token}" if doc.approval_token else ""
     item_label = doc.item_name or doc.item or "your device"
@@ -280,7 +280,6 @@ def _notify_approved(doc, phone, customer_name):
         return
 
     from ch_item_master.ch_core.whatsapp import send_template_message
-
     from frappe.utils import fmt_money
 
     price_str = fmt_money(doc.final_price, currency="INR") if doc.final_price else ""
@@ -306,7 +305,6 @@ def _notify_paid(doc, phone, customer_name):
         return
 
     from ch_item_master.ch_core.whatsapp import send_template_message
-
     from frappe.utils import fmt_money
 
     price_str = fmt_money(doc.final_price, currency="INR") if doc.final_price else ""

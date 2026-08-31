@@ -8,21 +8,20 @@ Alert channels:
 3. WhatsApp webhook (optional, via Buyback SLA Settings)
 """
 
-import frappe
-from frappe import _
-from frappe.utils import (
-    nowdate, now_datetime, get_datetime, add_days,
-    get_url_to_form, flt, cint, fmt_money)
 import json
 
+import frappe
+from frappe import _
+from frappe.utils import add_days, cint, flt, fmt_money, get_datetime, get_url_to_form, now_datetime, nowdate
+
+from buyback.outbound_security import post_whatsapp_webhook
 from buyback.utils import (
+    claim_scheduler_alert,
     filter_enabled_system_users,
     get_int_setting,
     get_role_setting,
-    claim_scheduler_alert,
-    new_scheduler_alert_budget)
-from buyback.outbound_security import post_whatsapp_webhook
-
+    new_scheduler_alert_budget,
+)
 
 # ─── Alert Dispatcher ────────────────────────────────────────────────
 

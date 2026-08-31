@@ -20,6 +20,7 @@ import json
 import re
 
 import frappe
+from ch_erp15.config import has_counter_staff_bypass
 from frappe import _
 from frappe.rate_limiter import rate_limit
 from frappe.utils import cint, flt, now_datetime
@@ -42,8 +43,6 @@ from buyback.utils import (
     validate_bounded_text,
     validate_indian_phone,
 )
-from ch_erp15.config import has_counter_staff_bypass
-
 
 # ---------------------------------------------------------------------------
 # Token security helpers (used by every guest endpoint that authenticates by
@@ -1466,7 +1465,7 @@ def submit_mobile_diagnostic(
         "results": result_rows,
         "warranty_status": warranty_status,
         "device_age_months": device_age_months,
-        "remarks": f"Auto-created from mobile diagnostic app",
+        "remarks": "Auto-created from mobile diagnostic app",
     })
     doc.insert()
 
@@ -2226,7 +2225,7 @@ def calculate_live_estimate(
     responses: str = None,
     brand: str = None,
     item_group: str = None,
-    is_phone_dead: int = 0, 
+    is_phone_dead: int = 0,
 ) -> dict:
     """Calculate estimated price + grade."""
     import json

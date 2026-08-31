@@ -7,13 +7,13 @@
 import frappe
 from frappe import _
 
+from buyback.buyback.constants import PAID_STATUSES, SOURCE_APP
 from buyback.buyback.report.report_utils import (
 	date_condition,
-	standard_conditions,
 	in_condition,
 	sla_minutes,
+	standard_conditions,
 )
-from buyback.buyback.constants import PAID_STATUSES, SOURCE_APP
 
 
 def execute(filters=None):
@@ -57,7 +57,7 @@ def get_data(filters):
 		FROM `tabBuyback Order` o
 		WHERE {dc} {sc}
 		GROUP BY o.owner
-	""".format(  # noqa: UP032
+	""".format(
 		paid_in=paid_in,
 		tat=sla_minutes("o.creation", "o.approval_date"),
 		dc=dc_o,

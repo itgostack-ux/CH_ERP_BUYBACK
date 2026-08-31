@@ -1,7 +1,7 @@
 import frappe
 from frappe import _
 from frappe.model.document import Document
-from frappe.utils import nowdate, add_days, getdate, now_datetime
+from frappe.utils import add_days, getdate, now_datetime, nowdate
 
 from buyback.exceptions import BuybackStatusError
 from buyback.utils import (
@@ -133,7 +133,9 @@ class BuybackAssessment(Document):
 
     def _check_imei_blacklist(self):
         if self.imei_serial:
-            from buyback.buyback.doctype.buyback_imei_blacklist.buyback_imei_blacklist import check_imei_and_block
+            from buyback.buyback.doctype.buyback_imei_blacklist.buyback_imei_blacklist import (
+                check_imei_and_block,
+            )
             check_imei_and_block(self.imei_serial)
 
     def _ensure_mobile_no(self):
@@ -366,8 +368,8 @@ class BuybackAssessment(Document):
             return
 
         try:
-            from buyback.buyback.pricing.engine import calculate_estimated_price
             from buyback.api import _provisional_grade_name
+            from buyback.buyback.pricing.engine import calculate_estimated_price
 
             diagnostic_data = []
             for d in (self.diagnostic_tests or []):

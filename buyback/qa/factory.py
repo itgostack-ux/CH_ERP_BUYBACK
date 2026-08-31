@@ -13,8 +13,7 @@ Usage::
 from __future__ import annotations
 
 import frappe
-from frappe.utils import nowdate, add_days
-
+from frappe.utils import add_days, nowdate
 
 # ─── Constants ────────────────────────────────────────────────────
 
@@ -1081,7 +1080,7 @@ def _cleanup_transactions():
         "tabBuyback Exchange Order Item",
     ):
         try:
-            frappe.db.sql("DELETE FROM `{}`".format(child_table))
+            frappe.db.sql(f"DELETE FROM `{child_table}`")
         except Exception:
             pass
 
@@ -1095,7 +1094,7 @@ def _cleanup_transactions():
         "tabBuyback QA Test Run",
     ):
         try:
-            frappe.db.sql("DELETE FROM `{}`".format(parent_table))
+            frappe.db.sql(f"DELETE FROM `{parent_table}`")
         except Exception:
             pass
 
@@ -1136,7 +1135,7 @@ def _cleanup_transactions():
     # OTP Logs for QA mobiles
     qa_mobiles = [c['mobile_no'] for c in CUSTOMERS]
     placeholders = ", ".join(["%s"] * len(qa_mobiles))
-    frappe.db.sql("DELETE FROM `tabCH OTP Log` WHERE mobile_no IN ({})".format(placeholders), qa_mobiles)
+    frappe.db.sql(f"DELETE FROM `tabCH OTP Log` WHERE mobile_no IN ({placeholders})", qa_mobiles)
 
     # Loyalty Point Entries for buyback
     frappe.db.sql("DELETE FROM `tabLoyalty Point Entry` WHERE invoice_type='Buyback Order'")

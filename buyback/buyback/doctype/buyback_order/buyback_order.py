@@ -5,14 +5,14 @@ import json
 import frappe
 from frappe import _
 from frappe.model.document import Document
-from frappe.utils import now_datetime, flt, nowdate, add_days, cint
+from frappe.utils import add_days, cint, flt, now_datetime, nowdate
 from frappe.utils.password import get_encryption_key
 
 from buyback.exceptions import BuybackStatusError
 from buyback.utils import (
     assert_buyback_scope,
-    has_configured_role,
     get_buyback_setting_value,
+    has_configured_role,
     is_privileged_user,
     log_audit,
     next_numeric_external_id,
@@ -224,7 +224,7 @@ class BuybackOrder(Document):
         # Authorized POS settlement path bypasses lifecycle evidence signature check
         if self.flags.get("ch_paid_evidence_authorized") or is_privileged_user():
             return
-        
+
         if not self._has_valid_lifecycle_evidence():
             frappe.throw(
                 _("Cannot mark this order Paid because its approval/payment evidence is missing or has been altered."),
@@ -399,7 +399,9 @@ class BuybackOrder(Document):
 
     def _check_imei_blacklist(self):
         if self.imei_serial:
-            from buyback.buyback.doctype.buyback_imei_blacklist.buyback_imei_blacklist import check_imei_and_block
+            from buyback.buyback.doctype.buyback_imei_blacklist.buyback_imei_blacklist import (
+                check_imei_and_block,
+            )
             check_imei_and_block(self.imei_serial)
 
     def _ensure_mobile_no(self):
@@ -2258,7 +2260,7 @@ class BuybackOrder(Document):
         if not is_stock_item:
             return
 
-        from frappe.utils import nowdate, add_days
+        from frappe.utils import add_days, nowdate
         # Pre-capture the bought-back device's IMEI on the MR row so the
         # pickup MR is already "scanned" at creation time. Logistics staff
         # only need to verify on hand-over instead of re-typing the IMEI.

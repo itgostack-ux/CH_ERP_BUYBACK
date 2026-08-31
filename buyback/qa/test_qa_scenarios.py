@@ -14,7 +14,7 @@ from __future__ import annotations
 import frappe
 from frappe.tests.utils import FrappeTestCase
 
-from buyback.qa.factory import seed_all, cleanup_all
+from buyback.qa.factory import cleanup_all, seed_all
 from buyback.qa.scenarios import get_all_scenarios
 
 

@@ -12,7 +12,6 @@ on this site are skipped -- seeding them would only create dead rows.
 """
 import frappe
 
-
 DOCTYPE = "Buyback Settings"
 
 # The values that were in force before this patch, lifted verbatim from the old
@@ -39,10 +38,10 @@ def _role_settings():
         return set_setting_roles
     except ImportError as exc:
         frappe.throw(
-            "ch_erp15 is out of date on this site: {0}.\n\n"
+            f"ch_erp15 is out of date on this site: {exc}.\n\n"
             "buyback patches write role settings owned by ch_erp15, so update it "
             "first (it must provide role_settings.set_setting_roles), then re-run "
-            "bench migrate.".format(exc),
+            "bench migrate.",
             title="Update ch_erp15 first",
         )
 

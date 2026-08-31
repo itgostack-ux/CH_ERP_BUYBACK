@@ -7,7 +7,6 @@ Run:  bench --site erpnext.local execute buyback.setup.seed_diagnostic_tests.run
 
 import frappe
 
-
 TESTS = [
     {
         "question_text": "Screen Test",

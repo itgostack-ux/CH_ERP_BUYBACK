@@ -53,7 +53,7 @@ def get_data(filters):
         sold_condition = " AND o.sales_invoice IS NULL"
 
     rows = frappe.db.sql(
-        """
+        f"""
         SELECT
             DATE(o.creation) AS order_date,
             o.name AS buyback_order,
@@ -87,13 +87,8 @@ def get_data(filters):
         WHERE o.docstatus < 2
             AND {dc} {sc} {item_group_condition} {sold_condition}
         ORDER BY o.creation DESC
-        """.format(
-            dc=dc,
-            sc=sc,
-            item_group_condition=item_group_condition,
-            sold_condition=sold_condition,
-        ),
+        """,
         as_dict=1,
-    )  # noqa: UP032
+    )
 
     return rows

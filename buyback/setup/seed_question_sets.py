@@ -11,7 +11,11 @@ Run:  bench --site <site> execute buyback.setup.seed_question_sets.run
 import frappe
 
 from buyback.setup.question_catalogue import (
-    BRAND_FAMILY_ONLY, QUESTIONS, RETIRED_CODES, SETS, unrated_faults,
+    BRAND_FAMILY_ONLY,
+    QUESTIONS,
+    RETIRED_CODES,
+    SETS,
+    unrated_faults,
     validate_catalogue,
 )
 

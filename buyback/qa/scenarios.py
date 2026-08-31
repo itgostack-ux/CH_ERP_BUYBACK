@@ -19,12 +19,12 @@ from typing import Any
 
 import frappe
 from frappe import _
-from frappe.utils import flt, cint, now_datetime, add_to_date, nowdate
+from frappe.utils import add_to_date, cint, flt, now_datetime, nowdate
 
 from buyback.qa.factory import (
     COMPANY,
-    ITEMS,
     CUSTOMERS,
+    ITEMS,
     get_checklist,
     get_customer,
     get_grade,
@@ -855,7 +855,7 @@ def s13_duplicate_imei(ctx: dict) -> tuple[bool, str]:
                 "responses": _build_response_rows(DEFAULT_RESPONSES),
             })
             a2.insert()
-            _track(ctx, "Buyback Assessment", a2.name, f"Duplicate IMEI assessment (may be allowed at assessment level)")
+            _track(ctx, "Buyback Assessment", a2.name, "Duplicate IMEI assessment (may be allowed at assessment level)")
     except Exception as e:
         _track(ctx, "Validation", "duplicate_imei", f"Blocked: {str(e)[:100]}")
 

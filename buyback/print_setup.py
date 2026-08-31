@@ -2,7 +2,6 @@
 
 import frappe
 
-
 BUYBACK_RECEIPT_HTML = """
 <style>
   .bb-receipt { font-family: Arial, sans-serif; font-size: 12px; color: #111; }

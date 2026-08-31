@@ -6,13 +6,13 @@
 import frappe
 from frappe import _
 
+from buyback.buyback.constants import AGING_BUCKETS_MINUTES, PENDING_APPROVAL_STATUSES
 from buyback.buyback.report.report_utils import (
-	date_condition,
-	standard_conditions,
-	sla_minutes,
 	aging_bucket_case,
+	date_condition,
+	sla_minutes,
+	standard_conditions,
 )
-from buyback.buyback.constants import PENDING_APPROVAL_STATUSES, AGING_BUCKETS_MINUTES
 
 
 def execute(filters=None):
@@ -38,7 +38,7 @@ def get_columns():
 def get_data(filters):
 	dc = date_condition("o.creation", filters)
 	sc = standard_conditions(filters, alias="o.")
-	pending_in = ", ".join("'{}'".format(s) for s in PENDING_APPROVAL_STATUSES)
+	pending_in = ", ".join(f"'{s}'" for s in PENDING_APPROVAL_STATUSES)
 	age_expr = sla_minutes("COALESCE(bi.inspection_completed_at, o.creation)", "NOW()")
 	bucket_expr = aging_bucket_case(age_expr, AGING_BUCKETS_MINUTES)
 

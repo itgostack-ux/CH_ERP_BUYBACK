@@ -13,7 +13,6 @@ from buyback.utils import (
     validate_indian_phone,
 )
 
-
 _PUBLIC_QUOTE_OTP_PURPOSE = "Buyback Customer Approval"
 
 

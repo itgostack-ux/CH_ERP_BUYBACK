@@ -8,8 +8,9 @@ Uses Frappe's website_route_rules to map the URL.
 The page calls ``buyback.api.get_buyback_approval_details`` (allow_guest=True)
 to get order details, then lets the customer trigger OTP verification.
 """
-import frappe
 from urllib.parse import parse_qs
+
+import frappe
 
 no_cache = 1
 

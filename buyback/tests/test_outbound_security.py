@@ -5,7 +5,6 @@ from frappe.tests import IntegrationTestCase
 
 from buyback.outbound_security import post_whatsapp_webhook, validate_whatsapp_webhook_url
 
-
 PUBLIC_DNS = [(2, 1, 6, "", ("93.184.216.34", 443))]
 
 

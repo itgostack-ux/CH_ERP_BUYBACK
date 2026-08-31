@@ -4,7 +4,6 @@
 import frappe
 from frappe.tests.utils import FrappeTestCase
 
-
 # ─── Minimal seed helpers (idempotent) ────────────────────────────────────────
 #
 # The Buyback Assessment test used to be an empty ``pass``, which meant every

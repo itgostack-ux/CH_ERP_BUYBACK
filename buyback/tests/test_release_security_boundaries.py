@@ -13,8 +13,8 @@ from frappe.utils import now_datetime
 
 from buyback import api, exchange_lifecycle, utils
 from buyback.buyback import scorecards
-from buyback.buyback.doctype.refurbishment_order import refurbishment_order
 from buyback.buyback.doctype.buyback_order import buyback_order
+from buyback.buyback.doctype.refurbishment_order import refurbishment_order
 from buyback.exceptions import BuybackStatusError
 
 

@@ -7,6 +7,7 @@ from frappe.model.document import Document
 
 from buyback.outbound_security import validate_whatsapp_webhook_url
 
+
 class BuybackSLASettings(Document):
     def validate(self):
         if self.enable_whatsapp_alerts:

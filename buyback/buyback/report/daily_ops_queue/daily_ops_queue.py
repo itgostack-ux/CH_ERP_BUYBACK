@@ -6,15 +6,15 @@
 import frappe
 from frappe import _
 
-from buyback.buyback.report.report_utils import (
-	date_condition,
-	standard_conditions,
-	in_condition,
-	sla_minutes,
-)
 from buyback.buyback.constants import (
 	INSPECTION_OPEN_STATUSES,
 	PENDING_PAYMENT_STATUSES,
+)
+from buyback.buyback.report.report_utils import (
+	date_condition,
+	in_condition,
+	sla_minutes,
+	standard_conditions,
 )
 
 

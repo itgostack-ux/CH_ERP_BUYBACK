@@ -28,7 +28,6 @@ Self-contained: nothing depends on erpnext's test-record cascade.
 from __future__ import annotations
 
 import frappe
-
 from ch_erp15.testing.contract import ContractTestCase
 
 

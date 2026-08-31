@@ -57,7 +57,6 @@ from frappe.utils import flt
 from buyback.exceptions import BuybackStatusError, BuybackValidationError
 from buyback.utils import assert_buyback_scope, log_audit, require_configured_role
 
-
 # ---------------------------------------------------------------------------
 # Internal constants
 # ---------------------------------------------------------------------------
@@ -93,7 +92,7 @@ _RETRYABLE_BPR_STATUSES = ("Failed", "Rejected")
 # ---------------------------------------------------------------------------
 
 
-def _load_order(buyback_order: str, permission_type: str = "read") -> "frappe.Document":
+def _load_order(buyback_order: str, permission_type: str = "read") -> frappe.Document:
     """Fetch the Buyback Order and enforce read permission."""
     if not buyback_order:
         frappe.throw(_("Buyback Order is required"), exc=BuybackValidationError)
@@ -104,7 +103,7 @@ def _load_order(buyback_order: str, permission_type: str = "read") -> "frappe.Do
     return order
 
 
-def _validate_payout_eligibility(order: "frappe.Document") -> None:
+def _validate_payout_eligibility(order: frappe.Document) -> None:
     """Raise unless the Buyback Order is in a state where a payout can start."""
     if order.docstatus == 2:
         frappe.throw(_("Buyback Order {0} is cancelled").format(order.name), exc=BuybackStatusError)
@@ -243,7 +242,7 @@ def initiate_payout(buyback_order: str, bank_profile: str | None = None) -> dict
             "payout_mode": order.customer_payout_mode,
             "bank_profile": bank_profile or "site_default",
         },
-        reason=f"Customer payout draft created via buyback.payment_api.initiate_payout",
+        reason="Customer payout draft created via buyback.payment_api.initiate_payout",
     )
 
     out = _serialize_bpr(bpr_name)
@@ -418,7 +417,7 @@ def retry_payout(buyback_order: str) -> dict:
         reference_doctype="Buyback Order",
         reference_name=order.name,
         new_value=_serialize_bpr(bpr_name),
-        reason=f"Manual retry via buyback.payment_api.retry_payout",
+        reason="Manual retry via buyback.payment_api.retry_payout",
     )
 
     return _serialize_bpr(bpr_name)

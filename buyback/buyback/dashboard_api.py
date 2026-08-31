@@ -5,9 +5,14 @@
 
 import frappe
 from frappe import _
-from frappe.utils import nowdate, add_months, add_days, date_diff, flt, getdate
+from frappe.utils import add_days, add_months, date_diff, flt, getdate, nowdate
 
-from buyback.utils import assert_buyback_scope, build_buyback_scope_sql, get_int_setting, require_configured_role
+from buyback.utils import (
+    assert_buyback_scope,
+    build_buyback_scope_sql,
+    get_int_setting,
+    require_configured_role,
+)
 
 
 def _date_params(from_date, to_date):
@@ -544,7 +549,7 @@ def get_compliance_dashboard(from_date=None, to_date=None, company=None) -> dict
 
     # Suspicious: branches with high override rate
     suspicious_threshold = get_int_setting("dashboard_suspicious_override_threshold", 3)
-    suspicious_branches = frappe.db.sql("""
+    suspicious_branches = frappe.db.sql(f"""
         SELECT o.store, COUNT(DISTINCT a.name) as override_count,
             COUNT(DISTINCT o.name) as order_count
         FROM `tabBuyback Audit Log` a
@@ -556,10 +561,10 @@ def get_compliance_dashboard(from_date=None, to_date=None, company=None) -> dict
         GROUP BY o.store
         HAVING override_count > %(suspicious_threshold)s
         ORDER BY override_count DESC LIMIT 10
-    """.format(order_scope=order_scope), {
+    """, {
         **scoped_date_params,
         "suspicious_threshold": suspicious_threshold,
-    }, as_dict=1)  # noqa: UP032
+    }, as_dict=1)
 
     # Recent audit actions
     recent_audits = frappe.db.sql("""

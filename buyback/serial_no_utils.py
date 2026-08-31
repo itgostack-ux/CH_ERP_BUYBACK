@@ -13,7 +13,7 @@ Functions:
 from __future__ import annotations
 
 import frappe
-from frappe.utils import nowdate, cint, flt
+from frappe.utils import cint, flt, nowdate
 
 from buyback.utils import get_buyback_data_scope
 

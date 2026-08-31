@@ -9,10 +9,8 @@ import re
 
 import frappe
 from frappe import _
-
 from frappe.model.naming import getseries
 from frappe.utils import cint, now_datetime
-
 
 _PRIVILEGED_ROLE = "System Manager"
 
@@ -105,7 +103,7 @@ def next_numeric_external_id(doctype: str, fieldname: str) -> int:
 # Indian phone number validation — canonical home is ch_item_master.utils
 # Re-exported here for backward compatibility.
 # ---------------------------------------------------------------------------
-from ch_item_master.ch_item_master.utils import (  # noqa: F401
+from ch_item_master.ch_item_master.utils import (
     normalize_indian_phone,
     validate_indian_phone,
 )
@@ -162,7 +160,7 @@ def log_audit(
     frappe.get_doc(payload).insert(ignore_permissions=True)
 
 
-def get_buyback_settings() -> "frappe.Document":
+def get_buyback_settings() -> frappe.Document:
     """Return the cached Buyback Settings singleton."""
     return frappe.get_cached_doc("Buyback Settings")
 

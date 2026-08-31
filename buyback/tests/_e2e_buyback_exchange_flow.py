@@ -205,8 +205,8 @@ def _make_order(check, tag):
 
 def _test_approval_payout_kyc(check):
 	from buyback.api import (
-		save_customer_payout_preference,
 		customer_approve_via_token,
+		save_customer_payout_preference,
 		verify_kyc,
 	)
 
@@ -290,11 +290,11 @@ def _bin_state(serial):
 
 
 def _test_buyback_bin_routing(check, order):
-	from buyback.utils import resolve_store_bin_warehouse
 	from ch_pos.api.pos_api import pos_settle_buyback_cashback
 	from ch_pos.api.search import get_available_serials
 
 	from buyback.lifecycle_api import record_indemnity
+	from buyback.utils import resolve_store_bin_warehouse
 
 	serial = order.imei_serial
 	record_indemnity(
@@ -334,8 +334,9 @@ def _test_buyback_bin_routing(check, order):
 # ─────────────────────────────────────────────────────────────────
 
 def _test_exchange_bin_routing(check):
-	from buyback.utils import resolve_store_bin_warehouse
 	from ch_pos.api.search import get_available_serials
+
+	from buyback.utils import resolve_store_bin_warehouse
 
 	order = _make_order(check, "EX")
 	order.db_set("settlement_type", "Exchange", update_modified=False)

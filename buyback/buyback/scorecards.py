@@ -29,8 +29,13 @@ Executive Scorecard (30-30-20-20):
 import frappe
 from frappe import _
 from frappe.utils import (
-    add_months, date_diff, flt, getdate, nowdate,
+    add_months,
+    date_diff,
+    flt,
+    getdate,
+    nowdate,
 )
+
 from buyback.buyback.sla_engine import DEFAULT_SLAS
 from buyback.utils import (
     assert_buyback_scope,
@@ -39,7 +44,6 @@ from buyback.utils import (
     get_int_setting,
     require_configured_role,
 )
-
 
 _SCORECARD_DEFAULTS = {
     "store_scorecard_configuration": {
@@ -297,7 +301,7 @@ def get_inspector_scorecards(from_date=None, to_date=None, store=None) -> list:
         linked_params["linked_store"] = store
     linked_paid_by_inspector = {
         row.inspector: row.cnt
-        for row in frappe.db.sql("""
+        for row in frappe.db.sql(f"""
             SELECT i.inspector, COUNT(o.name) AS cnt
             FROM `tabBuyback Inspection` i
             INNER JOIN `tabBuyback Order` o
@@ -309,10 +313,7 @@ def get_inspector_scorecards(from_date=None, to_date=None, store=None) -> list:
                 AND {inspection_scope}
                 {linked_store_cond}
             GROUP BY i.inspector
-        """.format(
-            inspection_scope=inspection_scope,
-            linked_store_cond=linked_store_cond,
-        ), linked_params, as_dict=1)  # noqa: UP032
+        """, linked_params, as_dict=1)
     }
     config = _scorecard_config("inspector_scorecard_configuration")
     grade_thresholds = _grade_thresholds()
@@ -418,7 +419,7 @@ def get_executive_scorecards(from_date=None, to_date=None, store=None) -> list:
         assessment_params["assessment_store"] = store
     assessments_by_owner = {
         row.executive: row.cnt
-        for row in frappe.db.sql("""
+        for row in frappe.db.sql(f"""
             SELECT owner AS executive, COUNT(*) AS cnt
             FROM `tabBuyback Assessment`
             WHERE docstatus < 2
@@ -426,10 +427,7 @@ def get_executive_scorecards(from_date=None, to_date=None, store=None) -> list:
                 AND {assessment_scope}
                 {assessment_store_cond}
             GROUP BY owner
-        """.format(
-            assessment_scope=assessment_scope,
-            assessment_store_cond=assessment_store_cond,
-        ), assessment_params, as_dict=1)  # noqa: UP032
+        """, assessment_params, as_dict=1)
     }
     config = _scorecard_config("executive_scorecard_configuration")
     grade_thresholds = _grade_thresholds()
