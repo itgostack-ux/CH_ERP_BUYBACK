@@ -7,7 +7,7 @@ app_license = "mit"
 
 boot_session = "buyback.boot.boot_session"
 
-required_apps = ["frappe/erpnext", "AbirJ1/ch_item_master", "ch_payments", "ch_erp15"]
+required_apps = ["frappe/erpnext", "ch_item_master", "ch_payments", "ch_erp15"]
 
 # Old apps-screen route lives on in bookmarks/history — redirect it.
 website_redirects = [{"source": "/BuyBack", "target": "/desk/buyback"}]
