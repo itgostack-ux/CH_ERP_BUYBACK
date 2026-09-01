@@ -131,8 +131,14 @@ class BuybackAssessment(Document):
             rows.extend(self.get(fieldname) or [])
         return rows
 
+    # Statuses past which the blacklist gate has nothing left to protect —
+    # the deal is already dead, and re-blocking only makes the record
+    # unsaveable (a CEIR hit blacklists the IMEI of the very assessment it
+    # cancels, so the gate would fire on that assessment's own close-out).
+    TERMINAL_STATUSES = ("Cancelled", "Expired")
+
     def _check_imei_blacklist(self):
-        if self.imei_serial:
+        if self.imei_serial and self.status not in self.TERMINAL_STATUSES:
             from buyback.buyback.doctype.buyback_imei_blacklist.buyback_imei_blacklist import (
                 check_imei_and_block,
             )
@@ -446,10 +452,27 @@ class BuybackAssessment(Document):
     # ------------------------------------------------------------------
 
     def submit_assessment(self):
-        """Customer finalises the self-assessment."""
+        """Finalise the assessment — a real submit, not just a status flip.
+
+        This used to set ``status = "Submitted"`` and ``save()``, leaving
+        docstatus at 0. Every assessment the POS intake wizard finalised
+        therefore still rendered as a red "Draft" on the Desk form and in
+        every list view, and the doctype's allow-on-submit design (status,
+        buyback_inspection, linked_pos_invoice, exchange_amount and the KYC
+        fields are all allow_on_submit) was never actually exercised.
+        Submitting for real is what the rest of the lifecycle already
+        assumes — ``pos_create_inspection`` calls ``ba.submit()`` directly.
+        """
         require_scoped_document_action(
             self, "assessment_operation_roles", _("submit a Buyback assessment")
         )
+        if self.docstatus == 1:
+            # Already submitted — only the status field can still be behind
+            # (legacy rows submitted before this method did a real submit).
+            if self.status == "Draft":
+                self.db_set("status", "Submitted")
+                log_audit("Assessment Submitted", "Buyback Assessment", self.name)
+            return
         if self.status != "Draft":
             frappe.throw(
                 _("Can only submit a Draft assessment."),
@@ -464,7 +487,7 @@ class BuybackAssessment(Document):
         if not self.quoted_price:
             self.quoted_price = self.estimated_price
         self.status = "Submitted"
-        self.save()
+        self.submit()
         log_audit("Assessment Submitted", "Buyback Assessment", self.name)
 
     @frappe.whitelist(methods=["POST"])
@@ -530,7 +553,22 @@ class BuybackAssessment(Document):
         if status in bad_outcomes:
             # Definitive national-registry hit — cancel outright, same severity
             # as the internal blacklist check, so no inspection effort follows.
+            # Also put the IMEI on the blacklist: cancelling this assessment
+            # alone only stops this document, and the same handset could be
+            # re-assessed at another store tomorrow. Nothing used to write to
+            # Buyback IMEI Blacklist at all, so `check_imei_and_block` had
+            # nothing to find.
+            from buyback.buyback.doctype.buyback_imei_blacklist.buyback_imei_blacklist import (
+                record_ceir_block,
+            )
             self.cancel_assessment()
+            record_ceir_block(
+                self.imei_serial,
+                status,
+                reference_doctype="Buyback Assessment",
+                reference_name=self.name,
+                remarks=remarks,
+            )
             log_audit("Assessment Cancelled", "Buyback Assessment", self.name,
                       new_value={"reason": f"IMEI {status} on Sanchar Saathi"})
             result["status"] = self.status

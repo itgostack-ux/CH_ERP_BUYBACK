@@ -361,12 +361,14 @@ frappe.ui.form.on("Buyback Order", {
                             fieldname: "appointment_slot",
                             fieldtype: "Select",
                             label: __("Slot"),
+                            // Must stay byte-identical to the Select options
+                            // on CH Buyback Pickup Appointment.appointment_slot.
                             options: [
                                 "",
-                                "09:00 - 12:00",
-                                "12:00 - 15:00",
-                                "15:00 - 18:00",
-                                "18:00 - 21:00",
+                                "09:00 - 12:00 (Morning)",
+                                "12:00 - 15:00 (Afternoon)",
+                                "15:00 - 18:00 (Evening)",
+                                "18:00 - 21:00 (Late Evening)",
                             ].join("\n"),
                         },
                         {

@@ -586,7 +586,8 @@
    "email": 1,
    "export": 1,
    "print": 1,
-   "report": 1
+   "report": 1,
+   "submit": 1
   },
   {
    "role": "Buyback Manager",
@@ -598,7 +599,10 @@
    "export": 1,
    "print": 1,
    "report": 1,
-   "share": 1
+   "share": 1,
+   "submit": 1,
+   "cancel": 1,
+   "amend": 1
   },
   {
    "role": "Buyback Auditor",
@@ -618,7 +622,10 @@
    "export": 1,
    "print": 1,
    "report": 1,
-   "share": 1
+   "share": 1,
+   "submit": 1,
+   "cancel": 1,
+   "amend": 1
   },
   {
    "role": "Buyback Store Manager",
@@ -629,7 +636,10 @@
    "export": 1,
    "print": 1,
    "report": 1,
-   "share": 1
+   "share": 1,
+   "submit": 1,
+   "cancel": 1,
+   "amend": 1
   }
  ],
  "row_format": "Dynamic",

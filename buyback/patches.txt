@@ -25,3 +25,5 @@ buyback.patches.v0_0_21_correct_double_counted_deductions
 buyback.patches.v0_0_21_report_missing_salvage_prices
 buyback.patches.backfill_assessment_kyc_to_order
 buyback.patches.v03_seed_alert_recipient_roles
+buyback.patches.v04_assessment_real_submit
+buyback.patches.v04_backfill_ceir_imei_blacklist

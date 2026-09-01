@@ -28,6 +28,47 @@ def _max_pickup_attempts() -> int:
     return max(cint(frappe.db.get_single_value("Buyback Settings", "max_pickup_attempts") or 3), 1)
 
 
+def _normalise_appointment_slot(slot: str | None) -> str | None:
+    """Map a caller's slot text onto the doctype's own Select options.
+
+    The POS and Desk dialogs and this API each carried their own copy of the
+    slot list, and the copies drifted: the clients offered "12:00 - 15:00"
+    while the field only accepts "12:00 - 15:00 (Afternoon)". The framework's
+    select validation then rejected the insert with a raw "Slot cannot be …"
+    popup. Match on the leading time range so an older cached bundle — or any
+    integration that sends the bare range — still schedules cleanly, and only
+    reject a slot that is genuinely not one of the configured windows.
+    """
+    slot = (slot or "").strip()
+    if not slot:
+        return None
+
+    options = [
+        opt.strip()
+        for opt in (
+            frappe.get_meta("CH Buyback Pickup Appointment")
+            .get_field("appointment_slot")
+            .options
+            or ""
+        ).split("\n")
+        if opt.strip()
+    ]
+    if slot in options:
+        return slot
+
+    # "12:00 - 15:00" → "12:00 - 15:00 (Afternoon)"
+    for option in options:
+        if option.split("(")[0].strip() == slot:
+            return option
+
+    frappe.throw(
+        _("{0} is not a valid pickup slot. Choose one of: {1}").format(
+            slot, ", ".join(options)
+        ),
+        title=_("Invalid Pickup Slot"),
+    )
+
+
 # ── Indemnity / NOC ──────────────────────────────────────────────────────
 
 
@@ -184,7 +225,7 @@ def schedule_pickup(
             "buyback_order": order_name,
             "customer": order.customer,
             "appointment_date": appointment_date,
-            "appointment_slot": (appointment_slot or "").strip() or None,
+            "appointment_slot": _normalise_appointment_slot(appointment_slot),
             "pickup_address": pickup_address or "",
             "contact_phone": (contact_phone or order.mobile_no or "").strip() or None,
             "landmark": (landmark or "").strip() or None,
@@ -198,7 +239,13 @@ def schedule_pickup(
     )
     doc.insert()
     doc.submit()
-    return {"name": doc.name, "attempt_number": doc.attempt_number}
+    # Both the POS and Desk dialogs key their success alert off `appointment`;
+    # returning only `name` made a successful schedule look like a no-op.
+    return {
+        "name": doc.name,
+        "appointment": doc.name,
+        "attempt_number": doc.attempt_number,
+    }
 
 
 @frappe.whitelist(methods=["POST"])
@@ -412,6 +459,7 @@ def record_data_wipe(
         doc.submit()
     return {
         "name": doc.name,
+        "certificate": doc.name,
         "status": doc.status,
         "buyback_order": doc.buyback_order,
     }

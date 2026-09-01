@@ -430,8 +430,12 @@ class BuybackOrder(Document):
         self._validate_lock_clearance_before_kyc()
         self._validate_ownership_proof_threshold()
 
+    # See BuybackAssessment.TERMINAL_STATUSES — a CEIR hit blacklists the IMEI
+    # of the order it rejects, so the gate must not fire on that order again.
+    TERMINAL_STATUSES = ("Rejected", "Cancelled")
+
     def _check_imei_blacklist(self):
-        if self.imei_serial:
+        if self.imei_serial and self.status not in self.TERMINAL_STATUSES:
             from buyback.buyback.doctype.buyback_imei_blacklist.buyback_imei_blacklist import (
                 check_imei_and_block,
             )
@@ -1586,6 +1590,11 @@ class BuybackOrder(Document):
         if status in bad_outcomes:
             # Definitive national-registry hit — reject outright, do not
             # leave the order sitting in limbo for staff to "fix" later.
+            # Blacklist the IMEI too, so the rejection follows the handset
+            # instead of only this order (see record_ceir_block).
+            from buyback.buyback.doctype.buyback_imei_blacklist.buyback_imei_blacklist import (
+                record_ceir_block,
+            )
             self.db_set(self._status_update("Rejected"), update_modified=True)
             self.db_set(
                 "approval_remarks",
@@ -1596,6 +1605,13 @@ class BuybackOrder(Document):
             self.reload()
             log_audit("Order Rejected", "Buyback Order", self.name,
                       new_value={"reason": f"IMEI {status} on Sanchar Saathi"})
+            record_ceir_block(
+                self.imei_serial,
+                status,
+                reference_doctype="Buyback Order",
+                reference_name=self.name,
+                remarks=remarks,
+            )
             result["order_status"] = self.status
             result["message"] = _(
                 "Device flagged as '{0}' on the Sanchar Saathi national registry. "
