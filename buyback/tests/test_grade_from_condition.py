@@ -33,6 +33,8 @@ SCRAP = 700.0
 
 def _ensure_priced_item():
     if not frappe.db.exists("Item", ITEM_CODE):
+        from buyback.tests import test_item_compliance_fields
+
         frappe.get_doc({
             "doctype": "Item",
             "item_code": ITEM_CODE,
@@ -40,6 +42,7 @@ def _ensure_priced_item():
             "item_group": frappe.db.get_value("Item Group", {"is_group": 0}, "name"),
             "stock_uom": "Nos",
             "is_stock_item": 0,
+            **test_item_compliance_fields(),
         }).insert(ignore_permissions=True)
 
     name = frappe.db.get_value("Buyback Price Master", {"item_code": ITEM_CODE}, "name")

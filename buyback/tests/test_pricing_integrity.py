@@ -27,6 +27,8 @@ DEAD = 400.0
 def _ensure_item():
     if frappe.db.exists("Item", ITEM_CODE):
         return ITEM_CODE
+    from buyback.tests import test_item_compliance_fields
+
     frappe.get_doc({
         "doctype": "Item",
         "item_code": ITEM_CODE,
@@ -34,6 +36,7 @@ def _ensure_item():
         "item_group": frappe.db.get_value("Item Group", {"is_group": 0}, "name"),
         "stock_uom": "Nos",
         "is_stock_item": 0,
+        **test_item_compliance_fields(),
     }).insert(ignore_permissions=True)
     return ITEM_CODE
 
@@ -103,9 +106,15 @@ class TestPricingIntegrity(FrappeTestCase):
         # A large impact used to blow past the deduction cap.
         _ensure_question("_test_heavy", "Customer Question",
                          [("Yes", -90), ("No", 0)])
+        # Schema truth (buyback_question_option.json): `forces_grade` now
+        # offers only "", "B", "C", "D" — "A" was removed as an option
+        # because A is the engine's default (GRADE_ORDER[0]); an option that
+        # "forces" A forces nothing. A clean answer therefore leaves
+        # forces_grade BLANK and the grade stays A unless another answer
+        # caps it lower. Do not resurrect the removed "A" option here.
         cls.preview_grade_question = _ensure_question(
             "_test_preview_grade", "Customer Question",
-            [("Clean", 0, "A"), ("Worn", 0, "C")],
+            [("Clean", 0, None), ("Worn", 0, "C")],
             purpose="Grading",
         )
         frappe.db.commit()

@@ -24,7 +24,15 @@ from buyback.utils import (
 
 
 def _require_order_action(doc, role_field: str, action: str) -> None:
-    """Require configured action authority, named write permission and location scope."""
+    """Require configured action authority, named write permission and location scope.
+
+    The configured-role gate runs FIRST, before any document permission
+    check, row lock or reload: a caller without the configured action role
+    must be refused before this helper touches (locks/reloads) the bound
+    order at all — deny-before-write is the release security boundary
+    test_release_security_boundaries pins down.
+    """
+    require_configured_role(role_field, action=action)
     doc.check_permission("write")
     assert_buyback_scope(store=doc.get("store"), company=doc.get("company"))
     frappe.db.sql(
@@ -85,6 +93,12 @@ class BuybackOrder(Document):
 
     def before_insert(self):
         """Validate uniqueness, assign sequential order_id, generate approval token."""
+        # Normalise the serial aliases BEFORE the duplicate check:
+        # before_insert fires ahead of validate(), so without this a
+        # leading/trailing-whitespace IMEI (" 351... ") slips past the
+        # exact-match duplicate guard and a second active order is created
+        # for the same physical device.
+        self._sync_serial_no_aliases()
         self._check_duplicate_active_order()
         self._assign_order_id()
         self._set_status("Draft")
@@ -274,23 +288,34 @@ class BuybackOrder(Document):
             )
 
     def _check_duplicate_active_order(self):
-        """Prevent creating a second active buyback order for the same serial number."""
-        if not self.imei_serial:
+        """Prevent creating a second active buyback order for the same serial number.
+
+        Compares on TRIM(imei_serial): scanners and copy-paste routinely add
+        leading/trailing whitespace, and legacy rows may already be stored
+        with it, so an exact-equality comparison lets " <IMEI> " bypass the
+        guard in either direction. Whitespace inside the IMEI is left alone —
+        only the ends are normalised, matching the capture-side strip.
+        """
+        imei = (self.imei_serial or "").strip()
+        if not imei:
             return
-        existing = frappe.db.get_value(
-            "Buyback Order",
-            {
-                "imei_serial": self.imei_serial,
-                "docstatus": ["!=", 2],
-                "status": ["not in", ("Cancelled", "Rejected", "Closed")],
-            },
-            "name",
+        rows = frappe.db.sql(
+            """
+            SELECT name FROM `tabBuyback Order`
+             WHERE TRIM(imei_serial) = %(imei)s
+               AND docstatus != 2
+               AND status NOT IN ('Cancelled', 'Rejected', 'Closed')
+               AND name != %(name)s
+             LIMIT 1
+            """,
+            {"imei": imei, "name": self.name or ""},
         )
+        existing = rows[0][0] if rows else None
         if existing:
             frappe.throw(
                 _("An active buyback order {0} already exists for serial/IMEI {1}. "
                   "Cancel it before creating a new one.").format(
-                    frappe.bold(existing), frappe.bold(self.imei_serial)
+                    frappe.bold(existing), frappe.bold(imei)
                 ),
                 title=_("Duplicate Buyback Order"),
             )
@@ -321,11 +346,19 @@ class BuybackOrder(Document):
                 f"Buyback Order {self.name or '<new>'}: serial_no/imei_serial "
                 f"diverged ('{new_val}' vs '{old_val}') — keeping serial_no."
             )
-            self.imei_serial = new_val
+            old_val = new_val
         elif new_val and not old_val:
-            self.imei_serial = new_val
+            old_val = new_val
         elif old_val and not new_val:
-            self.serial_no = old_val
+            new_val = old_val
+
+        # Always write the STRIPPED values back to BOTH fields. The old
+        # code only assigned in the copy/disagree branches, so a value that
+        # was merely padded (" <IMEI> ") was persisted verbatim and the
+        # duplicate guard's equality comparison never matched the clean
+        # copy: whitespace became a duplicate-order bypass.
+        self.imei_serial = old_val
+        self.serial_no = new_val
 
     def validate(self):
         self._validate_approval_token_fields()
@@ -2351,7 +2384,7 @@ class BuybackOrder(Document):
         if not role:
             return
         users = []
-        # Prefer role × store scope intersection so branch alerts don't
+        # Prefer role x store scope intersection so branch alerts don't
         # notify unrelated users from other stores.
         try:
             from ch_erp15.ch_erp15.notification_router import get_scoped_users

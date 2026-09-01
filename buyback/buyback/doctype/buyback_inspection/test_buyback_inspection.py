@@ -53,6 +53,31 @@ def _make_question(code, text, diagnosis_type="Customer Question", options=None)
     return doc.name
 
 
+def _make_item():
+    """Return the test Item, creating it if the site does not have it.
+
+    The suite used to assume "Test-Device-001" existed as committed site
+    data; after a data wipe every test errored on link validation before
+    reaching its actual assertion. Tests must create what they need inside
+    the transaction (rolled back in tearDown) — same pattern as
+    test_pricing_integrity's _ensure_item.
+    """
+    if frappe.db.exists("Item", "Test-Device-001"):
+        return "Test-Device-001"
+    from buyback.tests import test_item_compliance_fields
+
+    frappe.get_doc({
+        "doctype": "Item",
+        "item_code": "Test-Device-001",
+        "item_name": "Inspection Test Device",
+        "item_group": frappe.db.get_value("Item Group", {"is_group": 0}, "name"),
+        "stock_uom": "Nos",
+        "is_stock_item": 0,
+        **test_item_compliance_fields(),
+    }).insert(ignore_permissions=True)
+    return "Test-Device-001"
+
+
 def _make_inspection(**kwargs):
     """Create and insert a minimal Buyback Inspection in Draft status."""
     grade_a = _make_grade("A")
@@ -62,7 +87,7 @@ def _make_inspection(**kwargs):
         "pre_inspection_grade": grade_a,
         "post_inspection_grade": grade_a,
         "condition_grade": grade_a,
-        "item": "Test-Device-001",
+        "item": _make_item(),
         "inspector": "Administrator",
     }
     defaults.update(kwargs)
@@ -409,7 +434,7 @@ class TestInspectionResultChildTable(FrappeTestCase):
 
     def test_manual_row_can_be_saved(self):
         """A manually added result row (no question_ref) saves without error."""
-        grade_a = _make_grade("A")
+        _make_grade("A")
         doc = _make_inspection()
         doc.append("results", {
             "checklist_item": "Screen Check",
@@ -456,9 +481,14 @@ class TestInspectionWorkflow(FrappeTestCase):
         self.assertEqual(doc.inspector, "Administrator")
 
     def test_cannot_start_already_in_progress(self):
-        doc = _make_inspection(status="In Progress")
-        doc.inspection_started_at = now_datetime()
-        doc.save(ignore_permissions=True)
+        # Code truth: before_insert force-sets status = "Draft" (status is
+        # server-issued, clients cannot inject it at insert), so passing
+        # status="In Progress" into the insert no longer stages the
+        # precondition — set it after insert the way start_inspection does.
+        doc = _make_inspection()
+        doc.db_set("status", "In Progress", update_modified=False)
+        doc.db_set("inspection_started_at", now_datetime(), update_modified=False)
+        doc.reload()
 
         with self.assertRaises(Exception):
             doc.start_inspection()
@@ -474,11 +504,11 @@ class TestInspectionWorkflow(FrappeTestCase):
 
     def test_cannot_reject_completed(self):
         """Completed inspection cannot be rejected."""
-        doc = _make_inspection(
-            status="Completed",
-            condition_grade=self.grade_a,
-        )
-        doc.save(ignore_permissions=True)
+        # Code truth: before_insert force-sets status = "Draft" (status is
+        # server-issued), so stage the Completed state after insert.
+        doc = _make_inspection(condition_grade=self.grade_a)
+        doc.db_set("status", "Completed", update_modified=False)
+        doc.reload()
 
         with self.assertRaises(Exception):
             doc.reject_device(reason="Too late")
@@ -499,7 +529,12 @@ class TestInspectionWorkflow(FrappeTestCase):
                 {
                     "check_item": "Water Damage",
                     "check_code": "water_damage",
-                    "check_type": "Yes/No",
+                    # Schema truth (buyback_checklist_item.json): the
+                    # "Yes/No" Check Type option was removed — checklist
+                    # items are now Pass/Fail, Grade (A/B/C/D), Numeric
+                    # Score or Text Note. A binary water-damage check maps
+                    # to Pass/Fail. Do not resurrect the removed option.
+                    "check_type": "Pass/Fail",
                     "is_mandatory": 0,
                 },
             ],
@@ -508,6 +543,12 @@ class TestInspectionWorkflow(FrappeTestCase):
 
         doc = _make_inspection(checklist_template=tmpl.name)
         doc.populate_checklist()
+        # Schema truth: Buyback Inspection Result.result is now reqd — a
+        # populated checklist row cannot be SAVED until the inspector has
+        # recorded its outcome, so record one before persisting (the old
+        # test saved the blank rows populate_checklist stages for the UI).
+        for row in doc.results:
+            row.result = "Pass"
         doc.save(ignore_permissions=True)
         doc.reload()
 
@@ -612,16 +653,13 @@ class TestDuplicateButtonsPrevented(FrappeTestCase):
             hasattr(doc, "recalculate_grade_and_price"),
             "recalculate_grade_and_price method must exist"
         )
-        # Check it's decorated @frappe.whitelist
-        import inspect
+        # Check it's decorated @frappe.whitelist — frappe registers the
+        # function object in the frappe.whitelisted set; there is no
+        # __frappe_whitelist__ attribute (the old check was always False
+        # and the string fallback crashed inside frappe.is_whitelisted).
         method = type(doc).recalculate_grade_and_price
-        self.assertTrue(
-            getattr(method, "__frappe_whitelist__", False)
-            or "whitelistmethod" in str(type(method)).lower()
-            or hasattr(method, "_frappe_whitelist")
-            or frappe.is_whitelisted(
-                "buyback.buyback.doctype.buyback_inspection.buyback_inspection.BuybackInspection.recalculate_grade_and_price"
-            ),
+        self.assertIn(
+            method, frappe.whitelisted,
             "recalculate_grade_and_price should be whitelisted"
         )
 

@@ -990,6 +990,7 @@
    "read_only": 1
   },
   {
+   "allow_on_submit": 1,
    "fieldname": "lifecycle_evidence_signature",
    "fieldtype": "Data",
    "hidden": 1,
@@ -1001,7 +1002,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-03-05 10:00:00.000000",
+ "modified": "2026-09-01 10:00:00.000000",
  "modified_by": "Administrator",
  "module": "BuyBack",
  "name": "Buyback Order",

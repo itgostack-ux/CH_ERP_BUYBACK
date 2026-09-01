@@ -299,6 +299,12 @@ class RefurbishmentOrder(Document):
 def create_from_return(return_invoice: str, original_invoice: str | None = None, items: list | None = None,
 		customer: str | None = None, company: str | None = None, physical_condition: str | None = None,
 		return_reason: str | None = None, return_remarks: str | None = None) -> dict:
+	# Deny-before-read: the configured-role gate must refuse BEFORE the
+	# return invoice is locked or loaded, so an unauthorised caller cannot
+	# probe for invoice existence or take row locks on it.
+	require_configured_role(
+		"refurbishment_creation_roles", action=_("create a Refurbishment Order")
+	)
 	frappe.has_permission("Refurbishment Order", ptype="create", throw=True)
 	if not return_invoice:
 		frappe.throw(_("A submitted return invoice is required."))

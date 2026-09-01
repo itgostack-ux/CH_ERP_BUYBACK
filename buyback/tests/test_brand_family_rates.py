@@ -21,6 +21,8 @@ APPLE_ITEM = "_TEST_RATE_APPLE"
 
 def _ensure_item(code, sub_category):
     if not frappe.db.exists("Item", code):
+        from buyback.tests import test_item_compliance_fields
+
         frappe.get_doc({
             "doctype": "Item",
             "item_code": code,
@@ -28,6 +30,7 @@ def _ensure_item(code, sub_category):
             "item_group": frappe.db.get_value("Item Group", {"is_group": 0}, "name"),
             "stock_uom": "Nos",
             "is_stock_item": 0,
+            **test_item_compliance_fields(),
         }).insert(ignore_permissions=True)
     # Brand family is read off the sub-category, the same signal the question
     # sets route on. Fall back to the brand when the sub-category master has no

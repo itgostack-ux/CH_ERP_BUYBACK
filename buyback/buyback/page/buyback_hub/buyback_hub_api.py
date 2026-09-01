@@ -9,6 +9,15 @@ from buyback.utils import get_int_setting, require_configured_role
 
 
 def _check_hub_access() -> None:
+    """Refuse hub access unless the caller holds a configured dashboard role
+    AND read permission on every doctype the hub aggregates.
+
+    The configured-role gate comes first and fails closed: the hub had
+    silently lost it (leaving only the per-doctype reads), which let any
+    reader of the underlying doctypes pull the cross-store dashboard —
+    the exact gate-that-does-not-refuse pattern the go-live sweep flagged.
+    """
+    require_configured_role("dashboard_roles", action=_("view the Buyback Hub"))
     for doctype in ("Buyback Order", "Buyback Assessment", "Buyback Inspection"):
         frappe.has_permission(doctype, ptype="read", throw=True)
 

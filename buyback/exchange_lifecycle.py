@@ -44,9 +44,15 @@ def ensure_exchange_order_from_assessment(
         ``{"exchange_order": <name>, "buyback_order": <name or None>,
         "reused": bool, "source": "assessment" | "buyback_order"}``
     """
+    # Deny-before-read: the configured-role gate must refuse BEFORE the
+    # assessment is even looked up, so an unauthorised caller cannot probe
+    # for document existence or trigger a lock/reload on it.
+    require_configured_role(
+        "exchange_creation_roles", action=_("create a Buyback exchange order")
+    )
+
     if not assessment_name:
         frappe.throw(_("assessment_name is required"))
-
 
     if not frappe.db.exists("Buyback Assessment", assessment_name):
         frappe.throw(

@@ -9,7 +9,7 @@
  "idx": 0,
  "is_standard": "Yes",
  "letter_head": "",
- "modified": "2026-06-24 00:00:00",
+ "modified": "2026-09-01 10:00:00",
  "modified_by": "Administrator",
  "module": "Buyback",
  "name": "Buyback Refurb Queue",
@@ -22,7 +22,6 @@
   {"role": "System Manager"},
   {"role": "Buyback Manager"},
   {"role": "Buyback Admin"},
-  {"role": "Buyback User"},
-  {"role": "Stock Manager"}
+  {"role": "Buyback Store Manager"}
  ]
 }

@@ -184,9 +184,41 @@ def get_buyback_setting_value(fieldname: str, default=None):
 # Frappe DocPerm via frappe.has_permission(...).
 # ---------------------------------------------------------------------------
 def get_role_setting(fieldname: str, defaults=()) -> frozenset[str]:
+    """Roles configured for a Buyback action, defaults only as a last resort.
+
+    Delegates to the estate-wide ch_erp15 helper (CH Role Link child rows
+    with a legacy newline/comma fallback) but re-reads the stored Single
+    value locally when that comes back empty: stored configuration must
+    win over hardcoded defaults even if the shared helper's internals
+    change, because a silently dropped stored role list widens (or closes)
+    permission gates without anyone editing this app.
+    """
     from ch_erp15.role_settings import get_setting_roles
 
-    return get_setting_roles("Buyback Settings", fieldname, defaults)
+    roles = set(get_setting_roles("Buyback Settings", fieldname, ()))
+
+    if not roles:
+        # Same guarded pattern as get_buyback_setting_value: a metadata or
+        # cache failure here must degrade to "no stored roles" (fail closed
+        # at the gates), never crash the caller.
+        try:
+            meta = frappe.get_meta("Buyback Settings")
+            if meta.has_field(fieldname):
+                value = frappe.get_cached_value(
+                    "Buyback Settings", "Buyback Settings", fieldname
+                )
+                if value:
+                    roles.update(
+                        role.strip()
+                        for role in str(value).replace(",", "\n").splitlines()
+                        if role.strip()
+                    )
+        except Exception:
+            pass
+
+    if not roles:
+        roles.update(defaults)
+    return frozenset(roles)
 
 
 def is_privileged_user(user: str | None = None) -> bool:
@@ -346,7 +378,14 @@ def assert_buyback_scope(
 
 
 def require_scoped_document_action(doc, fieldname: str, action: str) -> None:
-    """Authorize and lock a named Buyback document before a bound mutation."""
+    """Authorize and lock a named Buyback document before a bound mutation.
+
+    The configured-role gate is deliberately the FIRST check: a caller
+    without the configured action role must be denied before this helper
+    touches (locks/reloads) the document — deny-before-write is the release
+    security boundary test_release_security_boundaries pins down.
+    """
+    require_configured_role(fieldname, action=action)
     doc.check_permission("write")
     assert_buyback_scope(
         store=doc.get("store"),
