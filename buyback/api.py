@@ -1088,27 +1088,14 @@ def request_price_exception(order_name: str, requested_price: float | str, reaso
     if requested == current_price:
         frappe.throw(_("Requested price is same as current final price."), exc=BuybackValidationError)
 
-    if not frappe.db.exists("CH Exception Type", "Exchange Value Override"):
-        frappe.throw(_("Exception Type 'Exchange Value Override' is not configured."), exc=BuybackValidationError)
-
-    from ch_item_master.ch_item_master.exception_api import raise_exception
-
-    ex = raise_exception(
-        exception_type="Exchange Value Override",
-        company=doc.company,
-        reason=(
-            f"Negotiated price change requested on {doc.name}: "
-            f"₹{current_price:,.2f} -> ₹{requested:,.2f}. "
-            f"Reason: {str(reason).strip()}"
-        ),
-        requested_value=abs(requested - current_price),
-        original_value=current_price,
-        reference_doctype="Buyback Order",
-        reference_name=doc.name,
-        item_code=doc.item,
-        serial_no=doc.imei_serial,
-        store_warehouse=doc.store,
-        customer=doc.customer,
+    # A buyback exception approves the final customer payout, not its delta.
+    # The generic Exchange Value Override is audit-only and expresses the
+    # requested value as an absolute difference, which cannot safely tell the
+    # approval hook whether the payout should go up or down.
+    ex = raise_buyback_exception(
+        order=doc.name,
+        requested_price=requested,
+        reason=str(reason).strip(),
     )
 
     log_audit(
