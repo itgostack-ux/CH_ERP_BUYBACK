@@ -285,7 +285,7 @@ def submit_public_quote_request(
     doc = frappe.get_doc(
         {
             "doctype": "Buyback Assessment",
-            "source": "Web",
+            "source": "App",
             "customer": customer,
             "customer_name": customer_name,
             "mobile_no": mobile_no,

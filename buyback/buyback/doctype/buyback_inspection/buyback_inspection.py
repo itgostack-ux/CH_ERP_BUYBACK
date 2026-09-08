@@ -219,6 +219,25 @@ class BuybackInspection(Document):
                 title=_("Account Lock Not Cleared"),
             )
 
+        # "App" (public web self-assessment) had no device in staff hands at
+        # intake, so BuybackAssessment.create_inspection() let it skip the
+        # usual pre-inspection Sanchar Saathi check. Enforce it here instead,
+        # now that the device has actually been in for grading \u2014 every other
+        # source already cleared this before an inspection could even start.
+        if self.source == "App" and self.buyback_assessment:
+            imei_status, imei_screenshot = frappe.db.get_value(
+                "Buyback Assessment", self.buyback_assessment,
+                ["imei_validation_status", "imei_validation_screenshot"],
+            )
+            if imei_status != "Verified Clean" or not imei_screenshot:
+                frappe.throw(
+                    _("Sanchar Saathi IMEI validation must be completed (status = 'Verified "
+                      "Clean', with screenshot) before completing inspection. Current status: "
+                      "{0}.").format(imei_status or "Pending"),
+                    exc=BuybackStatusError,
+                    title=_("IMEI Validation Required"),
+                )
+
         # Hard block: refuse to complete inspection when no base price is configured
         # in the Buyback Pricing Master for this item/grade. We must not present
         # a \u20b90 buyback offer to the customer.

@@ -1,4 +1,10 @@
 frappe.ui.form.on("Buyback Assessment", {
+	// "Store Warehouse" shows the store's display name only — Warehouse's own
+	// Link dropdown (a global Property Setter) shows docname/abbreviation/
+	// company too, which store staff don't need. Scoped to this field only.
+	setup(frm) {
+		frm.set_query("store", () => ({ query: "buyback.api.store_warehouse_query" }));
+	},
 	refresh(frm) {
 		// Clear custom buttons first to prevent duplicates on repeated refreshes
 		frm.clear_custom_buttons();
@@ -51,7 +57,7 @@ frappe.ui.form.on("Buyback Assessment", {
 		// Hide "Mobile App" from Source dropdown — only settable via API
 		if (frm.doc.source !== "Mobile App") {
 			frm.set_df_property("source", "options",
-				["In-Store Kiosk", "Web", "Store Manual"]
+				["In-Store Kiosk", "App", "Store Manual"]
 			);
 		}
 

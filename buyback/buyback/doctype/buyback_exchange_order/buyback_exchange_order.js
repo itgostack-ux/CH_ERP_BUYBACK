@@ -2,6 +2,12 @@
 // For license information, please see license.txt
 
 frappe.ui.form.on("Buyback Exchange Order", {
+    // "Store Warehouse" shows the store's display name only — Warehouse's own
+    // Link dropdown (a global Property Setter) shows docname/abbreviation/
+    // company too, which store staff don't need. Scoped to this field only.
+    setup(frm) {
+        frm.set_query("store", () => ({ query: "buyback.api.store_warehouse_query" }));
+    },
     refresh(frm) {
         if (frm.doc.docstatus !== 1) return;
 

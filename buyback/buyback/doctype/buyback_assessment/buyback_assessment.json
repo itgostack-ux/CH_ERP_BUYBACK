@@ -104,7 +104,7 @@
    "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Source",
-   "options": "Mobile App\nIn-Store Kiosk\nWeb\nStore Manual",
+   "options": "Mobile App\nIn-Store Kiosk\nApp\nStore Manual",
    "reqd": 1,
    "search_index": 1
   },

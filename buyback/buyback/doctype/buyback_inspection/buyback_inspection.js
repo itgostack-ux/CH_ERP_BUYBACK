@@ -9,6 +9,12 @@ const CHECK_TYPE_OPTIONS = {
 };
 
 frappe.ui.form.on("Buyback Inspection", {
+    // "Store Warehouse" shows the store's display name only — Warehouse's own
+    // Link dropdown (a global Property Setter) shows docname/abbreviation/
+    // company too, which store staff don't need. Scoped to this field only.
+    setup(frm) {
+        frm.set_query("store", () => ({ query: "buyback.api.store_warehouse_query" }));
+    },
     buyback_assessment(frm) {
         // When assessment is set on a new inspection, auto-populate tests & questions
         if (!frm.doc.buyback_assessment || !frm.is_new()) return;

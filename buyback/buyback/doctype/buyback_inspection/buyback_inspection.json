@@ -109,7 +109,7 @@
    "fieldname": "source",
    "fieldtype": "Select",
    "label": "Source",
-   "options": "Mobile App\nIn-Store Kiosk\nWeb\nStore Manual",
+   "options": "Mobile App\nIn-Store Kiosk\nApp\nStore Manual",
    "read_only": 1,
    "in_standard_filter": 1,
    "fetch_from": "buyback_assessment.source",

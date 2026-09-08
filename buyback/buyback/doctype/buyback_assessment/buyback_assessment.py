@@ -603,7 +603,14 @@ class BuybackAssessment(Document):
                 exc=BuybackStatusError,
             )
 
-        if self.imei_validation_status != "Verified Clean" or not self.imei_validation_screenshot:
+        # "App" (public web self-assessment) has no device in staff hands at
+        # intake, so the IMEI check can't happen yet — it's enforced instead by
+        # BuybackOrder before customer approval/KYC/OTP, once inspection has
+        # brought the device in. Every other source has the device at intake
+        # already, so the check stays a pre-inspection gate for them.
+        if self.source != "App" and (
+            self.imei_validation_status != "Verified Clean" or not self.imei_validation_screenshot
+        ):
             frappe.throw(
                 _("Sanchar Saathi IMEI validation must be completed (status = 'Verified Clean', "
                   "with screenshot) before inspection can start. Current status: {0}.").format(

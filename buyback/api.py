@@ -3197,3 +3197,30 @@ def check_device_quotable(
                 ).format(", ".join(missing), item_code, band, bpm.name),
             }
     return result
+
+
+@frappe.whitelist()
+def store_warehouse_query(doctype, txt, searchfield, start, page_len, filters=None):
+    """Link-field search for Buyback's "Store Warehouse" field.
+
+    Warehouse's own Link dropdown (via a global Property Setter) shows the
+    docname, abbreviation, and company alongside the title — clutter store
+    staff don't need since they only ever recognise a store by its display
+    name. Scoped to this one field: it doesn't touch how Warehouse pickers
+    look anywhere else in the system.
+    """
+    query_filters = dict(filters or {})
+    query_filters.setdefault("disabled", 0)
+    return frappe.get_list(
+        "Warehouse",
+        filters=query_filters,
+        or_filters=[
+            ["name", "like", f"%{txt}%"],
+            ["ch_display_name", "like", f"%{txt}%"],
+        ],
+        fields=["name", "ch_display_name"],
+        order_by="ch_display_name asc",
+        start=cint(start),
+        page_length=cint(page_len),
+        as_list=True,
+    )
