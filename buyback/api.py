@@ -2447,7 +2447,7 @@ def get_diagnostic_tests_for_item(item_code: str) -> list:
     tests = frappe.get_list(
         "Buyback Question Bank",
         filters=filters,
-        fields=["name", "question_code", "question_text"],
+        fields=["name", "question_code", "question_text", "fault_code"],
         order_by="idx asc, name asc",
         limit_page_length=500,
     )
@@ -2466,6 +2466,7 @@ def get_diagnostic_tests_for_item(item_code: str) -> list:
             "name": t.name,
             "test_code": t.question_code,
             "test_name": t.question_text,
+            "fault_code": t.get("fault_code") or "",
             "options": [
                 {
                     "value": o.get("option_value"),
@@ -2508,7 +2509,8 @@ def get_customer_questions_for_item(item_code: str) -> list:
     questions = frappe.get_list(
         "Buyback Question Bank",
         filters=filters,
-        fields=["name", "question_code", "question_text", "question_purpose"],
+        fields=["name", "question_code", "question_text", "question_purpose",
+                "question_category", "is_mandatory", "fault_code"],
         order_by="idx asc, name asc",
         limit_page_length=500,
     )
@@ -2531,6 +2533,9 @@ def get_customer_questions_for_item(item_code: str) -> list:
             # showing them in one undifferentiated list is what made it
             # impossible to see which answer moved what.
             "question_purpose": q.get("question_purpose") or "Deduction",
+            "question_category": q.get("question_category") or "",
+            "is_mandatory": cint(q.get("is_mandatory")),
+            "fault_code": q.get("fault_code") or "",
             "options": [
                 {
                     "value": o.get("option_value"),
