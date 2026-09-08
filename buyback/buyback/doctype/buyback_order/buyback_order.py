@@ -2145,6 +2145,47 @@ class BuybackOrder(Document):
             )
             return
 
+        # A dead phone (Grade F) often can't be powered on to read its IMEI,
+        # so it's the one condition where an uncaptured serial is expected
+        # rather than a data-entry gap.
+        condition_grade_name = (
+            frappe.db.get_value("Grade Master", self.condition_grade, "grade_name")
+            if self.condition_grade else None
+        )
+        is_phone_dead = condition_grade_name == "F"
+
+        # Guard: a serialized item needs either a captured IMEI/serial or a
+        # Serial No Series on the Item to auto-pick one — otherwise ERPNext
+        # only discovers this deep inside Stock Entry submit (via the child
+        # Stock Ledger Entry's Serial/Batch Bundle validation), which fails
+        # the whole transaction late with a generic, non-buyback-specific
+        # error. Fail fast here instead, before creating the Stock Entry.
+        item_details = frappe.db.get_value(
+            "Item", self.item, ["has_serial_no", "serial_no_series"], as_dict=True
+        )
+        if (
+            item_details.has_serial_no
+            and not is_phone_dead
+            and not self.imei_serial
+            and not item_details.serial_no_series
+        ):
+            frappe.throw(
+                _(
+                    "IMEI/Serial No is required to settle this buyback order for item {0} "
+                    "— none was captured, and Item {0} has no Serial No Series configured "
+                    "for auto-pick."
+                ).format(self.item),
+                title=_("Serial No Required"),
+            )
+
+        # A dead phone entering stock still needs a unique serial to satisfy
+        # the serialized item — synthesize one from the order when no real
+        # IMEI is on file, so it doesn't fall through to ERPNext's auto-pick
+        # (which would fail without a Serial No Series anyway).
+        effective_serial_no = self.imei_serial or (
+            f"DEAD-{self.name}" if is_phone_dead and item_details.has_serial_no else ""
+        )
+
         settings = frappe.get_single("Buyback Settings")
 
         # Destination depends on settlement type:
@@ -2200,7 +2241,7 @@ class BuybackOrder(Document):
                     "t_warehouse": target_warehouse,
                     "qty": 1,
                     "basic_rate": valuation_rate,
-                    "serial_no": self.imei_serial or "",
+                    "serial_no": effective_serial_no,
                 },
             ],
         })

@@ -24,21 +24,6 @@
           <tr><td class="text-muted">Store</td><td>{{ order.store_name or '-' }}</td></tr>
         </table>
 
-        <!-- Customer KYC -->
-        <h5 class="mt-4 mb-2">Customer KYC Details</h5>
-        <table class="table table-sm">
-          <tr><td class="text-muted">ID Proof Type</td><td><strong>{{ order.customer_id_type or '-' }}</strong></td></tr>
-          <tr><td class="text-muted">ID Number</td><td><strong>{{ order.customer_id_number_masked or '-' }}</strong></td></tr>
-          <tr><td class="text-muted">KYC Verified</td><td>{{ 'Yes' if order.kyc_verified else 'No' }}</td></tr>
-          {% if order.kyc_verified and order.kyc_verified_at %}
-          <tr><td class="text-muted">Verified At</td><td>{{ order.kyc_verified_at }}</td></tr>
-          {% endif %}
-        </table>
-
-        <div class="alert alert-info py-2">
-          KYC documents are retained securely and are not displayed through this link.
-        </div>
-
         <!-- Device Photos -->
         {% if order.device_photo_front or order.device_photo_back %}
         <h5 class="mt-4 mb-2">Device Photos</h5>
@@ -136,6 +121,26 @@
             <div id="payout-message" class="mt-2"></div>
           </div>
 
+          <!-- Terms & Conditions -->
+          <div class="border rounded p-3 mb-4">
+            <h6 class="mb-2">Buyback of Devices &ndash; Terms &amp; Conditions</h6>
+            <div class="small text-muted" style="max-height:220px; overflow-y:auto;">
+              <p>I declare, undertake as follows: I am the legal owner of the device (details of device), legally acquired, not stolen, not pledged, not rented from any person, and have full authority to sell the device to anybody. The device is not subject to any pending police complaint, FIR, or investigation. All documents given and information provided to the Company for KYC are genuine. The IMEI/serial number(s) of the device are genuine, unaltered, and match the device, not tampered, cloned, or counterfeit. I undertake to indemnify fully for losses or costs incurred due to my wrong declaration. I confirm that I have erased all my personal data from the device, and that the Company shall bear no liability for any data loss, privacy breach, or misuse of stored information. I state that the Company has authority to verify the device details with telecom operators, police portals, or third-party databases. Any dispute arising out of or in connection with this transaction is subject to the exclusive jurisdiction of the competent courts in Chennai, Tamil Nadu.</p>
+            </div>
+            <table class="table table-sm mt-2 mb-2">
+              <tr><td class="text-muted">Name</td><td><strong>{{ order.customer_name or '-' }}</strong></td></tr>
+              <tr><td class="text-muted">Aadhar Card</td><td><strong>{{ order.customer_id_number_masked or '-' }}</strong></td></tr>
+              <tr><td class="text-muted">Mob No</td><td><strong>{{ order.mobile_no_masked or '-' }}</strong></td></tr>
+              <tr><td class="text-muted">Date</td><td><strong id="tnc-date"></strong></td></tr>
+            </table>
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="tnc-agree" onchange="toggleSendOtpButton()">
+              <label class="form-check-label" for="tnc-agree">
+                I have read and agree to the above terms &amp; conditions.
+              </label>
+            </div>
+          </div>
+
           <!-- OTP Section -->
           <div id="otp-section">
             <p class="text-center text-muted">
@@ -144,7 +149,7 @@
             </p>
 
             <div id="send-otp-section" class="text-center">
-              <button id="btn-send-otp" class="btn btn-primary btn-lg" onclick="sendOTP()">
+              <button id="btn-send-otp" class="btn btn-primary btn-lg" onclick="sendOTP()" disabled>
                 Send OTP
               </button>
             </div>
@@ -261,7 +266,23 @@
     }
   }
 
+  function toggleSendOtpButton() {
+    const agree = document.getElementById('tnc-agree');
+    const btn = document.getElementById('btn-send-otp');
+    if (!agree || !btn) return;
+    btn.disabled = !agree.checked;
+  }
+
   async function sendOTP() {
+    const agree = document.getElementById('tnc-agree');
+    if (agree && !agree.checked) {
+      const msg = document.getElementById('otp-message');
+      if (msg) {
+        msg.innerHTML = '<span class="text-danger">Please agree to the terms & conditions before sending OTP.</span>';
+      }
+      return;
+    }
+
     const saved = payoutSaved ? true : await savePayoutPreference(true);
     if (!saved) {
       const msg = document.getElementById('otp-message');
@@ -337,6 +358,12 @@
       });
       togglePayoutFields();
     }
+
+    const dateEl = document.getElementById('tnc-date');
+    if (dateEl) {
+      dateEl.textContent = new Date().toLocaleString();
+    }
+    toggleSendOtpButton();
   });
 </script>
 {% endblock %}
