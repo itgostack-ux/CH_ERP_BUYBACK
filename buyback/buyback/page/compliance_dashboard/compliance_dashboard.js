@@ -63,14 +63,14 @@ function render_compliance(page, data) {
 
 	let html = `
 		<div class="row mb-4">
-			${kpi_card("Manager Overrides", k.manager_overrides, k.manager_overrides > 0 ? "orange" : "green")}
-			${kpi_card("Duplicate IMEIs", k.duplicate_imeis, k.duplicate_imeis > 0 ? "red" : "green")}
-			${kpi_card("High Value Orders", k.high_value_orders, "purple")}
-			${kpi_card("High Value Total", format_currency(k.high_value_total), "purple")}
+			${kpi_card("Manager Overrides", k.manager_overrides, k.manager_overrides > 0 ? "orange" : "green", "manager_overrides")}
+			${kpi_card("Duplicate IMEIs", k.duplicate_imeis, k.duplicate_imeis > 0 ? "red" : "green", "duplicate_imeis")}
+			${kpi_card("High Value Orders", k.high_value_orders, "purple", "high_value_orders")}
+			${kpi_card("High Value Total", format_currency(k.high_value_total), "purple", "high_value_total")}
 		</div>
 		<div class="row mb-4">
-			${kpi_card("Manual Approvals", k.manual_approvals, "orange")}
-			${kpi_card("Auto Approvals", k.auto_approvals, "green")}
+			${kpi_card("Manual Approvals", k.manual_approvals, "orange", "manual_approvals")}
+			${kpi_card("Auto Approvals", k.auto_approvals, "green", "auto_approvals")}
 			${kpi_card("Large Payout Threshold", format_currency(k.large_payout_threshold), "blue")}
 			<div class="col-md-3 col-sm-6 mb-3"></div>
 		</div>
@@ -104,6 +104,12 @@ function render_compliance(page, data) {
 	`;
 
 	page.content_area.html(html);
+
+	buyback.drilldown.attach(page.content_area, "compliance", () => ({
+		company: page.fields_dict.company?.get_value(),
+		from_date: page.fields_dict.from_date?.get_value(),
+		to_date: page.fields_dict.to_date?.get_value(),
+	}));
 }
 
 function audit_badge(action) {
@@ -115,12 +121,13 @@ function audit_badge(action) {
 	return "info";
 }
 
-function kpi_card(label, value, color) {
+function kpi_card(label, value, color, tile) {
 	const colors = { blue: "#5e64ff", green: "#29cd42", orange: "#ffa00a", red: "#ff5858", purple: "#7c5cfc" };
 	return `
 		<div class="col-md-3 col-sm-6 mb-3">
-			<div class="border rounded p-3 h-100" style="border-left: 4px solid ${colors[color]} !important;">
-				<div class="text-muted small">${label}</div>
+			<div class="border rounded p-3 h-100" ${tile ? `data-bb-tile="${tile}"` : ""}
+			     style="border-left: 4px solid ${colors[color]} !important;">
+				<div class="text-muted small bb-tile-label">${label}</div>
 				<div class="font-weight-bold h4 mb-0" style="color: ${colors[color]}">${value}</div>
 			</div>
 		</div>

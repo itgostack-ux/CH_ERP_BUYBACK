@@ -25,13 +25,17 @@ import unittest
 import frappe
 from frappe.utils import add_days, nowdate
 
+from buyback.buyback import dashboard_api as _dash_api
 from buyback.buyback.dashboard_api import (
     BUYBACK_TILES,
     CURRENCY_TILES,
+    get_compliance_dashboard,
     get_dashboard_tile_rows,
     get_finance_dashboard,
     get_store_dashboard,
 )
+
+_COMPLIANCE_CUSTOM = _dash_api._COMPLIANCE_CUSTOM
 
 _STORE = "DRILLDOWN-TEST-WH"
 
@@ -61,6 +65,39 @@ def _make_order(store, status, *, days_ago=1, paid=0.0, mode=None, settlement="B
     return doc.name
 
 
+def _make_audit_log(order, action, *, days_ago=1):
+    doc = frappe.new_doc("Buyback Audit Log")
+    doc.reference_doctype = "Buyback Order"
+    doc.reference_name = order
+    doc.action = action
+    doc.flags.ignore_permissions = True
+    doc.flags.ignore_mandatory = True
+    doc.flags.ignore_validate = True
+    doc.flags.ignore_links = True
+    doc.insert(ignore_permissions=True)
+    frappe.db.set_value("Buyback Audit Log", doc.name,
+                        {"action": action,
+                         "creation": f"{add_days(nowdate(), -days_ago)} 10:00:00"},
+                        update_modified=False)
+    return doc.name
+
+
+def _make_assessment(store, *, imei, days_ago=1):
+    doc = frappe.new_doc("Buyback Assessment")
+    doc.store = store
+    doc.imei_serial = imei
+    doc.flags.ignore_permissions = True
+    doc.flags.ignore_mandatory = True
+    doc.flags.ignore_validate = True
+    doc.flags.ignore_links = True
+    doc.insert(ignore_permissions=True)
+    frappe.db.set_value("Buyback Assessment", doc.name,
+                        {"imei_serial": imei,
+                         "creation": f"{add_days(nowdate(), -days_ago)} 10:00:00"},
+                        update_modified=False)
+    return doc.name
+
+
 class TestBuybackDashboardDrilldown(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -84,6 +121,15 @@ class TestBuybackDashboardDrilldown(unittest.TestCase):
         # OUTSIDE the window — only the undated cards may see these
         _make_order(self.store, "Awaiting Approval", days_ago=400)
         _make_order(self.store, "OTP Verified", days_ago=400, paid=0)
+
+        # A manually-overridden order, so manager_overrides / manual_approvals /
+        # auto_approvals are exercised rather than trivially zero.
+        self.overridden = _make_order(self.store, "Paid", days_ago=2, paid=60000, mode="Cash")
+        _make_audit_log(self.overridden, "Price Override", days_ago=2)
+
+        # Two assessments sharing an IMEI, so duplicate_imeis has something.
+        for _ in range(2):
+            _make_assessment(self.store, imei="DUPIMEI000000001", days_ago=2)
 
     def tearDown(self):
         frappe.db.rollback(save_point="drilldown")
@@ -152,3 +198,41 @@ class TestBuybackDashboardDrilldown(unittest.TestCase):
         with self.assertRaises(frappe.ValidationError) as caught:
             get_dashboard_tile_rows(dashboard="store", tile="no_such_card", store=self.store)
         self.assertIn("refresh", frappe.utils.strip_html(str(caught.exception)).lower())
+
+    def test_compliance_cards_open_onto_their_own_numbers(self):
+        """Including the two that are not plain table scans.
+
+        duplicate_imeis counts IMEI VALUES appearing more than once, so its list
+        is one row per duplicated IMEI — not one per assessment. auto_approvals
+        is derived on the card by subtracting the manually-touched orders, and
+        the drill-down expresses the same set difference.
+        """
+        comp = get_compliance_dashboard(from_date=self.fd, to_date=self.td)
+        kpis = comp.get("kpis", comp)
+        tiles = {t for (d, t) in BUYBACK_TILES if d == "compliance"} | _COMPLIANCE_CUSTOM
+        bad = []
+        for tile in sorted(tiles):
+            if tile not in kpis:
+                continue
+            r = get_dashboard_tile_rows(dashboard="compliance", tile=tile,
+                                        from_date=self.fd, to_date=self.td)
+            money_field = CURRENCY_TILES.get(("compliance", tile))
+            if money_field:
+                listed = sum(float(x.get(money_field) or 0) for x in r["rows"])
+                if abs(listed - float(kpis[tile] or 0)) > 0.01:
+                    bad.append(f"{tile}: card Rs{kpis[tile]} vs rows Rs{listed}")
+            elif kpis[tile] != r["total"]:
+                bad.append(f"{tile}: card {kpis[tile]} vs rows {r['total']}")
+        self.assertFalse(
+            bad, "Compliance cards disagreeing with their list:\n  " + "\n  ".join(bad))
+        # Guard against a vacuous pass: the seed must have moved these.
+        self.assertGreaterEqual(kpis.get("manager_overrides", 0), 1,
+                                "the seeded Price Override did not register")
+        self.assertGreaterEqual(kpis.get("duplicate_imeis", 0), 1,
+                                "the seeded duplicate IMEI did not register")
+
+    def test_the_threshold_card_is_not_openable(self):
+        """large_payout_threshold is a setting, not a population."""
+        with self.assertRaises(frappe.ValidationError):
+            get_dashboard_tile_rows(dashboard="compliance", tile="large_payout_threshold",
+                                    from_date=self.fd, to_date=self.td)

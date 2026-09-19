@@ -231,6 +231,18 @@ BUYBACK_TILES: dict[tuple[str, str], tuple[str, str | None, bool]] = {
     # the two screens deliberately answer over different windows.
     ("finance", "pending_count"):   (_ORDER, _UNPAID_APPROVED, True),
     ("finance", "pending_amount"):  (_ORDER, _UNPAID_APPROVED, True),
+
+    # ── Compliance ───────────────────────────────────────────────────
+    # The remaining four cards need shapes the generic builder cannot express
+    # and are handled by _compliance_sql below. "large_payout_threshold" is a
+    # setting, not a population, and is deliberately not openable.
+    ("compliance", "high_value_orders"): (_ORDER, None, True),
+    ("compliance", "high_value_total"):  (_ORDER, None, True),
+}
+
+#: Compliance cards served by _compliance_sql rather than the generic builder.
+_COMPLIANCE_CUSTOM = {
+    "manager_overrides", "manual_approvals", "auto_approvals", "duplicate_imeis",
 }
 
 #: Cards whose number is a money total rather than a row count. The list is the
@@ -239,7 +251,84 @@ CURRENCY_TILES = {
     ("store", "total_payout"): "total_paid",
     ("finance", "total_paid"): "total_paid",
     ("finance", "pending_amount"): "final_price",
+    ("compliance", "high_value_total"): "total_paid",
 }
+
+#: Compliance cards whose shape the generic single-table builder cannot express.
+#: Each returns (doctype, sql, params) and must yield exactly as many rows as the
+#: card counts — see the notes on each.
+_AUDIT_OVERRIDE_ACTIONS = "('Price Override', 'Grade Changed')"
+_AUDIT_MANUAL_ACTIONS = "('Manual Approval', 'Price Override', 'Grade Changed')"
+_APPROVED_ANY = "status IN ('Paid','Closed','Approved','Customer Approved','OTP Verified')"
+
+
+def _compliance_sql(tile, company, from_date, to_date):
+    """SQL for the compliance cards that are not a plain filtered table scan."""
+    params = dict(_date_params(from_date, to_date))
+    co_order, co_assess = "", ""
+    if company:
+        params["company"] = company
+        co_order = " AND o.company = %(company)s"
+        co_assess = " AND a.company = %(company)s"
+
+    if tile == "manager_overrides":
+        # The card counts DISTINCT audit-log rows, so the list is log rows.
+        return ("Buyback Audit Log", f"""
+            SELECT DISTINCT a.name, a.action, a.reference_name, a.owner, a.creation
+            FROM `tabBuyback Audit Log` a
+            INNER JOIN `tabBuyback Order` o
+                ON a.reference_doctype = 'Buyback Order' AND a.reference_name = o.name
+            WHERE a.action IN {_AUDIT_OVERRIDE_ACTIONS}
+              AND a.creation BETWEEN %(from_date)s AND %(to_date_end)s{co_order}
+            ORDER BY a.creation DESC
+        """, params)
+
+    if tile == "manual_approvals":
+        # Counts DISTINCT reference_name — so the list is ORDERS, not log rows.
+        return (_ORDER, f"""
+            SELECT DISTINCT o.name, o.customer_name, o.item, o.status,
+                   o.final_price, o.total_paid, o.customer_payout_mode, o.creation
+            FROM `tabBuyback Order` o
+            INNER JOIN `tabBuyback Audit Log` a
+                ON a.reference_doctype = 'Buyback Order' AND a.reference_name = o.name
+            WHERE a.action IN {_AUDIT_MANUAL_ACTIONS}
+              AND a.creation BETWEEN %(from_date)s AND %(to_date_end)s{co_order}
+            ORDER BY o.creation DESC
+        """, params)
+
+    if tile == "auto_approvals":
+        # Derived by subtraction on the card: approved orders MINUS the manually
+        # touched ones. Expressed here as the same set difference.
+        return (_ORDER, f"""
+            SELECT o.name, o.customer_name, o.item, o.status,
+                   o.final_price, o.total_paid, o.customer_payout_mode, o.creation
+            FROM `tabBuyback Order` o
+            WHERE o.docstatus < 2 AND o.{_APPROVED_ANY}
+              AND o.creation BETWEEN %(from_date)s AND %(to_date_end)s{co_order}
+              AND o.name NOT IN (
+                  SELECT a.reference_name FROM `tabBuyback Audit Log` a
+                  WHERE a.reference_doctype = 'Buyback Order'
+                    AND a.action IN {_AUDIT_MANUAL_ACTIONS}
+                    AND a.creation BETWEEN %(from_date)s AND %(to_date_end)s
+              )
+            ORDER BY o.creation DESC
+        """, params)
+
+    if tile == "duplicate_imeis":
+        # The card counts IMEI VALUES appearing more than once, not assessments.
+        # One row per duplicated IMEI keeps count == len(rows) honest, and the
+        # occurrence count is the useful thing to show next to it.
+        return ("Buyback Assessment", f"""
+            SELECT a.imei_serial AS name, COUNT(*) AS occurrences,
+                   MIN(a.creation) AS first_seen, MAX(a.creation) AS creation
+            FROM `tabBuyback Assessment` a
+            WHERE IFNULL(a.imei_serial, '') != ''
+              AND a.creation BETWEEN %(from_date)s AND %(to_date_end)s{co_assess}
+            GROUP BY a.imei_serial HAVING COUNT(*) > 1
+            ORDER BY occurrences DESC
+        """, params)
+
+    return None
 
 _TILE_COLUMNS = {
     _ORDER: ["name", "customer_name", "item", "status", "final_price", "total_paid",
@@ -252,8 +341,17 @@ _TILE_COLUMNS = {
 DRILLDOWN_LIMIT = 500
 
 
+def _high_value_threshold() -> float:
+    return flt(frappe.db.get_single_value(
+        "Buyback SLA Settings", "large_payout_threshold")) or 25000
+
+
 def _tile_where(dashboard: str, tile: str, store, company, from_date, to_date):
     doctype, extra, dated = BUYBACK_TILES[(dashboard, tile)]
+    if dashboard == "compliance" and tile in ("high_value_orders", "high_value_total"):
+        # Threshold comes from Buyback SLA Settings, so it cannot sit in the
+        # static registry.
+        extra = f"{_PAID} AND total_paid > {flt(_high_value_threshold())}"
     params: dict = {}
     clauses = []
 
@@ -290,7 +388,8 @@ def get_dashboard_tile_rows(dashboard: str, tile: str, store: str | None = None,
     """
     _check_dashboard_access()
     key = (dashboard, tile)
-    if key not in BUYBACK_TILES:
+    if key not in BUYBACK_TILES and not (
+            dashboard == "compliance" and tile in _COMPLIANCE_CUSTOM):
         frappe.throw(
             _("This dashboard has no {0} card. Refresh the page to see the current cards.")
             .format(frappe.bold(tile)),
@@ -302,13 +401,21 @@ def get_dashboard_tile_rows(dashboard: str, tile: str, store: str | None = None,
     if store:
         assert_buyback_scope(store=store)
 
-    doctype, where, params = _tile_where(dashboard, tile, store, company, from_date, to_date)
-    columns = _TILE_COLUMNS[doctype]
-    rows = frappe.db.sql(
-        "SELECT {cols} FROM `tab{dt}` WHERE {where} ORDER BY creation DESC LIMIT {lim}".format(
-            cols=", ".join(f"`{c}`" for c in columns), dt=doctype, where=where,
-            lim=DRILLDOWN_LIMIT + 1),
-        params, as_dict=1)
+    custom = (_compliance_sql(tile, company, from_date, to_date)
+              if dashboard == "compliance" and tile in _COMPLIANCE_CUSTOM else None)
+    if custom:
+        doctype, sql, params = custom
+        rows = frappe.db.sql(f"{sql} LIMIT {DRILLDOWN_LIMIT + 1}", params, as_dict=1)
+        columns = list(rows[0].keys()) if rows else ["name"]
+    else:
+        doctype, where, params = _tile_where(
+            dashboard, tile, store, company, from_date, to_date)
+        columns = _TILE_COLUMNS[doctype]
+        rows = frappe.db.sql(
+            "SELECT {cols} FROM `tab{dt}` WHERE {where} ORDER BY creation DESC LIMIT {lim}".format(
+                cols=", ".join(f"`{c}`" for c in columns), dt=doctype, where=where,
+                lim=DRILLDOWN_LIMIT + 1),
+            params, as_dict=1)
     truncated = len(rows) > DRILLDOWN_LIMIT
     rows = rows[:DRILLDOWN_LIMIT]
     return {
