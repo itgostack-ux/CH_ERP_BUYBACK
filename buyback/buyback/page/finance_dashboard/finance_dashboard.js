@@ -4,7 +4,7 @@
 frappe.pages["finance-dashboard"].on_page_load = function (wrapper) {
 	const page = frappe.ui.make_app_page({
 		parent: wrapper,
-		title: __("Finance Dashboard"),
+		title: __("Finance Today"),
 		single_column: true,
 	});
 

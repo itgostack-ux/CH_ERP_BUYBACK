@@ -12,10 +12,14 @@
  "owner": "Administrator",
  "page_name": "finance-dashboard",
  "roles": [
-  {"role": "System Manager"},
-  {"role": "Buyback Admin"}
+  {
+   "role": "System Manager"
+  },
+  {
+   "role": "Buyback Admin"
+  }
  ],
  "standard": "Yes",
  "system_page": 0,
- "title": "Finance Dashboard"
+ "title": "Finance Today"
 }

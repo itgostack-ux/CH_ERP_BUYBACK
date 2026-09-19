@@ -1,7 +1,7 @@
 frappe.pages["buyback-hub"].on_page_load = function (wrapper) {
 	const page = frappe.ui.make_app_page({
 		parent: wrapper,
-		title: __("Buyback Hub"),
+		title: __("Trade-In Hub"),
 		single_column: true,
 	});
 	wrapper.buyback_hub = new BuybackHub(page);
