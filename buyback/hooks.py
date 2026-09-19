@@ -23,7 +23,11 @@ add_to_apps_screen = [
 ]
 
 app_include_css = "/assets/buyback/css/buyback.css"
-app_include_js = "/assets/buyback/js/buyback.js"
+app_include_js = [
+    "/assets/buyback/js/buyback.js",
+    # Lets any buyback dashboard card open onto the rows it counted.
+    "/assets/buyback/js/dashboard_drilldown.js",
+]
 web_include_css = "/assets/buyback/css/buyback.css"
 
 after_install = "buyback.install.after_install"

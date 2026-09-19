@@ -63,9 +63,9 @@ function render_finance(page, data) {
 
 	let html = `
 		<div class="row mb-4">
-			${kpi_card("Total Paid", format_currency(k.total_paid), "green")}
-			${kpi_card("Pending Count", k.pending_count, "orange")}
-			${kpi_card("Pending Amount", format_currency(k.pending_amount), "orange")}
+			${kpi_card("Total Paid", format_currency(k.total_paid), "green", "total_paid")}
+			${kpi_card("Pending Count", k.pending_count, "orange", "pending_count")}
+			${kpi_card("Pending Amount", format_currency(k.pending_amount), "orange", "pending_amount")}
 			${kpi_card("Payment Methods", k.payment_methods, "blue")}
 		</div>
 		<div class="row mb-4">
@@ -104,6 +104,12 @@ function render_finance(page, data) {
 
 	page.content_area.html(html);
 
+	buyback.drilldown.attach(page.content_area, "finance", () => ({
+		company: page.fields_dict.company?.get_value(),
+		from_date: page.fields_dict.from_date?.get_value(),
+		to_date: page.fields_dict.to_date?.get_value(),
+	}));
+
 	// Payment by method pie chart
 	if (data.payment_by_method && data.payment_by_method.length) {
 		new frappe.Chart("#fin-payment-method", {
@@ -135,12 +141,13 @@ function render_finance(page, data) {
 	}
 }
 
-function kpi_card(label, value, color) {
+function kpi_card(label, value, color, tile) {
 	const colors = { blue: "#5e64ff", green: "#29cd42", orange: "#ffa00a", red: "#ff5858", purple: "#7c5cfc" };
 	return `
 		<div class="col-md-3 col-sm-6 mb-3">
-			<div class="border rounded p-3 h-100" style="border-left: 4px solid ${colors[color]} !important;">
-				<div class="text-muted small">${label}</div>
+			<div class="border rounded p-3 h-100" ${tile ? `data-bb-tile="${tile}"` : ""}
+			     style="border-left: 4px solid ${colors[color]} !important;">
+				<div class="text-muted small bb-tile-label">${label}</div>
 				<div class="font-weight-bold h4 mb-0" style="color: ${colors[color]}">${value}</div>
 			</div>
 		</div>

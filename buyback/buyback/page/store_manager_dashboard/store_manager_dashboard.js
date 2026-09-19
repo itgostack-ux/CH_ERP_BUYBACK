@@ -89,16 +89,16 @@ function render_store(page, data) {
 
 	let html = `
 		<div class="row mb-4">
-			${kpi_card("Total Orders", k.total_orders, "blue")}
-			${kpi_card("Paid", k.paid, "green")}
-			${kpi_card("Total Payout", format_currency(k.total_payout), "green")}
-			${kpi_card("Pending", k.pending, "orange")}
+			${kpi_card("Total Orders", k.total_orders, "blue", "total_orders")}
+			${kpi_card("Paid", k.paid, "green", "paid")}
+			${kpi_card("Total Payout", format_currency(k.total_payout), "green", "total_payout")}
+			${kpi_card("Pending", k.pending, "orange", "pending")}
 		</div>
 		<div class="row mb-4">
 			${kpi_card("SLA Compliance", k.sla_compliance + "%", sla_color)}
-			${kpi_card("SLA Breaches", k.sla_breaches, k.sla_breaches > 0 ? "red" : "green")}
-			${kpi_card("Pending Approvals", k.pending_approvals, k.pending_approvals > 0 ? "orange" : "green")}
-			${kpi_card("Pending Payments", k.pending_payments, k.pending_payments > 0 ? "orange" : "green")}
+			${kpi_card("SLA Breaches", k.sla_breaches, k.sla_breaches > 0 ? "red" : "green", "sla_breaches")}
+			${kpi_card("Pending Approvals", k.pending_approvals, k.pending_approvals > 0 ? "orange" : "green", "pending_approvals")}
+			${kpi_card("Pending Payments", k.pending_payments, k.pending_payments > 0 ? "orange" : "green", "pending_payments")}
 		</div>
 		<div class="row">
 			<div class="col-md-8">
@@ -129,14 +129,21 @@ function render_store(page, data) {
 	`;
 
 	page.content_area.html(html);
+
+	buyback.drilldown.attach(page.content_area, "store", () => ({
+		store: page.fields_dict.store?.get_value(),
+		from_date: page.fields_dict.from_date?.get_value(),
+		to_date: page.fields_dict.to_date?.get_value(),
+	}));
 }
 
-function kpi_card(label, value, color) {
+function kpi_card(label, value, color, tile) {
 	const colors = { blue: "#5e64ff", green: "#29cd42", orange: "#ffa00a", red: "#ff5858", purple: "#7c5cfc" };
 	return `
 		<div class="col-md-3 col-sm-6 mb-3">
-			<div class="border rounded p-3 h-100" style="border-left: 4px solid ${colors[color]} !important;">
-				<div class="text-muted small">${label}</div>
+			<div class="border rounded p-3 h-100" ${tile ? `data-bb-tile="${tile}"` : ""}
+			     style="border-left: 4px solid ${colors[color]} !important;">
+				<div class="text-muted small bb-tile-label">${label}</div>
 				<div class="font-weight-bold h4 mb-0" style="color: ${colors[color]}">${value}</div>
 			</div>
 		</div>

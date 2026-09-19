@@ -87,3 +87,13 @@
 .list-row .indicator-pill[data-state="Rejected"] { --indicator-dot-color: var(--red-500); }
 .list-row .indicator-pill[data-state="Expired"] { --indicator-dot-color: var(--gray-500); }
 .list-row .indicator-pill[data-state="Cancelled"] { --indicator-dot-color: var(--gray-500); }
+
+/* Dashboard cards that open onto their rows. */
+.bb-tile-open { cursor: pointer; transition: border-color 120ms ease; }
+.bb-tile-open:hover, .bb-tile-open:focus-visible { border-color: var(--primary, #2563eb); }
+.bb-tile-open:focus-visible { outline: 2px solid var(--primary, #2563eb); outline-offset: 2px; }
+.bb-tile-open.is-open { box-shadow: 0 0 0 2px var(--primary, #2563eb) inset; }
+.bb-drilldown { margin-top: 18px; }
+.bb-drilldown-head { font-weight: 600; margin-bottom: 8px; }
+.bb-drilldown-scroll { overflow-x: auto; }
+@media (prefers-reduced-motion: reduce) { .bb-tile-open { transition: none; } }

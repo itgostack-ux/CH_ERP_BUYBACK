@@ -175,6 +175,150 @@ def get_store_dashboard(store=None, from_date=None, to_date=None) -> dict:
 
 
 # ═══════════════════════════════════════════════════════════════════
+# DASHBOARD DRILL-DOWN — one registry for every buyback card
+#
+# Every card must open onto the rows it counted. The risk is not the SQL, it is
+# the predicates drifting apart, and two traps are already live in here:
+#
+#   * On the Store dashboard, `pending_approvals`, `pending_payments` and
+#     `pending_pickups` are NOT date-filtered — they count everything
+#     outstanding, whatever range is on screen. A drill-down that helpfully
+#     applied the range would return fewer rows than the card claims.
+#   * Finance's pending-payout card counts the same STATUS set as the Store
+#     dashboard's `pending_payments`, but IS date-filtered. Same words on two
+#     screens, two different populations.
+#
+# Stating each predicate once here is what keeps the number and the list
+# together; test_buyback_dashboard_drilldown asserts card == len(rows) for
+# every entry, against records it seeds and rolls back.
+# ═══════════════════════════════════════════════════════════════════
+
+_ORDER = "Buyback Order"
+_ASSESS = "Buyback Assessment"
+_SLA = "Buyback SLA Log"
+
+_PAID = "status IN ('Paid','Closed')"
+_AWAIT_APPROVAL = "status IN ('Awaiting Approval','Awaiting Customer Approval')"
+_UNPAID_APPROVED = ("status IN ('Approved','Customer Approved','OTP Verified') "
+                    "AND IFNULL(total_paid, 0) = 0")
+
+#: (dashboard, tile) -> (doctype, extra predicate or None, honours date range?)
+BUYBACK_TILES: dict[tuple[str, str], tuple[str, str | None, bool]] = {
+    # ── Store Manager ────────────────────────────────────────────────
+    ("store", "total_orders"):      (_ORDER, None, True),
+    ("store", "paid"):              (_ORDER, _PAID, True),
+    ("store", "total_payout"):      (_ORDER, _PAID, True),
+    ("store", "pending"):           (_ORDER,
+                                     "status IN ('Draft','Awaiting Approval','Awaiting OTP',"
+                                     "'Awaiting Customer Approval')", True),
+    ("store", "pending_approvals"): (_ORDER, _AWAIT_APPROVAL, False),
+    ("store", "pending_payments"):  (_ORDER, _UNPAID_APPROVED, False),
+    ("store", "pending_pickups"):   (_ORDER,
+                                     "status = 'Paid' AND IFNULL(settlement_type, '') "
+                                     "IN ('Buyback', '')", False),
+    ("store", "pending_inspection"): (_ASSESS, "status = 'Submitted'", True),
+    ("store", "sla_breaches"):      (_SLA, "breached = 1", True),
+
+    # ── Operations ───────────────────────────────────────────────────
+    ("operations", "sla_on_time"):  (_SLA, "IFNULL(breached, 0) = 0", True),
+    ("operations", "sla_breaches"): (_SLA, "breached = 1", True),
+
+    # ── Finance ──────────────────────────────────────────────────────
+    # Card keys as the page renders them. "total_paid" is a CURRENCY card —
+    # the sum of total_paid over the same rows — not a count.
+    ("finance", "total_paid"):      (_ORDER, _PAID, True),
+    # Same status set as store/pending_payments, but date-filtered. Not a typo:
+    # the two screens deliberately answer over different windows.
+    ("finance", "pending_count"):   (_ORDER, _UNPAID_APPROVED, True),
+    ("finance", "pending_amount"):  (_ORDER, _UNPAID_APPROVED, True),
+}
+
+#: Cards whose number is a money total rather than a row count. The list is the
+#: same rows either way; the test sums instead of counting.
+CURRENCY_TILES = {
+    ("store", "total_payout"): "total_paid",
+    ("finance", "total_paid"): "total_paid",
+    ("finance", "pending_amount"): "final_price",
+}
+
+_TILE_COLUMNS = {
+    _ORDER: ["name", "customer_name", "item", "status", "final_price", "total_paid",
+             "customer_payout_mode", "creation"],
+    _ASSESS: ["name", "customer_name", "status", "source", "store", "creation"],
+    # Buyback SLA Log names its stage `sla_stage`, not `stage`.
+    _SLA: ["name", "sla_stage", "reference_name", "breached", "exceeded_by", "creation"],
+}
+
+DRILLDOWN_LIMIT = 500
+
+
+def _tile_where(dashboard: str, tile: str, store, company, from_date, to_date):
+    doctype, extra, dated = BUYBACK_TILES[(dashboard, tile)]
+    params: dict = {}
+    clauses = []
+
+    if doctype != _SLA:
+        clauses.append("docstatus < 2")
+    if store:
+        params["store"] = store
+        clauses.append("store = %(store)s")
+    if company and doctype == _ORDER:
+        params["company"] = company
+        clauses.append("company = %(company)s")
+    if dated:
+        params.update(_date_params(from_date, to_date))
+        clauses.append("creation BETWEEN %(from_date)s AND %(to_date_end)s")
+    if extra:
+        clauses.append(f"({extra})")
+
+    scope_clause, scope_params = build_buyback_scope_sql(
+        store_field="store", company_field="company",
+        prefix=f"tile_{dashboard}_{tile}")
+    clauses.append(scope_clause)
+    params.update(scope_params)
+    return doctype, " AND ".join(clauses), params
+
+
+@frappe.whitelist()
+def get_dashboard_tile_rows(dashboard: str, tile: str, store: str | None = None,
+                            company: str | None = None,
+                            from_date=None, to_date=None) -> dict:
+    """The rows behind one buyback dashboard card.
+
+    Same access check, same scope and the same predicate that produced the
+    number — see BUYBACK_TILES.
+    """
+    _check_dashboard_access()
+    key = (dashboard, tile)
+    if key not in BUYBACK_TILES:
+        frappe.throw(
+            _("This dashboard has no {0} card. Refresh the page to see the current cards.")
+            .format(frappe.bold(tile)),
+            title=_("Page Out Of Date"),
+        )
+    from_date = from_date or nowdate()
+    to_date = to_date or nowdate()
+    from_date, to_date = _validate_date_range(from_date, to_date)
+    if store:
+        assert_buyback_scope(store=store)
+
+    doctype, where, params = _tile_where(dashboard, tile, store, company, from_date, to_date)
+    columns = _TILE_COLUMNS[doctype]
+    rows = frappe.db.sql(
+        "SELECT {cols} FROM `tab{dt}` WHERE {where} ORDER BY creation DESC LIMIT {lim}".format(
+            cols=", ".join(f"`{c}`" for c in columns), dt=doctype, where=where,
+            lim=DRILLDOWN_LIMIT + 1),
+        params, as_dict=1)
+    truncated = len(rows) > DRILLDOWN_LIMIT
+    rows = rows[:DRILLDOWN_LIMIT]
+    return {
+        "dashboard": dashboard, "tile": tile, "doctype": doctype,
+        "columns": columns, "rows": rows,
+        "total": len(rows), "truncated": truncated,
+    }
+
+
+# ═══════════════════════════════════════════════════════════════════
 # CATEGORY MANAGER DASHBOARD
 # ═══════════════════════════════════════════════════════════════════
 
