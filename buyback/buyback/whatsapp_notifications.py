@@ -69,12 +69,18 @@ def send_otp_email(to_email: str, otp_code: str, purpose: str, ref_name: str = "
 <p style="color:#6b7280;font-size:12px">If you did not request this OTP, please ignore this email.</p>
 """
     try:
-        frappe.sendmail(
-            recipients=[to_email],
-            subject=subject,
-            message=body,
-            delayed=False,
-        )
+        # Essential mail: a customer waiting at the counter to approve a
+        # trade-in must get the code even while alert mail is gated
+        # (ch_erp15.email_gate).
+        from ch_erp15.email_gate import essential_mail
+
+        with essential_mail():
+            frappe.sendmail(
+                recipients=[to_email],
+                subject=subject,
+                message=body,
+                delayed=False,
+            )
         return True
     except Exception:
         frappe.log_error(frappe.get_traceback(), f"OTP email delivery failed for {to_email}")
