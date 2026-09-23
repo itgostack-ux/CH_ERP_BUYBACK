@@ -43,6 +43,17 @@ class _DummyOrder:
 	def get(self, key, default=None):
 		return getattr(self, key, default)
 
+	def _resolve_expense_account_for_company(self, expense_account, company):
+		"""Stand in for BuybackOrder's own mapper.
+
+		_create_journal_entry calls self._resolve_expense_account_for_company
+		now, and a dummy order does not inherit it, so every run died with
+		AttributeError before reaching the assertion. Returning the account
+		unchanged is exactly the real method's same-company answer, which is
+		the case this test sets up.
+		"""
+		return expense_account
+
 	def db_set(self, key, value):
 		self._db_set[key] = value
 		setattr(self, key, value)
