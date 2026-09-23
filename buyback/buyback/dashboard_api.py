@@ -257,8 +257,20 @@ CURRENCY_TILES = {
 #: Compliance cards whose shape the generic single-table builder cannot express.
 #: Each returns (doctype, sql, params) and must yield exactly as many rows as the
 #: card counts — see the notes on each.
-_AUDIT_OVERRIDE_ACTIONS = "('Price Override', 'Grade Changed')"
-_AUDIT_MANUAL_ACTIONS = "('Manual Approval', 'Price Override', 'Grade Changed')"
+#: Real tuples, not pre-rendered SQL. Held as strings these read as
+#: collections to every reader and to scripts/lint_sequence_literals.py, whose
+#: complaint blocked `make lint` before ruff ever ran -- which is how an
+#: undefined-name bug stayed hidden in another app. _sql_in() renders them, and
+#: unlike f-string interpolation of a tuple it is also correct for one element,
+#: where Python would emit the invalid `('x',)`.
+_AUDIT_OVERRIDE_ACTIONS = ("Price Override", "Grade Changed")
+_AUDIT_MANUAL_ACTIONS = ("Manual Approval", "Price Override", "Grade Changed")
+
+
+def _sql_in(values) -> str:
+    """Render a sequence as an escaped SQL IN list."""
+    return "(" + ", ".join(frappe.db.escape(v) for v in values) + ")"
+
 _APPROVED_ANY = "status IN ('Paid','Closed','Approved','Customer Approved','OTP Verified')"
 
 
@@ -278,7 +290,7 @@ def _compliance_sql(tile, company, from_date, to_date):
             FROM `tabBuyback Audit Log` a
             INNER JOIN `tabBuyback Order` o
                 ON a.reference_doctype = 'Buyback Order' AND a.reference_name = o.name
-            WHERE a.action IN {_AUDIT_OVERRIDE_ACTIONS}
+            WHERE a.action IN {_sql_in(_AUDIT_OVERRIDE_ACTIONS)}
               AND a.creation BETWEEN %(from_date)s AND %(to_date_end)s{co_order}
             ORDER BY a.creation DESC
         """, params)
@@ -291,7 +303,7 @@ def _compliance_sql(tile, company, from_date, to_date):
             FROM `tabBuyback Order` o
             INNER JOIN `tabBuyback Audit Log` a
                 ON a.reference_doctype = 'Buyback Order' AND a.reference_name = o.name
-            WHERE a.action IN {_AUDIT_MANUAL_ACTIONS}
+            WHERE a.action IN {_sql_in(_AUDIT_MANUAL_ACTIONS)}
               AND a.creation BETWEEN %(from_date)s AND %(to_date_end)s{co_order}
             ORDER BY o.creation DESC
         """, params)
@@ -308,7 +320,7 @@ def _compliance_sql(tile, company, from_date, to_date):
               AND o.name NOT IN (
                   SELECT a.reference_name FROM `tabBuyback Audit Log` a
                   WHERE a.reference_doctype = 'Buyback Order'
-                    AND a.action IN {_AUDIT_MANUAL_ACTIONS}
+                    AND a.action IN {_sql_in(_AUDIT_MANUAL_ACTIONS)}
                     AND a.creation BETWEEN %(from_date)s AND %(to_date_end)s
               )
             ORDER BY o.creation DESC
