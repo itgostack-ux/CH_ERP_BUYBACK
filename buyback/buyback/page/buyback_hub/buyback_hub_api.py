@@ -243,6 +243,14 @@ def get_buyback_hub_data(company=None, store=None, from_date=None, to_date=None,
             GROUP BY bo.brand
             ORDER BY total DESC LIMIT 20""", prm, as_dict=True
     )
+    # MariaDB returns SUM(CASE ... THEN 1 ELSE 0 END) as DECIMAL, so these two
+    # arrived as 0.0 where COUNT(*) alongside them arrived as 0. They are counts
+    # of orders — a brand cannot have 2.5 approvals — and the published contract
+    # declares them <int>. Cast here rather than widening the contract: the shape
+    # was right, the query was leaking a storage detail through it.
+    for row in brand_summary:
+        row["approved"] = cint(row.get("approved"))
+        row["rejected"] = cint(row.get("rejected"))
 
     # ── AI Insights ──
     ai_insights = []
