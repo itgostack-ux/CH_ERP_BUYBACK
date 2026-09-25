@@ -10,12 +10,13 @@
   "appointment_id",
   "appointment_type",
   "status",
+  "store_id",
   "column_break_hdr",
   "buyback_order",
   "customer",
   "customer_name",
   "amended_from",
-  "store_id",
+  "store_name",
   "schedule_section",
   "appointment_date",
   "appointment_slot",
@@ -254,12 +255,17 @@
    "fieldname": "store_id",
    "fieldtype": "Data",
    "label": "Store ID"
+  },
+  {
+   "fieldname": "store_name",
+   "fieldtype": "Data",
+   "label": "Store Name"
   }
  ],
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-09-23 18:24:16.134424",
+ "modified": "2026-09-25 11:37:50.389219",
  "modified_by": "Administrator",
  "module": "BuyBack",
  "name": "CH Buyback Pickup Appointment",
