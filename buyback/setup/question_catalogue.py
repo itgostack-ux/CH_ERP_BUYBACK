@@ -49,7 +49,7 @@ QUESTIONS: dict[str, dict] = {
     # ── Eligibility ────────────────────────────────────────────────
     "elig_icloud_lock": {
         "text": "iCloud lock check",
-        "purpose": ELIGIBILITY, "category": "Software", "fault_code": "FAULT-ICLOUD-LOCK",
+        "purpose": ELIGIBILITY, "category": "General", "fault_code": "FAULT-ICLOUD-LOCK",
         "options": [
             ("not_locked", "Not locked", None, 0, None),
             ("locked", "Locked", None, 0, None),
@@ -57,7 +57,7 @@ QUESTIONS: dict[str, dict] = {
     },
     "elig_country_lock": {
         "text": "Is the device carrier or country locked?",
-        "purpose": ELIGIBILITY, "category": "Software", "fault_code": "FAULT-COUNTRY-LOCK",
+        "purpose": ELIGIBILITY, "category": "General", "fault_code": "FAULT-COUNTRY-LOCK",
         "options": [
             ("no", "Not locked", None, 0, None),
             ("yes", "Carrier / country locked", None, 0, None),
@@ -65,7 +65,7 @@ QUESTIONS: dict[str, dict] = {
     },
     "elig_account_removed": {
         "text": "Google, Xiaomi or Samsung account removed?",
-        "purpose": ELIGIBILITY, "category": "Software", "fault_code": "FAULT-ACCOUNT-REMOVED",
+        "purpose": ELIGIBILITY, "category": "General", "fault_code": "FAULT-ACCOUNT-REMOVED",
         "options": [
             ("yes", "Removed", None, 0, None),
             ("no", "Not removed", None, 0, None),
@@ -75,7 +75,7 @@ QUESTIONS: dict[str, dict] = {
     # ── Screen — grading ladders ───────────────────────────────────
     "scr_display_working": {
         "text": "Is the touch screen and display working properly?",
-        "purpose": GRADING, "category": "Cosmetic", "fault_code": "FAULT-DISPLAY-DEAD",
+        "purpose": GRADING, "category": "Physical", "fault_code": "FAULT-DISPLAY-DEAD",
         "options": [
             ("working", "Yes, working properly", None, 0, None),
             ("not_working", "No, not working", "D", 0, None),
@@ -83,7 +83,7 @@ QUESTIONS: dict[str, dict] = {
     },
     "scr_is_copy": {
         "text": "Is the screen a copy or duplicate part?",
-        "purpose": GRADING, "category": "Cosmetic", "fault_code": "FAULT-DISPLAY-COPY",
+        "purpose": GRADING, "category": "Physical", "fault_code": "FAULT-DISPLAY-COPY",
         "options": [
             ("original", "Original screen", None, 0, None),
             ("copy", "Copy / duplicate screen", "D", 0, None),
@@ -91,7 +91,7 @@ QUESTIONS: dict[str, dict] = {
     },
     "scr_spots": {
         "text": "Are there any visible spots on the screen?",
-        "purpose": GRADING, "category": "Cosmetic", "fault_code": "FAULT-SCREEN-SPOTS",
+        "purpose": GRADING, "category": "Physical", "fault_code": "FAULT-SCREEN-SPOTS",
         "options": [
             ("none", "No spots", None, 0, None),
             ("upto_3_white", "Up to 3 white spots of 2mm, or 1 white spot of 3mm", "B", 0, None),
@@ -101,7 +101,7 @@ QUESTIONS: dict[str, dict] = {
     },
     "scr_lines": {
         "text": "Are there any visible lines on the screen?",
-        "purpose": GRADING, "category": "Cosmetic", "fault_code": "FAULT-SCREEN-LINES",
+        "purpose": GRADING, "category": "Physical", "fault_code": "FAULT-SCREEN-LINES",
         "options": [
             ("none", "No lines on screen", None, 0, None),
             ("lines", "Lines on screen", "D", 0, None),
@@ -109,7 +109,7 @@ QUESTIONS: dict[str, dict] = {
     },
     "scr_discolouration": {
         "text": "Is the screen discoloured?",
-        "purpose": GRADING, "category": "Cosmetic", "fault_code": "FAULT-SCREEN-DISCOLOUR",
+        "purpose": GRADING, "category": "Physical", "fault_code": "FAULT-SCREEN-DISCOLOUR",
         "options": [
             ("none", "No discolouration", None, 0, None),
             ("minor", "Minor — very slight shade along the edges, not clearly visible", "B", 0, None),
@@ -119,7 +119,7 @@ QUESTIONS: dict[str, dict] = {
     },
     "scr_cracks_scratches": {
         "text": "Is the screen cracked or scratched?",
-        "purpose": GRADING, "category": "Cosmetic", "fault_code": "FAULT-SCREEN-SCRATCH",
+        "purpose": GRADING, "category": "Physical", "fault_code": "FAULT-SCREEN-SCRATCH",
         "options": [
             ("none", "Excellent — no scratch visible", None, 0, None),
             ("upto_5_under_1cm", "Up to 5 scratches under 1cm", "B", 0, None),
@@ -130,7 +130,7 @@ QUESTIONS: dict[str, dict] = {
     },
     "scr_bubble_paint": {
         "text": "Is there paint peel-off or bubbling on the screen?",
-        "purpose": GRADING, "category": "Cosmetic", "fault_code": "FAULT-SCREEN-PAINT",
+        "purpose": GRADING, "category": "Physical", "fault_code": "FAULT-SCREEN-PAINT",
         "options": [
             ("none", "No paint peel-off or bubble", None, 0, None),
             ("minor", "Minor paint peel-off, or fewer than 2 bubbles", "B", 0, None),
@@ -139,7 +139,7 @@ QUESTIONS: dict[str, dict] = {
     },
     "scr_flickering": {
         "text": "Does the screen flicker?",
-        "purpose": GRADING, "category": "Cosmetic", "fault_code": "FAULT-SCREEN-FLICKER",
+        "purpose": GRADING, "category": "Physical", "fault_code": "FAULT-SCREEN-FLICKER",
         "options": [
             ("none", "No flickering", None, 0, None),
             ("flickering", "Flickering on screen", "D", 0, None),
@@ -149,7 +149,7 @@ QUESTIONS: dict[str, dict] = {
     # ── Screen — foldable only ─────────────────────────────────────
     "scr_outer_display": {
         "text": "Outer screen condition",
-        "purpose": GRADING, "category": "Cosmetic", "fault_code": "FAULT-OUTER-SCREEN",
+        "purpose": GRADING, "category": "Physical", "fault_code": "FAULT-OUTER-SCREEN",
         "options": [
             ("ok", "No issue with the outer screen", None, 0, None),
             ("damaged", "Outer screen damaged — line, break or spot", "D", 0, None),
@@ -157,7 +157,7 @@ QUESTIONS: dict[str, dict] = {
     },
     "scr_inner_display": {
         "text": "Inner screen condition",
-        "purpose": GRADING, "category": "Cosmetic", "fault_code": "FAULT-INNER-SCREEN",
+        "purpose": GRADING, "category": "Physical", "fault_code": "FAULT-INNER-SCREEN",
         "options": [
             ("ok", "No issue with the inner screen", None, 0, None),
             ("damaged", "Inner screen damaged — line, break or spot", "D", 0, None),
@@ -311,7 +311,7 @@ QUESTIONS: dict[str, dict] = {
     },
     "fn_wifi": {
         "text": "Wi-Fi",
-        "purpose": DEDUCTION, "category": "Network", "fault_code": "FAULT-WIFI",
+        "purpose": DEDUCTION, "category": "Functional", "fault_code": "FAULT-WIFI",
         "options": [
             ("working", "Connects normally", None, 0, None),
             ("not_working", "Not working", None, 5, 7),
@@ -319,7 +319,7 @@ QUESTIONS: dict[str, dict] = {
     },
     "fn_bluetooth": {
         "text": "Bluetooth",
-        "purpose": DEDUCTION, "category": "Network", "fault_code": "FAULT-BLUETOOTH",
+        "purpose": DEDUCTION, "category": "Functional", "fault_code": "FAULT-BLUETOOTH",
         "options": [
             ("working", "Pairs normally", None, 0, None),
             ("not_working", "Not working", None, 5, 7),
@@ -404,7 +404,7 @@ QUESTIONS: dict[str, dict] = {
     # ── SIM / network — deductions ─────────────────────────────────
     "sim_1_working": {
         "text": "Is SIM slot 1 working?",
-        "purpose": DEDUCTION, "category": "Network", "fault_code": "FAULT-SIM-1",
+        "purpose": DEDUCTION, "category": "Functional", "fault_code": "FAULT-SIM-1",
         "options": [
             ("yes", "Working", None, 0, None),
             ("no", "Not working", None, 0, None),  # rate not on the sheet
@@ -412,7 +412,7 @@ QUESTIONS: dict[str, dict] = {
     },
     "sim_2_working": {
         "text": "Is SIM slot 2 working?",
-        "purpose": DEDUCTION, "category": "Network", "fault_code": "FAULT-SIM-2",
+        "purpose": DEDUCTION, "category": "Functional", "fault_code": "FAULT-SIM-2",
         "options": [
             ("yes", "Working", None, 0, None),
             ("no", "Not working", None, 0, None),  # rate not on the sheet
@@ -421,7 +421,7 @@ QUESTIONS: dict[str, dict] = {
     },
     "sim_calls": {
         "text": "Can the device make and receive calls?",
-        "purpose": GRADING, "category": "Network", "fault_code": "FAULT-CALLS",
+        "purpose": GRADING, "category": "Functional", "fault_code": "FAULT-CALLS",
         "options": [
             ("yes", "Yes", None, 0, None),
             ("no", "No", "D", 0, None),
@@ -429,7 +429,7 @@ QUESTIONS: dict[str, dict] = {
     },
     "sim_esim_support": {
         "text": "How many eSIMs does the device support?",
-        "purpose": DEDUCTION, "category": "Network", "fault_code": "FAULT-ESIM-COUNT",
+        "purpose": DEDUCTION, "category": "Functional", "fault_code": "FAULT-ESIM-COUNT",
         "options": [
             ("single_esim", "Single eSIM", None, 0, None),
             ("dual_esim", "Dual eSIM", None, 0, None),
@@ -497,7 +497,7 @@ QUESTIONS: dict[str, dict] = {
     # ── Battery — deductions, one question per platform ────────────
     "bat_health_ios": {
         "text": "Battery health",
-        "purpose": DEDUCTION, "category": "Battery", "fault_code": "FAULT-BATTERY",
+        "purpose": DEDUCTION, "category": "Functional", "fault_code": "FAULT-BATTERY",
         "options": [
             ("above_85", "Above 85% — good", None, 0, None),
             ("80_to_85", "80–85% — moderate", None, 4, None),
@@ -506,7 +506,7 @@ QUESTIONS: dict[str, dict] = {
     },
     "bat_condition_android": {
         "text": "Battery condition",
-        "purpose": DEDUCTION, "category": "Battery", "fault_code": "FAULT-BATTERY",
+        "purpose": DEDUCTION, "category": "Functional", "fault_code": "FAULT-BATTERY",
         "options": [
             ("healthy", "Healthy", None, 0, None),
             ("bulged", "Bulged or not working", None, 5, None),
