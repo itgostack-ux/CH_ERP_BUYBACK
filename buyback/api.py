@@ -2853,7 +2853,7 @@ _INTAKE_PURPOSE_TABLE = {
 }
 
 
-def _get_or_create_walkin_customer(mobile_no: str) -> str:
+def _get_or_create_walkin_customer(mobile_no: str, customer_name: str | None = None) -> str:
     """Resolve a Customer for a buyback trade-in whose mobile number has no
     existing match — creates a minimal walk-in record instead of leaving
     Customer blank, since a blank customer here passes Buyback Assessment
@@ -2869,7 +2869,8 @@ def _get_or_create_walkin_customer(mobile_no: str) -> str:
         return existing
 
     doc = frappe.new_doc("Customer")
-    doc.customer_name = mobile_no
+    # The mobile number stands in only when the executive gave no name.
+    doc.customer_name = (customer_name or "").strip() or mobile_no
     doc.mobile_no = mobile_no
     doc.customer_type = "Individual"
     if frappe.db.exists("Customer Group", "Individual"):
@@ -2885,6 +2886,20 @@ def _get_or_create_walkin_customer(mobile_no: str) -> str:
     return doc.name
 
 
+def _fill_placeholder_customer_name(customer: str, mobile_no: str, customer_name: str | None) -> None:
+    """Give a walk-in Customer the name the executive typed, if all it has so
+    far is its mobile number — the stand-in _get_or_create_walkin_customer
+    uses when no name was given. A real name on file is left alone: the intake
+    only fills a gap, it does not rename customers."""
+    name = (customer_name or "").strip()
+    if not name or name == mobile_no:
+        return
+    current = (frappe.db.get_value("Customer", customer, "customer_name") or "").strip()
+    if current and current != mobile_no:
+        return
+    frappe.db.set_value("Customer", customer, "customer_name", name)
+
+
 @frappe.whitelist(methods=["POST"])
 def create_assessment_from_intake(
     mobile_no: str,
@@ -2898,6 +2913,7 @@ def create_assessment_from_intake(
     diagnostics: str | None = None,
     answers: str | None = None,
     remarks: str | None = None,
+    customer_name: str | None = None,
 ) -> dict:
     """Create and submit a Buyback Assessment from the POS guided intake wizard.
 
@@ -2925,6 +2941,9 @@ def create_assessment_from_intake(
         diagnostics: JSON ``[{"test": <Question Bank name>, "result": <value>}]``
         answers: JSON ``[{"question": <Question Bank name>, "answer": <value>}]``
         remarks: Free-text note from the executive.
+        customer_name: Name typed on the Customer step. Names a new walk-in
+            Customer, and fills in an existing one whose only name so far is
+            its mobile number. A real name already on file is never replaced.
 
     Returns:
         dict: name, status, estimated_grade, estimated_price, and the count of
@@ -2977,7 +2996,9 @@ def create_assessment_from_intake(
         # cryptic mandatory-field error when the assessment is converted to
         # a Buyback Order (Customer IS mandatory there). Create a minimal
         # walk-in Customer now instead, so every assessment always has one.
-        customer = _get_or_create_walkin_customer(mobile_no)
+        customer = _get_or_create_walkin_customer(mobile_no, customer_name)
+    else:
+        _fill_placeholder_customer_name(customer, mobile_no, customer_name)
 
     doc = frappe.new_doc("Buyback Assessment")
     doc.source = "Store Manual"
