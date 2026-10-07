@@ -506,10 +506,16 @@ class BuybackOrder(Document):
             self.revised_inspection_price = self.original_quoted_price
 
         if flt(self.original_quoted_price):
-            self.price_variance = flt(self.revised_inspection_price) - flt(self.original_quoted_price)
-            self.price_variance_pct = (
-                self.price_variance / flt(self.original_quoted_price) * 100
-            )
+            # Rounded to what the database column keeps (9 decimals). Left
+            # unrounded, a percentage that does not divide evenly — 980.4
+            # against 3,500 is -71.98857142857142 — came back from the
+            # database as -71.988571429, and the next save of the submitted
+            # order was refused: "Not allowed to change Variance % after
+            # submission", for a value nobody had changed.
+            self.price_variance = flt(
+                flt(self.revised_inspection_price) - flt(self.original_quoted_price), 9)
+            self.price_variance_pct = flt(
+                self.price_variance / flt(self.original_quoted_price) * 100, 9)
         else:
             self.price_variance = 0
             self.price_variance_pct = 0
