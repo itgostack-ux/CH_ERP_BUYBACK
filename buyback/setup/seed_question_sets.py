@@ -86,6 +86,83 @@ def _upsert_set(spec: dict, question_names: dict[str, str]) -> str:
     return doc.name
 
 
+# Reporting Category of the questions that are not in the catalogue above: the
+# older customer questions and the app's automated diagnostic tests. Taken
+# from the category sheet the business keeps for the question bank — that
+# sheet decides, so a category changed in Desk for one of these codes is put
+# back on the next migrate; change it here instead.
+LEGACY_QUESTION_CATEGORIES = {
+    "Accessories": (
+        "bill_with_same_imei", "original_box_with_same_imei", "access",
+    ),
+    "General": (
+        "if_fold_mobile", "if_flip_mobile_hinges_opening_properly", "manufacturer_warrenty",
+        "is_your_phones_screen_original", "touch_screen_working_or_not",
+        "is_the_phone_in_proper_working_condition",
+    ),
+    "Physical": (
+        "is_hinge_working_properly", "is_crease_normal", "is_cover_screen_working",
+        "back_panel_condition", "center_or_side_panel_condition", "touch_glass_condition",
+        "screen_condition",
+    ),
+    "Functional": (
+        "bat_2", "ba_2", "audio_receiver_not_working", "silent_button_not_working",
+        "face_sensor_not_working", "battery_faulty", "wifi_not_working",
+        "finger_touch_not_working", "sim_network_problem", "bat", "vibara", "ear_spea",
+        "power", "pr", "cahr", "blutooth_not_work", "vlo", "tp", "mic", "speaker_2",
+        "network", "camera_glass_broken", "back_camera", "front_camera",
+    ),
+    # Every automated test: run by the device, not asked of the customer.
+    "Diagnosis": (
+        "cha", "multi_touch", "ba", "fr", "volume_buttons", "vibration", "speaker",
+        "screen", "proximity_sensor", "wifi", "power_button", "microphone", "gps",
+        "flash_light", "finger_print", "ear_receiver", "camera_test", "bluetooth", "battery",
+    ),
+}
+# An automated test added later, and not yet on the sheet, is reported with
+# the rest of them until somebody says otherwise.
+AUTOMATED_TEST_CATEGORY = "Diagnosis"
+
+
+def _ensure_category(category: str) -> None:
+    if not frappe.db.exists("Buyback Question Category", category):
+        frappe.get_doc({
+            "doctype": "Buyback Question Category", "category_name": category,
+        }).insert(ignore_permissions=True)
+
+
+def _categorise_legacy_questions() -> int:
+    """Set the Reporting Category of the questions the catalogue does not own.
+
+    Catalogue questions are skipped — the catalogue sets theirs — so the two
+    never write the same row.
+    """
+    changed = 0
+    for category, codes in LEGACY_QUESTION_CATEGORIES.items():
+        _ensure_category(category)
+        for code in codes:
+            if code in QUESTIONS:
+                continue
+            for name, current in frappe.get_all(
+                    "Buyback Question Bank", filters={"question_code": code},
+                    fields=["name", "question_category"], as_list=True):
+                if current != category:
+                    frappe.db.set_value(
+                        "Buyback Question Bank", name, "question_category", category,
+                        update_modified=False)
+                    changed += 1
+    _ensure_category(AUTOMATED_TEST_CATEGORY)
+    for name in frappe.get_all(
+            "Buyback Question Bank",
+            filters={"diagnosis_type": "Automated Test", "question_category": ("in", ("", None))},
+            pluck="name"):
+        frappe.db.set_value(
+            "Buyback Question Bank", name, "question_category", AUTOMATED_TEST_CATEGORY,
+            update_modified=False)
+        changed += 1
+    return changed
+
+
 def run(retire_legacy: int = 0):
     """Seed catalogue + sets.
 
@@ -103,6 +180,10 @@ def run(retire_legacy: int = 0):
     for spec in SETS:
         set_name = _upsert_set(spec, question_names)
         print(f"✔ {set_name}: {len(spec['questions'])} questions")
+
+    categorised = _categorise_legacy_questions()
+    if categorised:
+        print(f"✔ Reporting Category set on {categorised} question(s) outside the catalogue")
 
     # Codes this catalogue owned and dropped. Always disabled, regardless of
     # retire_legacy: leaving one enabled but in no set means it can still be
