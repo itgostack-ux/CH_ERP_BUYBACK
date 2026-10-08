@@ -124,6 +124,34 @@ LEGACY_QUESTION_CATEGORIES = {
 AUTOMATED_TEST_CATEGORY = "Diagnosis"
 
 
+# Older customer questions that ask again what the device is already tested
+# for, or what a later question asks: the app's automated tests cover Wi-Fi,
+# battery, fingerprint, proximity and the ear receiver, and "Network Problem",
+# "Touch ID Or Face ID Working" and "Ear Speaker not Working Or Low" replaced
+# the rest. Shown alongside those they made the customer answer the same thing
+# twice — and could deduct for one fault twice — so they are switched off.
+# Disabled, not deleted: answers already given on past assessments keep them.
+REPEATED_QUESTION_CODES = (
+    "sim_network_problem",          # asked again as "Network Problem"
+    "finger_touch_not_working",     # Finger Print test / "Touch ID Or Face ID Working"
+    "wifi_not_working",             # Wi-Fi test
+    "battery_faulty",               # Battery test
+    "face_sensor_not_working",      # Proximity Sensor test / "Touch ID Or Face ID Working"
+    "silent_button_not_working",
+    "audio_receiver_not_working",   # Ear Receiver test / "Ear Speaker not Working Or Low"
+)
+
+
+def _retire_repeated_questions() -> int:
+    names = frappe.get_all(
+        "Buyback Question Bank",
+        filters={"question_code": ("in", REPEATED_QUESTION_CODES), "disabled": 0},
+        pluck="name")
+    for name in names:
+        frappe.db.set_value("Buyback Question Bank", name, "disabled", 1, update_modified=False)
+    return len(names)
+
+
 def _ensure_category(category: str) -> None:
     if not frappe.db.exists("Buyback Question Category", category):
         frappe.get_doc({
@@ -180,6 +208,10 @@ def run(retire_legacy: int = 0):
     for spec in SETS:
         set_name = _upsert_set(spec, question_names)
         print(f"✔ {set_name}: {len(spec['questions'])} questions")
+
+    repeated = _retire_repeated_questions()
+    if repeated:
+        print(f"✔ {repeated} repeated customer question(s) switched off")
 
     categorised = _categorise_legacy_questions()
     if categorised:
