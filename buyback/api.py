@@ -2980,7 +2980,15 @@ def create_assessment_from_intake(
     company = None
     if store:
         store_doc = frappe.get_doc("Warehouse", store)
-        store_doc.check_permission("read")
+        # Said in words: a bare permission error reaches the counter as
+        # "Cannot quote — Please retry." and nobody can tell what to fix.
+        if not store_doc.has_permission("read"):
+            frappe.throw(
+                _("You do not have access to the store warehouse {0}, so an assessment "
+                  "cannot be created for it. Ask an administrator to give your user "
+                  "access to this warehouse.").format(store),
+                frappe.PermissionError,
+            )
         store_name = store
         company = store_doc.company
     if not store_name and not is_privileged_user():
