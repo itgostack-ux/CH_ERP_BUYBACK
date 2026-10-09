@@ -55,6 +55,44 @@ def duplicate_assessment_message(existing, imei) -> str:
 
 
 class BuybackAssessment(Document):
+    def autoname(self):
+        """Move the numbering past every assessment already in the table.
+
+        The mobile app's service writes assessments straight into the table
+        with the next number in their names, without telling the ERP's own
+        counter. The counter then hands out a number that is taken, the
+        insert fails with a duplicate entry, the failure rolls the counter
+        back, and every later attempt fails the same way: no assessment can
+        be created from the ERP at all. Catching the counter up first lets
+        the usual naming series carry on from a free number. The name itself
+        is still left to the series.
+        """
+        from frappe.model.naming import NamingSeries
+
+        series = self.get("naming_series") or self.meta.get_field("naming_series").options
+        series = (series or "").split("\n")[0].strip()
+        if not series:
+            return
+        try:
+            prefix = NamingSeries(series).get_prefix()
+        except Exception:
+            return
+        if not prefix:
+            return
+        highest = frappe.db.sql(
+            """SELECT MAX(CAST(SUBSTRING(name, %(start)s) AS UNSIGNED))
+                 FROM `tabBuyback Assessment`
+                WHERE name LIKE %(like)s AND SUBSTRING(name, %(start)s) REGEXP '^[0-9]+$'""",
+            {"start": len(prefix) + 1, "like": prefix.replace("%", "\\%").replace("_", "\\_") + "%"},
+        )[0][0]
+        if not highest:
+            return
+        frappe.db.sql(
+            """INSERT INTO `tabSeries` (`name`, `current`) VALUES (%s, %s)
+               ON DUPLICATE KEY UPDATE `current` = GREATEST(`current`, VALUES(`current`))""",
+            (prefix, int(highest)),
+        )
+
     def before_insert(self):
         self.assessment_id = next_numeric_external_id(
             "Buyback Assessment", "assessment_id"

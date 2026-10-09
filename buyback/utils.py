@@ -16,8 +16,8 @@ _PRIVILEGED_ROLE = "System Manager"
 
 # Buyback action fields that resolve through Buyback Settings.  This is a NAME
 # registry only -- unknown field names fail closed.  The roles themselves live
-# in the DB (Table MultiSelect -> CH Role Link); an empty list means DENY, and
-# no shipped default can override what an administrator configured.
+# in Buyback Settings; what an administrator configured there always wins.
+# An action nobody has configured falls back to DEFAULT_ACTION_ROLES below.
 ROLE_SETTING_FIELDS: frozenset[str] = frozenset({
     "app_access_roles",
     "approval_alert_roles",
@@ -42,6 +42,42 @@ ROLE_SETTING_FIELDS: frozenset[str] = frozenset({
     "scorecard_roles",
     "sla_alert_roles",
 })
+
+
+# Who may do each counter action when Buyback Settings does not say.
+#
+# These settings are retired on the form (hidden, "now enforced by Role
+# Permission Manager"), but the gates that read them were left in place and
+# an empty one denies everyone except a System Manager.  The result was a
+# store that could only take a trade-in by making its staff administrators of
+# the whole ERP.  The roles here are the buyback and counter roles that
+# already hold the matching document permissions, so the gate agrees with
+# Role Permission Manager instead of overruling it; the further a step is
+# from the counter (money, bypasses, refurbishment), the shorter its list.
+# A value stored in Buyback Settings still replaces its line.
+_COUNTER_ROLES = (
+    "Buyback Agent", "Buyback Store Manager", "Buyback Manager", "Buyback Admin",
+    "POS User", "Store Manager",
+)
+_STORE_LEAD_ROLES = ("Buyback Store Manager", "Buyback Manager", "Buyback Admin", "Store Manager")
+_BUYBACK_LEAD_ROLES = ("Buyback Manager", "Buyback Admin")
+DEFAULT_ACTION_ROLES: dict[str, tuple[str, ...]] = {
+    "assessment_operation_roles": _COUNTER_ROLES,
+    "inspection_operation_roles": _COUNTER_ROLES,
+    "order_operation_roles": _COUNTER_ROLES,
+    "imei_validation_roles": _COUNTER_ROLES,
+    "imei_history_roles": _COUNTER_ROLES,
+    "customer_lookup_roles": _COUNTER_ROLES,
+    "pickup_request_roles": _COUNTER_ROLES,
+    "payment_operation_roles": _STORE_LEAD_ROLES,
+    "exchange_creation_roles": _STORE_LEAD_ROLES,
+    "refurbishment_creation_roles": _STORE_LEAD_ROLES,
+    "refurbishment_operation_roles": _STORE_LEAD_ROLES,
+    "refurbishment_restock_roles": _STORE_LEAD_ROLES,
+    "otp_bypass_roles": _BUYBACK_LEAD_ROLES,
+    "dashboard_roles": _BUYBACK_LEAD_ROLES,
+    "scorecard_roles": _BUYBACK_LEAD_ROLES,
+}
 
 
 _NUMERIC_EXTERNAL_ID_SERIES = {
@@ -265,7 +301,8 @@ def has_configured_role(fieldname: str, *, user: str | None = None) -> bool:
         return True
     if fieldname not in ROLE_SETTING_FIELDS:
         return False          # unknown action fields fail closed
-    return bool(set(frappe.get_roles(user)).intersection(get_role_setting(fieldname)))
+    allowed = get_role_setting(fieldname, DEFAULT_ACTION_ROLES.get(fieldname, ()))
+    return bool(set(frappe.get_roles(user)).intersection(allowed))
 
 
 def has_app_permission(user: str | None = None) -> bool:
