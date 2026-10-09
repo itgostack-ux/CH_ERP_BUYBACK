@@ -171,7 +171,10 @@ frappe.ui.form.on("Buyback Assessment", {
 		// Render reference price cards
 		buyback_render_price_cards(frm);
 
-		// Auto-load tests/questions on refresh if item is set but tables are empty
+		// Auto-load tests/questions on refresh if item is set but tables are empty.
+		// Listing them is not an edit: a form opened and left alone must not
+		// read "Not Saved" (see buyback_keep_clean).
+		frm._bb_clean_at_load = !frm.is_dirty();
 		if (frm.doc.item && frm.doc.status === "Draft" && !frm.doc.is_phone_dead) {
 			buyback_load_diagnostic_tests(frm);
 			buyback_load_customer_questions(frm);
@@ -185,6 +188,8 @@ frappe.ui.form.on("Buyback Assessment", {
 		frm.clear_table("diagnostic_tests");
 		frm.refresh_field("diagnostic_tests");
 		BUYBACK_ANSWER_TABLES.forEach(t => { frm.clear_table(t); frm.refresh_field(t); });
+		// A different device has different tests and questions: this is an edit.
+		frm._bb_clean_at_load = false;
 
 		buyback_render_price_cards(frm);
 		buyback_load_diagnostic_tests(frm);
@@ -456,19 +461,20 @@ function buyback_load_diagnostic_tests(frm) {
 
 			// API-created and previously saved assessments already contain rows.
 			// Rehydrate option metadata so their stored value/label is preselected.
-			if (existing_rows.length) {
-				existing_rows.forEach(row => {
-					const test = tests_by_name[row.test];
-					if (test) _buyback_set_diagnostic_option_maps(row, test.options);
-				});
+			existing_rows.forEach(row => {
+				const test = tests_by_name[row.test];
+				if (test) _buyback_set_diagnostic_option_maps(row, test.options);
+			});
+			// A submitted assessment is shown as it was answered, nothing added.
+			if (frm.doc.docstatus) {
 				_buyback_render_diagnostic_radios(frm);
 				return;
 			}
 
-			// Clear existing empty rows
-			frm.clear_table("diagnostic_tests");
-
-			r.message.forEach(test => {
+			// Offer the tests it has no row for yet. Unanswered ones are
+			// optional and are not kept when the assessment is saved.
+			const listed = new Set(existing_rows.map(row => row.test));
+			r.message.filter(test => !listed.has(test.name)).forEach(test => {
 				const row = frm.add_child("diagnostic_tests");
 				row.test = test.name;
 				row.test_code = test.test_code;
@@ -487,11 +493,7 @@ function buyback_load_diagnostic_tests(frm) {
 				);
 			}
 			_buyback_render_diagnostic_radios(frm);
-
-			frappe.show_alert({
-				message: __("{0} diagnostic tests loaded", [r.message.length]),
-				indicator: "blue",
-			});
+			buyback_keep_clean(frm);
 		},
 	});
 }
@@ -657,6 +659,15 @@ function _buyback_table_for(purpose) {
 	return "responses";
 }
 
+/** Listing the tests and questions on open is not an edit: put the form back
+ *  to "saved" if that is how it was opened. Anything the user then changes
+ *  marks it unsaved again in the usual way. */
+function buyback_keep_clean(frm) {
+	if (!frm._bb_clean_at_load || frm.is_new()) return;
+	frm.doc.__unsaved = 0;
+	frm.toolbar && frm.toolbar.refresh();
+}
+
 function _buyback_all_answer_rows(frm) {
 	return BUYBACK_ANSWER_TABLES.reduce(
 		(rows, table) => rows.concat(frm.doc[table] || []), []
@@ -680,12 +691,15 @@ function buyback_load_customer_questions(frm) {
 
 			// Saved assessments already have rows. Rehydrate their configured
 			// options so the inline radios can be rendered after every refresh.
-			if (existing_rows.length) {
-				existing_rows.forEach(row => {
-					const question = questions_by_name[row.question];
-					if (question) _buyback_set_response_option_maps(row, question.options);
-				});
+			existing_rows.forEach(row => {
+				const question = questions_by_name[row.question];
+				if (question) _buyback_set_response_option_maps(row, question.options);
+			});
+			// Once any question has a row the list is the assessment's own: it
+			// is shown as answered, and never topped up behind the user's back.
+			if (existing_rows.length || frm.doc.docstatus) {
 				_buyback_render_response_radios(frm);
+				buyback_keep_clean(frm);
 				return;
 			}
 
@@ -706,11 +720,7 @@ function buyback_load_customer_questions(frm) {
 			BUYBACK_ANSWER_TABLES.forEach(t => frm.refresh_field(t));
 
 			_buyback_render_response_radios(frm);
-
-			frappe.show_alert({
-				message: __("{0} customer questions loaded", [r.message.length]),
-				indicator: "blue",
-			});
+			buyback_keep_clean(frm);
 		},
 	});
 }

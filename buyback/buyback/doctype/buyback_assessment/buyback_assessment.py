@@ -30,8 +30,10 @@ ACTIVE_ASSESSMENT_STATUSES = ("Draft", "Submitted", "In Progress", "Inspected", 
 
 def active_assessment_for_imei(imei, exclude=None):
     """The open assessment already raised for this IMEI/serial, if there is
-    one — a phone can only be in one buyback at a time. Asked the moment an
-    IMEI is entered, and again when an assessment is saved."""
+    one. A second assessment for the same phone is allowed — a customer may
+    be quoted more than once — so this is told to the person entering the
+    IMEI as information, not used to refuse them. Buying the phone twice is
+    what is refused, on the Buyback Order."""
     imei = (imei or "").strip()
     if not imei:
         return None
@@ -48,9 +50,8 @@ def active_assessment_for_imei(imei, exclude=None):
 
 
 def duplicate_assessment_message(existing, imei) -> str:
-    return _("An active buyback assessment ({0}, status: {1}) already exists for "
-             "IMEI/Serial {2}. Please complete or cancel it before creating a new one."
-             ).format(existing.name, existing.status, imei)
+    return _("Another buyback assessment ({0}, status: {1}) is already open for "
+             "IMEI/Serial {2}.").format(existing.name, existing.status, imei)
 
 
 class BuybackAssessment(Document):
@@ -81,12 +82,12 @@ class BuybackAssessment(Document):
         super()._validate_links()
 
     def validate(self):
+        self._drop_unanswered_diagnostic_tests()
         self._ensure_mobile_no()
         if self.mobile_no:
             self.mobile_no = validate_indian_phone(self.mobile_no, "Mobile No")
         update_customer_mobile_if_missing(self.customer, self.mobile_no)
         self._check_imei_blacklist()
-        self._check_duplicate_active_assessment()
         self._resolve_customer_from_mobile()
         sync_customer_identity(self)
         self._auto_fill_item_details()
@@ -141,6 +142,15 @@ class BuybackAssessment(Document):
             self.estimated_grade = frappe.db.get_value(
                 "Grade Master", {"grade_name": "A"}, "name"
             )
+
+    def _drop_unanswered_diagnostic_tests(self):
+        """Diagnostic tests are optional. The form lists every test for the
+        device so any of them can be answered; the ones left without a result
+        say nothing about the phone, so they are not kept — they would only
+        read as tests that were run."""
+        answered = [d for d in (self.diagnostic_tests or []) if str(d.result or "").strip()]
+        if len(answered) != len(self.diagnostic_tests or []):
+            self.set("diagnostic_tests", answered)
 
     def _heal_rows_written_outside_erp(self):
         """Put right what a row written straight into the table gets wrong.
@@ -217,21 +227,6 @@ class BuybackAssessment(Document):
         )
         if cust:
             self.mobile_no = cust.mobile_no or cust.ch_alternate_phone or cust.ch_whatsapp_number
-
-    def _check_duplicate_active_assessment(self):
-        """BB-1 fix: Prevent duplicate active buyback assessments for the same IMEI/serial."""
-        if not self.imei_serial:
-            return
-        # Internal lifecycle transitions (e.g. mark_expired, cancel_assessment) must be able
-        # to save even when another active assessment exists for the same IMEI.
-        if self.flags.get("skip_duplicate_check"):
-            return
-        existing = active_assessment_for_imei(self.imei_serial, exclude=self.name)
-        if existing:
-            frappe.throw(
-                duplicate_assessment_message(existing, self.imei_serial),
-                title=_("Duplicate Assessment"),
-            )
 
     # ------------------------------------------------------------------
     # Business helpers
