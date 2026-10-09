@@ -29,3 +29,4 @@ buyback.patches.v04_assessment_real_submit
 buyback.patches.v04_backfill_ceir_imei_blacklist
 buyback.patches.v04_rename_source_web_to_app
 buyback.patches.v04_fix_diagnostic_test_yes_no_vocabulary
+buyback.patches.v04_assessment_grade_letter_to_master

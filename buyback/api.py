@@ -3105,6 +3105,54 @@ def lookup_imei_for_intake(imei: str) -> dict:
     imei = (imei or "").strip()
     if not imei:
         return {"origin": "unknown"}
+    out = _lookup_imei_for_intake(imei)
+    # Said now, while the IMEI is being typed, not when the assessment is saved.
+    out["active_assessment"] = _active_assessment_note(imei)
+    return out
+
+
+def _active_assessment_note(imei: str) -> dict | None:
+    from buyback.buyback.doctype.buyback_assessment.buyback_assessment import (
+        active_assessment_for_imei,
+        duplicate_assessment_message,
+    )
+
+    existing = active_assessment_for_imei(imei)
+    if not existing:
+        return None
+    return {
+        "name": existing.name,
+        "status": existing.status,
+        "customer_name": existing.customer_name,
+        "mobile_no": existing.mobile_no,
+        "raised_on": existing.creation,
+        "message": duplicate_assessment_message(existing, imei),
+    }
+
+
+@frappe.whitelist()
+def check_imei_available(imei: str) -> dict:
+    """Whether a new buyback assessment may be raised for this IMEI/serial.
+
+    For the mobile app to call as soon as the IMEI is entered: a phone that
+    already has an open assessment is refused here, with the assessment named,
+    instead of being discovered when somebody tries to submit the second one.
+
+    Returns:
+        dict: available (bool); when it is not, message plus the open
+        assessment's name, status, customer and date.
+    """
+    frappe.has_permission("Buyback Assessment", ptype="read", throw=True)
+    imei = (imei or "").strip()
+    if not imei:
+        frappe.throw(_("IMEI/Serial is required."))
+    existing = _active_assessment_note(imei)
+    if not existing:
+        return {"available": True, "imei": imei}
+    return {"available": False, "imei": imei, **existing}
+
+
+def _lookup_imei_for_intake(imei: str) -> dict:
 
     sn = frappe.db.get_value(
         "Serial No", imei,

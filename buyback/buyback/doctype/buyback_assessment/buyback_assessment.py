@@ -14,6 +14,45 @@ from buyback.utils import (
 )
 
 
+def resolve_grade(grade):
+    """The Grade Master a grade refers to, whether it was given as the
+    master's ID or as its letter. Anything unrecognised is returned as it
+    came, so the usual "could not find" still names the bad value."""
+    grade = (grade or "").strip()
+    if not grade or frappe.db.exists("Grade Master", grade):
+        return grade
+    return frappe.db.get_value("Grade Master", {"grade_name": grade}, "name") or grade
+
+
+#: An assessment in one of these is still open: the phone is spoken for.
+ACTIVE_ASSESSMENT_STATUSES = ("Draft", "Submitted", "In Progress", "Inspected", "Quoted")
+
+
+def active_assessment_for_imei(imei, exclude=None):
+    """The open assessment already raised for this IMEI/serial, if there is
+    one — a phone can only be in one buyback at a time. Asked the moment an
+    IMEI is entered, and again when an assessment is saved."""
+    imei = (imei or "").strip()
+    if not imei:
+        return None
+    return frappe.db.get_value(
+        "Buyback Assessment",
+        {
+            "imei_serial": imei,
+            "status": ("in", ACTIVE_ASSESSMENT_STATUSES),
+            "name": ("!=", exclude or ""),
+        },
+        ["name", "status", "customer_name", "mobile_no", "creation"],
+        as_dict=True, order_by="creation desc",
+    )
+
+
+def duplicate_assessment_message(existing, imei) -> str:
+    return _("An active buyback assessment ({0}, status: {1}) already exists for "
+             "IMEI/Serial {2}. Please complete or cancel it before creating a new one."
+             ).format(existing.name, existing.status, imei)
+
+
 class BuybackAssessment(Document):
     def before_insert(self):
         self.assessment_id = next_numeric_external_id(
@@ -34,6 +73,12 @@ class BuybackAssessment(Document):
             self.status = "Submitted"
         if not self.quoted_price:
             self.quoted_price = self.estimated_price
+
+    def _validate_links(self):
+        # Frappe checks links before any validate hook runs, so a row has to
+        # be put right here to be saved or submitted at all.
+        self._heal_rows_written_outside_erp()
+        super()._validate_links()
 
     def validate(self):
         self._ensure_mobile_no()
@@ -96,6 +141,23 @@ class BuybackAssessment(Document):
             self.estimated_grade = frappe.db.get_value(
                 "Grade Master", {"grade_name": "A"}, "name"
             )
+
+    def _heal_rows_written_outside_erp(self):
+        """Put right what a row written straight into the table gets wrong.
+
+        The mobile app's service writes assessments without going through
+        this document, so nothing here ran for them: the grade arrives as its
+        letter ("E") where the field links to a Grade Master ("GRD-00005"),
+        and the quote has no expiry. Left alone, the first save or submit in
+        the ERP is refused with "Could not find Estimated Grade: E". Called
+        ahead of the link check, so the row is corrected instead of refused.
+        """
+        self.estimated_grade = resolve_grade(self.estimated_grade)
+        if not self.expires_on:
+            validity_days = (
+                frappe.db.get_single_value("Buyback Settings", "quote_validity_days") or 7
+            )
+            self.expires_on = add_days(nowdate(), validity_days)
 
     def before_save(self):
         if self.is_new():
@@ -164,22 +226,10 @@ class BuybackAssessment(Document):
         # to save even when another active assessment exists for the same IMEI.
         if self.flags.get("skip_duplicate_check"):
             return
-        active_statuses = ("Draft", "Submitted", "In Progress", "Inspected", "Quoted")
-        existing = frappe.db.get_value(
-            "Buyback Assessment",
-            {
-                "imei_serial": self.imei_serial,
-                "status": ("in", active_statuses),
-                "name": ("!=", self.name or ""),
-            },
-            ["name", "status"],
-            as_dict=True,
-        )
+        existing = active_assessment_for_imei(self.imei_serial, exclude=self.name)
         if existing:
             frappe.throw(
-                _("An active buyback assessment ({0}, status: {1}) already exists for "
-                  "IMEI/Serial {2}. Please complete or cancel it before creating a new one."
-                ).format(existing.name, existing.status, self.imei_serial),
+                duplicate_assessment_message(existing, self.imei_serial),
                 title=_("Duplicate Assessment"),
             )
 
