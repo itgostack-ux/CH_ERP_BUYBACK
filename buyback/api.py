@@ -3210,6 +3210,114 @@ def _lookup_imei_for_intake(imei: str) -> dict:
     return out
 
 
+def _device_specs(item_code: str) -> dict:
+    """Model, RAM, storage and colour of an item, for the intake screen.
+
+    The model is the catalogue model's own name (CH Model), falling back to
+    the template the item is a variant of; RAM, storage and colour are the
+    item's variant attributes. Anything the item does not carry is left out:
+    Apple items, for one, record no RAM.
+    """
+    item = frappe.db.get_value("Item", item_code, ["ch_model", "variant_of"], as_dict=True) or {}
+    model = None
+    if item.get("ch_model") and frappe.db.has_column("CH Model", "model_name"):
+        model = frappe.db.get_value("CH Model", item.ch_model, "model_name")
+    attributes = dict(frappe.db.sql(
+        """SELECT attribute, attribute_value FROM `tabItem Variant Attribute`
+            WHERE parent = %s AND parenttype = 'Item'
+              AND attribute IN ('RAM', 'Storage', 'Colour')""",
+        (item_code,)))
+    return {
+        "model": model or item.get("variant_of") or "",
+        "ram": attributes.get("RAM") or "",
+        "storage": attributes.get("Storage") or "",
+        "colour": attributes.get("Colour") or "",
+    }
+
+
+# Model first, then RAM, Storage and Colour: the intake screen narrows a model
+# down to the one item by its variant attributes, in this order.
+_PICKER_DIMENSIONS = (("ram", "RAM"), ("storage", "Storage"), ("colour", "Colour"))
+
+
+@frappe.whitelist()
+def search_device_models(search_text: str | None = None, limit: int | str = 10) -> list[dict]:
+    """Models (variant templates) matching `search_text` that have at least one
+    variant with a buyback price — a model with nothing priced cannot be quoted,
+    so it is not offered."""
+    _require_app_read(_("search Buyback items"), "Item")
+    term = (search_text or "").strip()
+    if len(term) < 2:
+        return []
+    # Every word must appear, in any order: "Samsung S22" finds "Samsung
+    # Galaxy S22", which a single LIKE on the whole phrase does not.
+    words = [w for w in term.split() if w][:6]
+    match = " AND ".join(f"t.item_name LIKE %(w{i})s" for i in range(len(words)))
+    values = {f"w{i}": f"%{w}%" for i, w in enumerate(words)}
+    values["limit"] = min(max(int(limit or 10), 1), 30)
+    # Mobiles only: phones are what is bought back, and without this a search
+    # for a phone's name also lists its cases and spare parts.
+    return frappe.db.sql(
+        f"""
+        SELECT t.name AS model, t.item_name AS model_name, t.brand
+          FROM `tabItem` t
+         WHERE t.has_variants = 1 AND t.disabled = 0 AND t.item_group = 'Mobiles'
+           AND {match}
+           AND EXISTS (SELECT 1 FROM `tabItem` v
+                         JOIN `tabBuyback Price Master` b ON b.item_code = v.name
+                        WHERE v.variant_of = t.name AND v.disabled = 0)
+         ORDER BY t.item_name
+         LIMIT %(limit)s
+        """,
+        values,
+        as_dict=True,
+    )
+
+
+@frappe.whitelist()
+def get_device_variants(model: str | None = None, item_code: str | None = None) -> dict:
+    """The priced variants of a model, each with its RAM, Storage and Colour.
+
+    Given an `item_code` instead (a device identified by its IMEI), its model is
+    looked up and its own RAM, Storage and Colour come back as `selected`, so the
+    screen can show that item already chosen.
+    """
+    _require_app_read(_("search Buyback items"), "Item")
+    if item_code and not model:
+        model = frappe.db.get_value("Item", item_code, "variant_of")
+    if not model:
+        return {"model": None, "variants": []}
+    template = frappe.db.get_value("Item", model, ["item_name", "brand"], as_dict=True) or {}
+    rows = frappe.db.sql(
+        """
+        SELECT v.name AS item_code, v.item_name, v.brand
+          FROM `tabItem` v
+          JOIN `tabBuyback Price Master` b ON b.item_code = v.name
+         WHERE v.variant_of = %s AND v.disabled = 0
+         ORDER BY v.item_name
+        """,
+        (model,), as_dict=True,
+    )
+    names = [r.item_code for r in rows] or [""]
+    attrs = {}
+    for parent, attribute, value in frappe.db.sql(
+            """SELECT parent, attribute, attribute_value FROM `tabItem Variant Attribute`
+                WHERE parenttype = 'Item' AND parent IN %s""", (tuple(names),)):
+        attrs.setdefault(parent, {})[attribute] = value
+    variants = []
+    for r in rows:
+        own = attrs.get(r.item_code, {})
+        variants.append({**r, **{key: own.get(label) or "" for key, label in _PICKER_DIMENSIONS}})
+    selected = next((v for v in variants if v["item_code"] == item_code), None)
+    return {
+        "model": model,
+        "model_name": template.get("item_name") or model,
+        "brand": template.get("brand") or "",
+        "variants": variants,
+        "selected": {key: selected[key] for key, _label in _PICKER_DIMENSIONS} if selected else None,
+    }
+
+
 @frappe.whitelist()
 def check_device_quotable(
     item_code: str,
@@ -3246,6 +3354,7 @@ def check_device_quotable(
         "quotable": True,
         "price_master": bpm.name,
         "market_price": flt(bpm.current_market_price),
+        "device": _device_specs(item_code),
     }
     if warranty_status and device_age_months:
         from buyback.buyback.pricing.engine import (
@@ -3277,6 +3386,10 @@ def check_device_quotable(
                     "before starting the assessment."
                 ).format(", ".join(missing), item_code, band, bpm.name),
             }
+        # The best this device can fetch in its band: the Grade A cell, shown
+        # beside the market reference as soon as warranty and age are chosen.
+        result["band"] = _BUCKET_LABELS.get(bucket, bucket)
+        result["grade_a_price"] = flt(prices.get(f"a_grade_{bucket}"))
     return result
 
 
